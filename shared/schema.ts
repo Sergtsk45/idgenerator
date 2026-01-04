@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -10,7 +10,7 @@ export const works = pgTable("works", {
   code: text("code").notNull(), // Code from BoQ
   description: text("description").notNull(), // Work description
   unit: text("unit").notNull(), // Unit of measurement
-  quantityTotal: integer("quantity_total"), // Total planned quantity
+  quantityTotal: numeric("quantity_total", { precision: 20, scale: 4 }), // Total planned quantity (numeric for floats)
   synonyms: jsonb("synonyms").$type<string[]>(), // Normalized synonyms for matching
 });
 

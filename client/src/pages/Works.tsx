@@ -93,7 +93,7 @@ export default function Works() {
               code: String(code),
               description: String(description),
               unit: String(unit || ""),
-              quantityTotal: Number(quantityTotal) || 0,
+              quantityTotal: String(quantityTotal || "0"),
               synonyms: [],
             });
             successCount++;
