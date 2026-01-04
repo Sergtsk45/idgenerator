@@ -41,7 +41,7 @@ export default function Works() {
     try {
       await createWork.mutateAsync({
         ...formData,
-        quantityTotal: parseInt(formData.quantityTotal) || 0,
+        quantityTotal: formData.quantityTotal || "0",
         synonyms: [], // Empty for now
       });
       setIsDialogOpen(false);

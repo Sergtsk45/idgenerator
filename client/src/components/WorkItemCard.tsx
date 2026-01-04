@@ -26,7 +26,7 @@ export function WorkItemCard({ work, onClick }: WorkItemCardProps) {
             <h3 className="font-semibold text-sm leading-tight text-balance">{work.description}</h3>
           </div>
           <div className="text-right shrink-0">
-            <span className="text-sm font-bold block">{work.quantityTotal}</span>
+            <span className="text-sm font-bold block">{Number(work.quantityTotal || 0).toLocaleString()}</span>
             <span className="text-xs text-muted-foreground">{work.unit}</span>
           </div>
         </div>
