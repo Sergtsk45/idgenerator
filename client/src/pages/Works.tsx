@@ -89,22 +89,35 @@ export default function Works() {
 
           let successCount = 0;
           for (const row of jsonRaw) {
-            // Mapping based on the provided 7-column BoQ format (ВОР)
-            // Column 1 (№): row[0]
-            // Column 3 (Наименование работ): row[2]
-            // Column 4 (Ед. изм.): row[3]
-            // Column 5 (Кол-во): row[4]
-
+            // row is an array of cells [ №, ??, Наименование, Ед. изм., Кол-во, ... ]
             const code = row[0];
             const description = row[2];
             const unit = row[3];
             const quantityTotal = row[4];
 
-            const numericCode = Number(code);
-            // Check if code is present and description is present
-            // We allow non-numeric codes if they look like strings but prioritize numeric ones
-            // Actually, the user's logic was to check !isNaN(Number(code))
-            if (code && description && !isNaN(numericCode)) {
+            // 1. Skip if row is empty or not an array
+            if (!Array.isArray(row) || row.length < 3) continue;
+
+            // 2. Skip technical header rows (like "1", "2", "3", "4", "5" which are column numbers)
+            // A technical row usually has code "1" and description "2" or similar
+            if (String(code).trim() === "1" && (String(description).trim() === "3" || String(row[1]).trim() === "2")) continue;
+
+            // 3. Skip section headers
+            // Section headers usually have a description but NO unit and NO quantity
+            const hasDescription = description && String(description).trim().length > 0;
+            const hasUnit = unit && String(unit).trim().length > 0;
+            const hasQuantity = quantityTotal !== undefined && quantityTotal !== null && String(quantityTotal).trim().length > 0;
+
+            // If it's a section header (starts with "Раздел" or just has description without data)
+            if (hasDescription && !hasUnit && !hasQuantity) {
+              console.log("Skipping section header:", description);
+              continue;
+            }
+
+            // 4. Validate and import work item
+            // Code must be present and numeric-ish (e.g. "1", "1.1", "3.2.1")
+            const numericCode = parseFloat(String(code));
+            if (code && hasDescription && hasUnit && !isNaN(numericCode)) {
               await createWork.mutateAsync({
                 code: String(code),
                 description: String(description),
