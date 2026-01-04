@@ -89,44 +89,45 @@ export default function Works() {
 
           let successCount = 0;
           for (const row of jsonRaw) {
-            // row is an array of cells [ №, ??, Наименование, Ед. изм., Кол-во, ... ]
-            const code = row[0];
+            // Skip empty rows or rows with less than 5 columns
+            if (!Array.isArray(row) || row.length < 5) continue;
+
+            // Actual Excel structure (based on file analysis):
+            // Column 0: № п/п (empty for work items)
+            // Column 1: № в ЛСР (work code like "1", "3", "4")
+            // Column 2: Наименование работ (description)
+            // Column 3: Ед. изм. (unit)
+            // Column 4: Кол-во (quantity)
+            const code = row[1]; // № в ЛСР is in column 1
             const description = row[2];
             const unit = row[3];
             const quantityTotal = row[4];
 
-            // 1. Skip if row is empty or not an array
-            if (!Array.isArray(row) || row.length < 3) continue;
-
-            // 2. Skip technical header rows (like "1", "2", "3", "4", "5" which are column numbers)
-            // A technical row usually has code "1" and description "2" or similar
-            if (String(code).trim() === "1" && (String(description).trim() === "3" || String(row[1]).trim() === "2")) continue;
-
-            // 3. Skip section headers
-            // Section headers usually have a description but NO unit and NO quantity
-            const hasDescription = description && String(description).trim().length > 0;
-            const hasUnit = unit && String(unit).trim().length > 0;
-            const hasQuantity = quantityTotal !== undefined && quantityTotal !== null && String(quantityTotal).trim().length > 0;
-
-            // If it's a section header (starts with "Раздел" or just has description without data)
-            if (hasDescription && !hasUnit && !hasQuantity) {
-              console.log("Skipping section header:", description);
+            // Skip technical header row (contains column numbers like 1, 2, 3, 4, 5)
+            if (row[0] === 1 && row[1] === 2 && row[2] === 3) {
               continue;
             }
 
-            // 4. Validate and import work item
-            // Code must be present and numeric-ish (e.g. "1", "1.1", "3.2.1")
+            // Skip rows where code is null/undefined or not a valid work code
+            if (code === null || code === undefined) continue;
+
+            // Skip rows where code is not numeric (section headers usually have text in other columns)
             const numericCode = parseFloat(String(code));
-            if (code && hasDescription && hasUnit && !isNaN(numericCode)) {
-              await createWork.mutateAsync({
-                code: String(code),
-                description: String(description),
-                unit: String(unit || ""),
-                quantityTotal: String(quantityTotal || "0"),
-                synonyms: [],
-              });
-              successCount++;
-            }
+            if (isNaN(numericCode)) continue;
+
+            // Skip rows without description
+            const hasDescription = description && String(description).trim().length > 0;
+            if (!hasDescription) continue;
+
+            // Import valid work item
+            await createWork.mutateAsync({
+              code: String(code),
+              description: String(description),
+              unit: String(unit || ""),
+              quantityTotal: String(quantityTotal || "0"),
+              synonyms: [],
+            });
+            successCount++;
           }
 
           console.log("Import finished. Success count:", successCount);
