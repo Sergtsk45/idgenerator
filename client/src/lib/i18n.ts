@@ -25,6 +25,7 @@ export const translations = {
     nav: {
       home: 'Home',
       works: 'Works',
+      worklog: 'Work Log',
       acts: 'Acts',
       settings: 'Settings'
     },
@@ -53,6 +54,24 @@ export const translations = {
       location: 'Location',
       view: 'View'
     },
+    worklog: {
+      title: 'General Work Log',
+      subtitle: 'Section 5 - Construction Control',
+      rowNumber: 'No.',
+      date: 'Date',
+      workDescription: 'Work Description',
+      quantity: 'Qty',
+      unit: 'Unit',
+      location: 'Location',
+      notes: 'Notes',
+      noRecords: 'No work records yet',
+      noRecordsHint: 'Send work messages to populate this log',
+      status: 'Status',
+      processed: 'Processed',
+      pending: 'Pending',
+      exportPdf: 'Export PDF',
+      rdStandard: 'RD-11-05-2007'
+    },
     settings: {
       title: 'Settings',
       language: 'Language',
@@ -64,6 +83,7 @@ export const translations = {
     nav: {
       home: 'Главная',
       works: 'ВОИР',
+      worklog: 'ЖР',
       acts: 'Акты',
       settings: 'Настройки'
     },
@@ -91,6 +111,24 @@ export const translations = {
       status: 'Статус',
       location: 'Участок',
       view: 'Открыть'
+    },
+    worklog: {
+      title: 'Общий журнал работ',
+      subtitle: 'Раздел 5 - Строительный контроль',
+      rowNumber: '№',
+      date: 'Дата',
+      workDescription: 'Наименование работ',
+      quantity: 'Кол-во',
+      unit: 'Ед. изм.',
+      location: 'Участок',
+      notes: 'Примечание',
+      noRecords: 'Записи отсутствуют',
+      noRecordsHint: 'Отправляйте сообщения о работах для заполнения журнала',
+      status: 'Статус',
+      processed: 'Обработано',
+      pending: 'В обработке',
+      exportPdf: 'Экспорт PDF',
+      rdStandard: 'РД-11-05-2007'
     },
     settings: {
       title: 'Настройки',
