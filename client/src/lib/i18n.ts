@@ -39,9 +39,10 @@ export const translations = {
     works: {
       title: 'Bill of Quantities',
       code: 'Code',
-      description: 'Description',
+      description: 'Work Description',
       unit: 'Unit',
-      quantity: 'Total Quantity',
+      quantity: 'Qty',
+      rowNumber: 'No.',
       importExcel: 'Import Excel',
       importSuccess: 'Imported {count} items successfully',
       importError: 'Failed to import Excel'
@@ -89,7 +90,7 @@ export const translations = {
   ru: {
     nav: {
       home: 'Главная',
-      works: 'ВОИР',
+      works: 'ВОР',
       worklog: 'ЖР',
       acts: 'Акты',
       settings: 'Настройки'
@@ -102,11 +103,12 @@ export const translations = {
       noMessages: 'Нет сообщений. Начните с записи работы!'
     },
     works: {
-      title: 'Ведомость объемов (ВОИР)',
-      code: 'Код',
-      description: 'Описание',
+      title: 'Ведомость объемов работ',
+      code: '№ в ЛСР',
+      description: 'Наименование работ',
       unit: 'Ед. изм.',
-      quantity: 'Общий объем',
+      quantity: 'Кол-во',
+      rowNumber: '№',
       importExcel: 'Импорт Excel',
       importSuccess: 'Успешно импортировано {count} позиций',
       importError: 'Ошибка импорта Excel'

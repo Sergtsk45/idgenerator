@@ -2,7 +2,6 @@ import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Header } from "@/components/Header";
 import { useWorks, useCreateWork } from "@/hooks/use-works";
-import { WorkItemCard } from "@/components/WorkItemCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -16,8 +15,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Loader2, FileUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
 import { useLanguageStore, translations } from "@/lib/i18n";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
 
 export default function Works() {
@@ -42,13 +41,13 @@ export default function Works() {
       await createWork.mutateAsync({
         ...formData,
         quantityTotal: formData.quantityTotal || "0",
-        synonyms: [], // Empty for now
+        synonyms: [],
       });
       setIsDialogOpen(false);
       setFormData({ code: "", description: "", unit: "m3", quantityTotal: "" });
       toast({ 
         title: language === 'ru' ? "Успех" : "Success", 
-        description: language === 'ru' ? "Работа добавлена в ВОИР" : "Work item added to BoQ" 
+        description: language === 'ru' ? "Работа добавлена в ВОР" : "Work item added to BoQ" 
       });
     } catch (error) {
       toast({ 
@@ -65,14 +64,11 @@ export default function Works() {
 
     setIsImporting(true);
     try {
-      // Clear existing works first (temporary debugging measure)
       const { apiRequest } = await import("@/lib/queryClient");
       try {
         await apiRequest("DELETE", "/api/works");
-        console.log("Successfully cleared existing works");
       } catch (clearError) {
         console.error("Failed to clear works before import:", clearError);
-        // Continue anyway
       }
 
       const reader = new FileReader();
@@ -82,44 +78,26 @@ export default function Works() {
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          // Header: 1 to get raw array of arrays
           const jsonRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-
-          console.log("Starting import of rows:", jsonRaw.length);
 
           let successCount = 0;
           for (const row of jsonRaw) {
-            // Skip empty rows or rows with less than 5 columns
             if (!Array.isArray(row) || row.length < 5) continue;
 
-            // Actual Excel structure (based on file analysis):
-            // Column 0: № п/п (empty for work items)
-            // Column 1: № в ЛСР (work code like "1", "3", "4")
-            // Column 2: Наименование работ (description)
-            // Column 3: Ед. изм. (unit)
-            // Column 4: Кол-во (quantity)
-            const code = row[1]; // № в ЛСР is in column 1
+            const code = row[1];
             const description = row[2];
             const unit = row[3];
             const quantityTotal = row[4];
 
-            // Skip technical header row (contains column numbers like 1, 2, 3, 4, 5)
-            if (row[0] === 1 && row[1] === 2 && row[2] === 3) {
-              continue;
-            }
-
-            // Skip rows where code is null/undefined or not a valid work code
+            if (row[0] === 1 && row[1] === 2 && row[2] === 3) continue;
             if (code === null || code === undefined) continue;
 
-            // Skip rows where code is not numeric (section headers usually have text in other columns)
             const numericCode = parseFloat(String(code));
             if (isNaN(numericCode)) continue;
 
-            // Skip rows without description
             const hasDescription = description && String(description).trim().length > 0;
             if (!hasDescription) continue;
 
-            // Import valid work item
             await createWork.mutateAsync({
               code: String(code),
               description: String(description),
@@ -130,15 +108,13 @@ export default function Works() {
             successCount++;
           }
 
-          console.log("Import finished. Success count:", successCount);
-
           toast({
             title: language === 'ru' ? "Импорт завершен" : "Import Complete",
             description: language === 'ru' 
               ? `Успешно импортировано ${successCount} позиций` 
               : `Successfully imported ${successCount} items`,
           });
-          event.target.value = ''; // Reset input
+          event.target.value = '';
         } catch (error) {
           console.error("Error processing file data:", error);
           toast({
@@ -167,12 +143,11 @@ export default function Works() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-background bg-grain">
+    <div className="flex flex-col min-h-screen bg-background">
       <Header title={t.title} />
       
-      <div className="flex-1 px-4 py-6 pb-24 max-w-md mx-auto w-full">
-        {/* Search & Actions */}
-        <div className="mb-6 sticky top-14 z-30 bg-background/95 backdrop-blur py-2 space-y-3">
+      <div className="flex-1 px-2 py-4 pb-24">
+        <div className="mb-4 sticky top-14 z-30 bg-background/95 backdrop-blur py-2 space-y-3 px-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
@@ -180,6 +155,7 @@ export default function Works() {
               className="pl-9 rounded-xl bg-secondary/50 border-transparent focus:bg-background transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              data-testid="input-search-works"
             />
           </div>
           
@@ -193,45 +169,76 @@ export default function Works() {
               <label className="cursor-pointer">
                 <FileUp className="h-4 w-4" />
                 {isImporting ? (language === 'ru' ? "Загрузка..." : "Importing...") : (language === 'ru' ? "Импорт Excel" : "Import Excel")}
-                <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleFileUpload} />
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls, .csv" 
+                  className="hidden" 
+                  onChange={handleFileUpload}
+                  data-testid="input-file-upload"
+                />
               </label>
             </Button>
           </div>
         </div>
 
-        {/* Content */}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">{language === 'ru' ? "Загрузка ВОИР..." : "Loading BoQ..."}</p>
+            <p className="text-sm text-muted-foreground">{language === 'ru' ? "Загрузка ВОР..." : "Loading BoQ..."}</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {filteredWorks.map((work, idx) => (
-              <motion.div
-                key={work.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-              >
-                <WorkItemCard work={work} />
-              </motion.div>
-            ))}
-            
-            {filteredWorks.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <p>{language === 'ru' ? "Работы не найдены." : "No work items found."}</p>
-              </div>
-            )}
-          </div>
+          <ScrollArea className="h-[calc(100vh-16rem)]">
+            <div className="overflow-x-auto px-2">
+              <table className="w-full border-collapse text-sm" style={{ borderColor: '#1e3a5f' }}>
+                <thead>
+                  <tr>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-2 text-center font-semibold w-12">{t.rowNumber}</th>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-2 text-center font-semibold w-16">{t.code}</th>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-2 text-center font-semibold">{t.description}</th>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-2 text-center font-semibold w-16">{t.unit}</th>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-2 text-center font-semibold w-20">{t.quantity}</th>
+                  </tr>
+                  <tr>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-1 text-center text-xs text-muted-foreground">1</th>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-1 text-center text-xs text-muted-foreground">2</th>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-1 text-center text-xs text-muted-foreground">3</th>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-1 text-center text-xs text-muted-foreground">4</th>
+                    <th className="border-2 border-[#1e3a5f] bg-background p-1 text-center text-xs text-muted-foreground">5</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredWorks.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="border-2 border-[#1e3a5f] p-8 text-center text-muted-foreground">
+                        {language === 'ru' ? "Работы не найдены. Импортируйте Excel файл для добавления работ." : "No work items found. Import an Excel file to add works."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredWorks.map((work, idx) => (
+                      <tr key={work.id} data-testid={`row-work-${work.id}`}>
+                        <td className="border-2 border-[#1e3a5f] p-2 text-center align-top">{idx + 1}</td>
+                        <td className="border-2 border-[#1e3a5f] p-2 text-center align-top">{work.code}</td>
+                        <td className="border-2 border-[#1e3a5f] p-2 align-top">{work.description}</td>
+                        <td className="border-2 border-[#1e3a5f] p-2 text-center align-top">{work.unit}</td>
+                        <td className="border-2 border-[#1e3a5f] p-2 text-right align-top">{work.quantityTotal}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </ScrollArea>
         )}
       </div>
 
-      {/* FAB to Add Work */}
       <div className="fixed bottom-20 right-4 z-40 md:right-[max(1rem,calc(50vw-220px))]">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="icon" className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95">
+            <Button 
+              size="icon" 
+              className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
+              data-testid="button-add-work"
+            >
               <Plus className="h-6 w-6" />
             </Button>
           </DialogTrigger>
@@ -248,6 +255,7 @@ export default function Works() {
                   placeholder="e.g. 3.1.2" 
                   value={formData.code}
                   onChange={e => setFormData({...formData, code: e.target.value})}
+                  data-testid="input-work-code"
                 />
               </div>
               <div className="grid gap-2">
@@ -257,6 +265,7 @@ export default function Works() {
                   placeholder="..." 
                   value={formData.description}
                   onChange={e => setFormData({...formData, description: e.target.value})}
+                  data-testid="input-work-description"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -267,6 +276,7 @@ export default function Works() {
                     placeholder="m3" 
                     value={formData.unit}
                     onChange={e => setFormData({...formData, unit: e.target.value})}
+                    data-testid="input-work-unit"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -277,6 +287,7 @@ export default function Works() {
                     placeholder="100" 
                     value={formData.quantityTotal}
                     onChange={e => setFormData({...formData, quantityTotal: e.target.value})}
+                    data-testid="input-work-quantity"
                   />
                 </div>
               </div>
@@ -285,6 +296,7 @@ export default function Works() {
               onClick={handleCreate} 
               disabled={createWork.isPending || !formData.code || !formData.description}
               className="w-full h-12 rounded-xl text-base"
+              data-testid="button-submit-work"
             >
               {createWork.isPending ? (language === 'ru' ? "Добавление..." : "Adding...") : (language === 'ru' ? "Добавить" : "Add Item")}
             </Button>
