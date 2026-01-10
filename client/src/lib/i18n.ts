@@ -76,6 +76,15 @@ export const translations = {
         endDate: 'End date of work at the capital construction facility',
         representative: 'Position (if any), surname, initials, signature of the authorized representative of the person carrying out construction, reconstruction, major repairs'
       },
+      section2: {
+        title: 'SECTION 2',
+        subtitle: 'List of special journals in which records of work performed are kept, as well as supervision journals of the person preparing the design documentation',
+        rowNumber: 'No.',
+        journalName: 'Name of the special journal (supervision journal) and date of its issue',
+        personInfo: 'Full and (or) abbreviated name or surname, first name, patronymic (if any) of the person carrying out construction, reconstruction, major repairs (the person preparing the design documentation), keeping the journal, their authorized representatives with indication of position (if any), surname, initials',
+        transferDate: 'Date of transfer to the developer or customer of the journal',
+        signature: 'Signature of the authorized representative of the developer or technical customer, person responsible for operation of the building, structure, and (or) regional operator'
+      },
       section3: {
         title: 'SECTION 3',
         subtitle: 'Information on work performed during construction, reconstruction, major repairs of capital construction facility',
@@ -151,6 +160,15 @@ export const translations = {
         startDate: 'Дата начала работ на объекте капитального строительства с указанием вида работ',
         endDate: 'Дата окончания работ на объекте капитального строительства',
         representative: 'Должность (при наличии), фамилия, инициалы, подпись уполномоченного представителя лица, осуществляющего строительство, реконструкцию, капитальный ремонт'
+      },
+      section2: {
+        title: 'РАЗДЕЛ 2',
+        subtitle: 'Перечень специальных журналов, в которых ведется учет выполнения работ, а также журналов авторского надзора лица, осуществляющего подготовку проектной документации',
+        rowNumber: '№ п/п',
+        journalName: 'Наименование специального журнала (журнала авторского надзора) и дата его выдачи',
+        personInfo: 'Полное и (или) сокращенное наименование или фамилия, имя, отчество (при наличии) лица, осуществляющего строительство, реконструкцию, капитальный ремонт (лица, осуществляющего подготовку проектной документации), ведущих журнал, их уполномоченных представителей с указанием должности (при наличии), фамилии, инициалов',
+        transferDate: 'Дата передачи застройщику или заказчику журнала',
+        signature: 'Подпись уполномоченного представителя застройщика или технического заказчика, лица, ответственного за эксплуатацию здания, сооружения, и (или) регионального оператора'
       },
       section3: {
         title: 'РАЗДЕЛ 3',
