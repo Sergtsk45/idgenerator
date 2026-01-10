@@ -476,8 +476,76 @@ export default function WorkLog() {
           </TabsContent>
 
           <TabsContent value="section5" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full px-2 py-4">
-              <PlaceholderSection title={t.tabs.section5} comingSoon={t.comingSoon} />
+            <ScrollArea className="h-full px-2 py-2">
+              <div className="max-w-6xl mx-auto">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="text-center flex-1">
+                    <h2 className="text-lg font-bold mb-2">{t.section5.title}</h2>
+                    <p className="text-sm text-muted-foreground leading-tight px-2">
+                      {t.section5.subtitle}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleRefresh}
+                    className="shrink-0 ml-2"
+                    data-testid="button-refresh-section5"
+                  >
+                    {t.refreshLog}
+                  </Button>
+                </div>
+
+                <div className="overflow-x-auto border-2 border-foreground">
+                  <table className="w-full border-collapse text-sm" data-testid="section5-table">
+                    <thead>
+                      <tr>
+                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
+                          {t.section5.rowNumber}
+                        </th>
+                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                          {t.section5.docName}
+                        </th>
+                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                          {t.section5.signatureInfo}
+                        </th>
+                      </tr>
+                      <tr>
+                        <th className="border border-foreground px-1 py-1 text-xs font-bold text-center">1</th>
+                        <th className="border border-foreground px-1 py-1 text-xs font-bold text-center">2</th>
+                        <th className="border border-foreground px-1 py-1 text-xs font-bold text-center">3</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">1</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">2</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">3</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">4</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                      </tr>
+                      <tr>
+                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">5</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </ScrollArea>
           </TabsContent>
 

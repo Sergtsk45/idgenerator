@@ -96,6 +96,13 @@ export const translations = {
         defectFixDate: 'Date of defect elimination',
         fixSignature: 'Position (if any), surname, initials, signature of authorized representative of developer or technical customer, person responsible for operation of building, structure, and (or) regional operator on construction control matters'
       },
+      section5: {
+        title: 'SECTION 5',
+        subtitle: 'List of executive documentation during construction, reconstruction, major repairs of capital construction facility',
+        rowNumber: 'No.',
+        docName: 'Name of executive documentation (indicating type of work, location of structures, sections of utility networks, etc.)',
+        signatureInfo: 'Date of signing the act, positions, surnames, initials of persons who signed the acts'
+      },
       section3: {
         title: 'SECTION 3',
         subtitle: 'Information on work performed during construction, reconstruction, major repairs of capital construction facility',
@@ -191,6 +198,13 @@ export const translations = {
         controlSignature: 'Должность (при наличии), фамилия, инициалы, подпись уполномоченного представителя застройщика или технического заказчика, лица, ответственного за эксплуатацию здания, сооружения, и (или) регионального оператора по вопросам строительного контроля',
         defectFixDate: 'Дата устранения недостатков',
         fixSignature: 'Должность (при наличии), фамилия, инициалы, подпись уполномоченного представителя застройщика или технического заказчика, лица, ответственного за эксплуатацию здания, сооружения, и(или) регионального оператора по вопросам строительного контроля'
+      },
+      section5: {
+        title: 'РАЗДЕЛ 5',
+        subtitle: 'Перечень исполнительной документации при строительстве, реконструкции, капитальном ремонте объекта капитального строительства',
+        rowNumber: '№ п/п',
+        docName: 'Наименование исполнительной документации (с указанием вида работ, места расположения конструкций, участков сетей инженерно – технического обеспечения и т.д.)',
+        signatureInfo: 'Дата подписания акта, должности, фамилии, инициалы лиц, подписавших акты'
       },
       section3: {
         title: 'РАЗДЕЛ 3',
