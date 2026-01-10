@@ -115,7 +115,12 @@ export const translations = {
       noRecords: 'No work records yet',
       noRecordsHint: 'Send work messages to populate this log',
       refreshLog: 'Refresh log',
-      comingSoon: 'Coming soon'
+      comingSoon: 'Coming soon',
+      actions: {
+        edit: 'Edit',
+        save: 'Save',
+        search: 'Search'
+      }
     },
     settings: {
       title: 'Settings',
@@ -218,7 +223,12 @@ export const translations = {
       noRecords: 'Записи отсутствуют',
       noRecordsHint: 'Отправляйте сообщения о работах для заполнения журнала',
       refreshLog: 'Обновить журнал',
-      comingSoon: 'В разработке'
+      comingSoon: 'В разработке',
+      actions: {
+        edit: 'Редактировать',
+        save: 'Сохранить',
+        search: 'Поиск'
+      }
     },
     settings: {
       title: 'Настройки',

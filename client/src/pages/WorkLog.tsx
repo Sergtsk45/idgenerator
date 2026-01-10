@@ -6,7 +6,7 @@ import { useLanguageStore, translations } from "@/lib/i18n";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, FileText, RefreshCw, Construction } from "lucide-react";
+import { Loader2, FileText, RefreshCw, Construction, Pencil, Save, Search } from "lucide-react";
 import { format } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,25 @@ function PlaceholderSection({ title, comingSoon }: { title: string; comingSoon: 
       </div>
       <h3 className="font-semibold text-lg mb-1">{title}</h3>
       <p className="text-sm text-muted-foreground">{comingSoon}</p>
+    </div>
+  );
+}
+
+function SectionActionBar({ actions, sectionId }: { actions: { edit: string; save: string; search: string }; sectionId: string }) {
+  return (
+    <div className="flex gap-2 justify-center mb-4" data-testid={`action-bar-${sectionId}`}>
+      <Button variant="outline" size="sm" data-testid={`button-edit-${sectionId}`}>
+        <Pencil className="h-4 w-4 mr-1" />
+        {actions.edit}
+      </Button>
+      <Button variant="outline" size="sm" data-testid={`button-save-${sectionId}`}>
+        <Save className="h-4 w-4 mr-1" />
+        {actions.save}
+      </Button>
+      <Button variant="outline" size="sm" data-testid={`button-search-${sectionId}`}>
+        <Search className="h-4 w-4 mr-1" />
+        {actions.search}
+      </Button>
     </div>
   );
 }
@@ -115,6 +134,7 @@ export default function WorkLog() {
 
           <TabsContent value="title" className="flex-1 m-0 overflow-hidden">
             <ScrollArea className="h-full px-2 py-4">
+              <SectionActionBar actions={t.actions} sectionId="title" />
               <PlaceholderSection title={t.tabs.title} comingSoon={t.comingSoon} />
             </ScrollArea>
           </TabsContent>
@@ -128,6 +148,8 @@ export default function WorkLog() {
                     {t.section1.subtitle}
                   </p>
                 </div>
+
+                <SectionActionBar actions={t.actions} sectionId="section1" />
 
                 <div className="overflow-x-auto border-2 border-foreground">
                   <table className="w-full border-collapse text-sm" data-testid="section1-table">
@@ -203,6 +225,8 @@ export default function WorkLog() {
                   </p>
                 </div>
 
+                <SectionActionBar actions={t.actions} sectionId="section2" />
+
                 <div className="overflow-x-auto border-2 border-foreground">
                   <table className="w-full border-collapse text-sm" data-testid="section2-table">
                     <thead>
@@ -263,10 +287,16 @@ export default function WorkLog() {
           <TabsContent value="section3" className="flex-1 m-0 overflow-hidden">
             <ScrollArea className="h-full px-2 py-2">
               <div className="max-w-6xl mx-auto">
-                <div className="flex items-center justify-between mb-3 px-2">
-                  <p className="text-sm text-muted-foreground leading-tight max-w-[70%]">
+                <div className="text-center mb-2">
+                  <h2 className="text-lg font-bold mb-2">{t.section3.title}</h2>
+                  <p className="text-sm text-muted-foreground leading-tight px-2">
                     {t.section3.subtitle}
                   </p>
+                </div>
+
+                <SectionActionBar actions={t.actions} sectionId="section3" />
+
+                <div className="flex justify-end mb-3">
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -381,6 +411,8 @@ export default function WorkLog() {
                   </p>
                 </div>
 
+                <SectionActionBar actions={t.actions} sectionId="section4" />
+
                 <div className="overflow-x-auto border-2 border-foreground">
                   <table className="w-full border-collapse text-sm" data-testid="section4-table">
                     <thead>
@@ -459,23 +491,14 @@ export default function WorkLog() {
           <TabsContent value="section5" className="flex-1 m-0 overflow-hidden">
             <ScrollArea className="h-full px-2 py-2">
               <div className="max-w-6xl mx-auto">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="text-center flex-1">
-                    <h2 className="text-lg font-bold mb-2">{t.section5.title}</h2>
-                    <p className="text-sm text-muted-foreground leading-tight px-2">
-                      {t.section5.subtitle}
-                    </p>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleRefresh}
-                    className="shrink-0 ml-2"
-                    data-testid="button-refresh-section5"
-                  >
-                    {t.refreshLog}
-                  </Button>
+                <div className="text-center mb-4">
+                  <h2 className="text-lg font-bold mb-2">{t.section5.title}</h2>
+                  <p className="text-sm text-muted-foreground leading-tight px-2">
+                    {t.section5.subtitle}
+                  </p>
                 </div>
+
+                <SectionActionBar actions={t.actions} sectionId="section5" />
 
                 <div className="overflow-x-auto border-2 border-foreground">
                   <table className="w-full border-collapse text-sm" data-testid="section5-table">
@@ -532,6 +555,7 @@ export default function WorkLog() {
 
           <TabsContent value="section6" className="flex-1 m-0 overflow-hidden">
             <ScrollArea className="h-full px-2 py-4">
+              <SectionActionBar actions={t.actions} sectionId="section6" />
               <PlaceholderSection title={t.tabs.section6} comingSoon={t.comingSoon} />
             </ScrollArea>
           </TabsContent>
