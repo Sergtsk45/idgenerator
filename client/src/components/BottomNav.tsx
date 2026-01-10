@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { FileText, Mic, ListTodo, Settings } from "lucide-react";
+import { FileText, Mic, ListTodo, Settings, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguageStore, translations } from "@/lib/i18n";
 
@@ -11,6 +11,7 @@ export function BottomNav() {
   const navItems = [
     { href: "/", icon: Mic, label: t.home },
     { href: "/works", icon: ListTodo, label: t.works },
+    { href: "/worklog", icon: ClipboardList, label: t.worklog },
     { href: "/acts", icon: FileText, label: t.acts },
     { href: "/settings", icon: Settings, label: t.settings },
   ];
