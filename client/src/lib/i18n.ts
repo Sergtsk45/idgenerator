@@ -66,6 +66,16 @@ export const translations = {
         section5: 'Section 5',
         section6: 'Section 6'
       },
+      section1: {
+        title: 'SECTION 1',
+        subtitle: 'List of engineering and technical personnel of the person carrying out construction, reconstruction, major repairs, engaged in the construction, reconstruction, major repairs of the capital construction facility',
+        rowNumber: 'No.',
+        orgName: 'Full and (or) abbreviated name or surname, first name, patronymic (if any) of the person carrying out construction, reconstruction, major repairs',
+        personInfo: 'Surname, initials, position (if any) of the person included in the list of engineering and technical personnel',
+        startDate: 'Start date of work at the capital construction facility with indication of the type of work',
+        endDate: 'End date of work at the capital construction facility',
+        representative: 'Position (if any), surname, initials, signature of the authorized representative of the person carrying out construction, reconstruction, major repairs'
+      },
       section3: {
         title: 'SECTION 3',
         subtitle: 'Information on work performed during construction, reconstruction, major repairs of capital construction facility',
@@ -131,6 +141,16 @@ export const translations = {
         section4: 'Раздел 4',
         section5: 'Раздел 5',
         section6: 'Раздел 6'
+      },
+      section1: {
+        title: 'РАЗДЕЛ 1',
+        subtitle: 'Список инженерно-технического персонала лица, осуществляющего строительство, реконструкцию, капитальный ремонт, занятого при строительстве, реконструкции, капитальном ремонте объекта капитального строительства',
+        rowNumber: '№ п/п',
+        orgName: 'Полное и (или) сокращенное наименование или фамилия, имя отчество (последнее - при наличии) лица, осуществляющего строительство, реконструкцию, капитальный ремонт',
+        personInfo: 'Фамилия, инициалы, должность (при наличии) лица, входящего в список инженерно-технического персонала',
+        startDate: 'Дата начала работ на объекте капитального строительства с указанием вида работ',
+        endDate: 'Дата окончания работ на объекте капитального строительства',
+        representative: 'Должность (при наличии), фамилия, инициалы, подпись уполномоченного представителя лица, осуществляющего строительство, реконструкцию, капитальный ремонт'
       },
       section3: {
         title: 'РАЗДЕЛ 3',
