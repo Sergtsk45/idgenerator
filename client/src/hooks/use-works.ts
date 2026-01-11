@@ -35,3 +35,27 @@ export function useCreateWork() {
     },
   });
 }
+
+export function useImportWorks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { mode?: "merge" | "replace"; items: InsertWork[] }) => {
+      const res = await fetch(api.works.import.path, {
+        method: api.works.import.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to import works");
+      }
+
+      return api.works.import.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.works.list.path] });
+    },
+  });
+}

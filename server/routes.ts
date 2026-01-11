@@ -14,6 +14,37 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+async function normalizeWorkMessage(messageRaw: string) {
+  const works = await storage.getWorks();
+  const worksContext = works
+    .map((w) => `${w.code}: ${w.description} (${w.unit})`)
+    .join("\n");
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: `You are a construction assistant. Extract data from the worker's message.
+Available Works (BoQ):
+${worksContext}
+
+Return JSON with:
+- workCode (best match from BoQ)
+- quantity (number)
+- date (YYYY-MM-DD, assume current year if not specified)
+- location (string)
+
+If no work matches, set workCode to null.`,
+      },
+      { role: "user", content: messageRaw },
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(completion.choices[0].message.content || "{}");
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -25,7 +56,45 @@ export async function registerRoutes(
     res.json(works);
   });
 
+  // Works: safe bulk import (no destructive behavior by default)
+  app.post(api.works.import.path, async (req, res) => {
+    try {
+      const input = api.works.import.input.parse(req.body);
+      const mode = input.mode ?? "merge";
+
+      // De-duplicate by code (last wins) and trim codes
+      const map = new Map<string, (typeof input.items)[number]>();
+      for (const item of input.items) {
+        const code = String(item.code || "").trim();
+        if (!code) continue;
+        map.set(code, { ...item, code });
+      }
+
+      const items = Array.from(map.values());
+      const result = await storage.importWorks(items, mode);
+
+      return res.status(200).json({
+        mode,
+        received: input.items.length,
+        created: result.created,
+        updated: result.updated,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("Works import failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   app.delete("/api/works", async (_req, res) => {
+    // Safety: do not allow destructive "clear all works" in production.
+    // (The UI no longer depends on this endpoint; keep it only for dev/debug.)
+    if (process.env.NODE_ENV === "production") {
+      return res.status(404).json({ message: "Not found" });
+    }
+
     try {
       console.log("Clearing all works from database...");
       await storage.clearWorks();
@@ -67,32 +136,7 @@ export async function registerRoutes(
       // Trigger normalization in background (or await if fast enough)
       // For MVP, we'll await it to show immediate result
       try {
-        const works = await storage.getWorks();
-        const worksContext = works.map(w => `${w.code}: ${w.description} (${w.unit})`).join('\n');
-
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "system",
-              content: `You are a construction assistant. Extract data from the worker's message.
-              Available Works (BoQ):
-              ${worksContext}
-
-              Return JSON with:
-              - workCode (best match from BoQ)
-              - quantity (number)
-              - date (YYYY-MM-DD, assume current year if not specified)
-              - location (string)
-              
-              If no work matches, set workCode to null.`
-            },
-            { role: "user", content: input.messageRaw }
-          ],
-          response_format: { type: "json_object" }
-        });
-
-        const normalized = JSON.parse(completion.choices[0].message.content || "{}");
+        const normalized = await normalizeWorkMessage(input.messageRaw);
         await storage.updateMessageNormalized(message.id, normalized);
         
         // Return the updated message
@@ -109,6 +153,31 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       }
       res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Messages: explicit processing endpoint (sync with shared/routes.ts)
+  app.post(api.messages.process.path, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ message: "Invalid message id" });
+      }
+
+      const message = await storage.getMessage(id);
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+
+      // Re-run normalization on demand (useful if initial processing failed)
+      const normalized = await normalizeWorkMessage(message.messageRaw);
+      await storage.updateMessageNormalized(message.id, normalized);
+
+      const updated = await storage.getMessage(message.id);
+      return res.status(200).json(updated);
+    } catch (err) {
+      console.error("Message processing failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
     }
   });
 

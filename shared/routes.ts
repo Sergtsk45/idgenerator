@@ -19,6 +19,23 @@ export const api = {
         400: z.object({ message: z.string() }),
       },
     },
+    import: {
+      method: 'POST' as const,
+      path: '/api/works/import',
+      input: z.object({
+        mode: z.enum(['merge', 'replace']).optional(),
+        items: z.array(insertWorkSchema),
+      }),
+      responses: {
+        200: z.object({
+          mode: z.enum(['merge', 'replace']),
+          received: z.number(),
+          created: z.number(),
+          updated: z.number(),
+        }),
+        400: z.object({ message: z.string() }),
+      },
+    },
   },
   messages: {
     list: {

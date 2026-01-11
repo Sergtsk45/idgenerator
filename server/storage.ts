@@ -6,7 +6,7 @@ import {
   type ActTemplate, type InsertActTemplate,
   type ActTemplateSelection, type InsertActTemplateSelection
 } from "@shared/schema";
-import { eq, desc, and, gte, lte } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Works
@@ -14,6 +14,7 @@ export interface IStorage {
   createWork(work: InsertWork): Promise<Work>;
   getWorkByCode(code: string): Promise<Work | undefined>;
   clearWorks(): Promise<void>;
+  importWorks(items: InsertWork[], mode: "merge" | "replace"): Promise<{ created: number; updated: number }>;
 
   // Messages
   getMessages(): Promise<Message[]>;
@@ -59,6 +60,67 @@ export class DatabaseStorage implements IStorage {
 
   async clearWorks(): Promise<void> {
     await db.delete(works);
+  }
+
+  async importWorks(
+    items: InsertWork[],
+    mode: "merge" | "replace"
+  ): Promise<{ created: number; updated: number }> {
+    return await db.transaction(async (tx) => {
+      if (mode === "replace") {
+        await tx.delete(works);
+      }
+
+      const codes = Array.from(
+        new Set(
+          items
+            .map((i) => String(i.code || "").trim())
+            .filter((c) => c.length > 0)
+        )
+      );
+
+      const existing =
+        codes.length === 0
+          ? []
+          : await tx
+              .select({ code: works.code })
+              .from(works)
+              .where(inArray(works.code, codes));
+
+      const existingSet = new Set(existing.map((e) => e.code));
+
+      let created = 0;
+      let updated = 0;
+
+      for (const item of items) {
+        const code = String(item.code || "").trim();
+        if (!code) continue;
+
+        const values: InsertWork = {
+          ...item,
+          code,
+        };
+
+        if (existingSet.has(code)) {
+          await tx
+            .update(works)
+            .set({
+              description: values.description,
+              unit: values.unit,
+              quantityTotal: values.quantityTotal ?? null,
+              synonyms: values.synonyms ?? null,
+            })
+            .where(eq(works.code, code));
+          updated++;
+        } else {
+          await tx.insert(works).values(values);
+          existingSet.add(code);
+          created++;
+        }
+      }
+
+      return { created, updated };
+    });
   }
 
   async getMessages(): Promise<Message[]> {
