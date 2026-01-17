@@ -27,7 +27,7 @@ export const translations = {
       works: 'Works',
       worklog: 'Work Log',
       acts: 'Acts',
-      settings: 'Settings'
+      schedule: 'Schedule'
     },
     home: {
       title: 'Work Log',
@@ -127,6 +127,10 @@ export const translations = {
       language: 'Language',
       en: 'English',
       ru: 'Russian'
+    },
+    schedule: {
+      title: 'Work Schedule',
+      comingSoon: 'Coming soon'
     }
   },
   ru: {
@@ -135,7 +139,7 @@ export const translations = {
       works: 'ВОР',
       worklog: 'ЖР',
       acts: 'Акты',
-      settings: 'Настройки'
+      schedule: 'График работ'
     },
     home: {
       title: 'Журнал работ',
@@ -235,6 +239,10 @@ export const translations = {
       language: 'Язык',
       en: 'English (En)',
       ru: 'Русский (Ru)'
+    },
+    schedule: {
+      title: 'График работ',
+      comingSoon: 'В разработке'
     }
   }
 };

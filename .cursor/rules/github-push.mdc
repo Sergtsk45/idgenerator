@@ -1,0 +1,104 @@
+/**
+ * @file: github-push.mdc
+ * @description: Чеклист для безопасного пуша на GitHub (проверка больших файлов и базовая диагностика)
+ * @dependencies: .gitignore
+ * @created: 2026-01-17
+ */
+
+description: Сохранение изменений на GitHub (с проверкой больших файлов)
+
+Цель: безопасно отправлять изменения на GitHub, предотвращая ошибки из‑за больших файлов (> 100 MB) и проблем с аутентификацией.
+
+Шаги перед пушем
+
+1) Проверка статуса ветки
+```bash
+git status
+git rev-parse --abbrev-ref HEAD
+git remote -v
+```
+
+2) Быстрая проверка больших файлов в рабочем дереве и индексе (до коммита)
+```bash
+# Порог 95 MB (зазор до лимита GitHub 100 MB)
+find . -type f \
+  -not -path "./.git/*" \
+  -not -path "./node_modules/*" \
+  -size +95M -print | sed 's/^/LARGE (working tree): /'
+
+# Проверить только файлы, подготовленные к коммиту
+git diff --cached --name-only | xargs -I{} bash -c '[[ -f "{}" ]] && [[ $(stat -c%s "{}") -gt 99500000 ]] && echo "LARGE (staged): {} ($(stat -c%s "{}") bytes)" || true'
+```
+
+3) Проверка больших BLOBов в истории текущей ветки (на уровне Git объектов)
+```bash
+# Требует стандартный git; выводит объекты >100 MB с путями (если встречаются в истории)
+git rev-list --objects HEAD \
+| awk '{print $1}' \
+| git cat-file --batch-check='%(objecttype) %(objectsize) %(objectname)' \
+| awk '$1=="blob" && $2>100000000 {print $3 " (" $2/1000000 " MB)"}' \
+| while read -r oid_and_size; do \
+    oid=$(echo "$oid_and_size" | awk '{print $1}'); \
+    path=$(git rev-list --objects HEAD | grep "^$oid " | awk '{ $1=""; sub(/^ /, ""); print }' | head -n1); \
+    echo "LARGE (history): $path - $oid_and_size"; \
+  done
+```
+
+Если найдены большие файлы
+
+- Исключить из индекса и добавить в .gitignore:
+```bash
+git rm --cached PATH/TO/BIGFILE
+printf "\n# Ignore large archives\n*.zip\n*.tar.gz\n*.7z\n*.rar\nout/\ndist/\n" >> .gitignore
+git add .gitignore
+git commit --amend -C HEAD  # или обычный коммит, если нужно
+```
+
+- Если большой файл уже в истории (старые коммиты), очистить историю ветки:
+```bash
+# Вариант A (рекомендуется): git filter-repo (если установлен)
+git filter-repo --strip-blobs-bigger-than 100M
+
+# Вариант B (альтернатива): BFG Repo-Cleaner
+# java -jar bfg.jar --strip-blobs-bigger-than 100M .
+
+# После переписывания истории:
+git push --force-with-lease
+```
+
+Аутентификация и удалённый URL
+
+- SSH (рекомендуется):
+```bash
+git remote set-url origin git@github.com:Sergtsk45/TelegramJurnalRabot.git
+ssh -T git@github.com  # должен показать успешную аутентификацию
+```
+
+- HTTPS (альтернатива, с токеном):
+```bash
+git remote set-url origin https://TOKEN@github.com/Sergtsk45/TelegramJurnalRabot.git
+git config --global credential.helper store
+```
+
+Стандартная последовательность сохранения
+
+```bash
+# 1. Обновить основу (опционально)
+git fetch origin
+
+# 2. Проверить большие файлы (см. секции выше)
+
+# 3. Коммит
+git add -A
+git commit -m "feat: описание изменений"
+
+# 4. Пуш ветки
+git push -u origin $(git rev-parse --abbrev-ref HEAD)
+```
+
+Примечания
+
+- GitHub жёстко отклоняет файлы > 100 MB. Держите порог проверки 95–99 MB.
+- Не добавляйте в репозиторий бэкапы, артефакты сборки (`out/`, `dist/`), архивации и большие бинарные файлы.
+- При необходимости используйте Git LFS для бинарников, но предпочтительно держать репозиторий «текстовым».
+

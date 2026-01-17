@@ -8,6 +8,7 @@ import Home from "@/pages/Home";
 import Works from "@/pages/Works";
 import WorkLog from "@/pages/WorkLog";
 import Acts from "@/pages/Acts";
+import Schedule from "@/pages/Schedule";
 import Settings from "@/pages/Settings";
 
 function Router() {
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/works" component={Works} />
       <Route path="/worklog" component={WorkLog} />
       <Route path="/acts" component={Acts} />
+      <Route path="/schedule" component={Schedule} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>

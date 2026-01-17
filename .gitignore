@@ -6,4 +6,8 @@ vite.config.ts.*
 *.tar.gz
 # Generated PDFs
 generated_pdfs/
-.cursor/
+# Cursor (ignore everything, but keep selected rules)
+.cursor/**
+!.cursor/rules/
+!.cursor/rules/github-push.mdc
+.env

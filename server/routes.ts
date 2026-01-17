@@ -8,13 +8,25 @@ import { generateAosrPdf, loadTemplateCatalog, type ActData } from "./pdfGenerat
 import * as fs from "fs";
 import * as path from "path";
 
-// Initialize OpenAI client - it will use the environment variables from the integration
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+// OpenAI is optional for local/dev runs. Only initialize when credentials exist.
+let openaiClient: OpenAI | null = null;
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  if (!apiKey) return null;
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    });
+  }
+  return openaiClient;
+}
 
 async function normalizeWorkMessage(messageRaw: string) {
+  const openai = getOpenAIClient();
+  if (!openai) {
+    throw new Error("OpenAI API key is not configured (AI_INTEGRATIONS_OPENAI_API_KEY).");
+  }
   const works = await storage.getWorks();
   const worksContext = works
     .map((w) => `${w.code}: ${w.description} (${w.unit})`)
