@@ -1,5 +1,16 @@
 import { z } from 'zod';
-import { insertWorkSchema, insertMessageSchema, insertActSchema, works, messages, acts, attachments } from './schema';
+import {
+  insertWorkSchema,
+  insertMessageSchema,
+  insertActSchema,
+  insertScheduleSchema,
+  schedules,
+  scheduleTasks,
+  works,
+  messages,
+  acts,
+  attachments
+} from './schema';
 
 export const api = {
   works: {
@@ -95,6 +106,70 @@ export const api = {
       },
     },
   },
+  schedules: {
+    default: {
+      method: 'GET' as const,
+      path: '/api/schedules/default',
+      responses: {
+        200: z.custom<typeof schedules.$inferSelect>(),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/schedules',
+      input: insertScheduleSchema,
+      responses: {
+        201: z.custom<typeof schedules.$inferSelect>(),
+        400: z.object({ message: z.string() }),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/schedules/:id',
+      responses: {
+        200: z.custom<typeof schedules.$inferSelect & { tasks: typeof scheduleTasks.$inferSelect[] }>(),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    bootstrapFromWorks: {
+      method: 'POST' as const,
+      path: '/api/schedules/:id/bootstrap-from-works',
+      input: z.object({
+        workIds: z.array(z.number().int().positive()).optional(),
+        defaultStartDate: z.string().optional(), // YYYY-MM-DD
+        defaultDurationDays: z.number().int().min(1).optional(),
+      }),
+      responses: {
+        200: z.object({
+          scheduleId: z.number(),
+          created: z.number(),
+          skipped: z.number(),
+        }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+  scheduleTasks: {
+    patch: {
+      method: 'PATCH' as const,
+      path: '/api/schedule-tasks/:id',
+      input: z
+        .object({
+          titleOverride: z.string().nullable().optional(),
+          startDate: z.string().optional(), // YYYY-MM-DD
+          durationDays: z.number().int().min(1).optional(),
+          orderIndex: z.number().int().min(0).optional(),
+        })
+        .refine((v) => Object.keys(v).length > 0, { message: 'Empty patch' }),
+      responses: {
+        200: z.custom<typeof scheduleTasks.$inferSelect>(),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
@@ -108,3 +183,18 @@ export function buildUrl(path: string, params?: Record<string, string | number>)
   }
   return url;
 }
+
+export type {
+  Work,
+  InsertWork,
+  Message,
+  InsertMessage,
+  Act,
+  InsertAct,
+  Schedule,
+  InsertSchedule,
+  ScheduleTask,
+  InsertScheduleTask,
+  CreateMessageRequest,
+  GenerateActRequest,
+} from "./schema";

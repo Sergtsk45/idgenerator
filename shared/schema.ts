@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, numeric, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -84,6 +84,37 @@ export const actTemplateSelections = pgTable("act_template_selections", {
   generatedAt: timestamp("generated_at"),
 });
 
+// Schedules (Gantt)
+export const schedules = pgTable("schedules", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  calendarStart: date("calendar_start"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const scheduleTasks = pgTable(
+  "schedule_tasks",
+  {
+    id: serial("id").primaryKey(),
+    scheduleId: integer("schedule_id")
+      .notNull()
+      .references(() => schedules.id),
+    workId: integer("work_id")
+      .notNull()
+      .references(() => works.id),
+    titleOverride: text("title_override"),
+    startDate: date("start_date").notNull(),
+    durationDays: integer("duration_days").notNull(),
+    orderIndex: integer("order_index").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    scheduleIdIdx: index("schedule_tasks_schedule_id_idx").on(t.scheduleId),
+    workIdIdx: index("schedule_tasks_work_id_idx").on(t.workId),
+    scheduleOrderIdx: index("schedule_tasks_schedule_order_idx").on(t.scheduleId, t.orderIndex),
+  })
+);
+
 
 // === SCHEMAS ===
 
@@ -93,6 +124,8 @@ export const insertActSchema = createInsertSchema(acts).omit({ id: true, created
 export const insertAttachmentSchema = createInsertSchema(attachments).omit({ id: true, createdAt: true });
 export const insertActTemplateSchema = createInsertSchema(actTemplates).omit({ id: true });
 export const insertActTemplateSelectionSchema = createInsertSchema(actTemplateSelections).omit({ id: true, generatedAt: true });
+export const insertScheduleSchema = createInsertSchema(schedules).omit({ id: true, createdAt: true });
+export const insertScheduleTaskSchema = createInsertSchema(scheduleTasks).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API TYPES ===
 
@@ -112,6 +145,12 @@ export type InsertActTemplate = z.infer<typeof insertActTemplateSchema>;
 
 export type ActTemplateSelection = typeof actTemplateSelections.$inferSelect;
 export type InsertActTemplateSelection = z.infer<typeof insertActTemplateSelectionSchema>;
+
+export type Schedule = typeof schedules.$inferSelect;
+export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
+
+export type ScheduleTask = typeof scheduleTasks.$inferSelect;
+export type InsertScheduleTask = z.infer<typeof insertScheduleTaskSchema>;
 
 // Request/Response Types
 export type CreateMessageRequest = {

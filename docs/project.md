@@ -33,6 +33,8 @@ flowchart LR
     DB --> M[messages (raw + normalized)]
     DB --> A[acts (aggregated)]
     DB --> AT[attachments]
+    DB --> S[schedules (gantt)]
+    DB --> ST[schedule_tasks (gantt)]
   end
 ```
 
@@ -58,6 +60,8 @@ flowchart LR
 - `messages`: исходный текст, нормализованные поля (json), флаги обработки.
 - `acts`: акты (период, локация, статус, агрегированные работы в json).
 - `attachments`: вложения к актам (url/name/type).
+- `schedules`: графики работ (контейнеры диаграммы Ганта; в MVP обычно используется дефолтный).
+- `schedule_tasks`: задачи графика (полосы Ганта), привязанные к `works` и содержащие `startDate`/`durationDays`/`orderIndex`.
 
 Дополнительно (задел под AI-чат):
 - `conversations` и chat-`messages` (см. `shared/schema.ts` + `server/replit_integrations/chat/*`).
@@ -69,6 +73,8 @@ flowchart LR
 - **Works**: `GET /api/works`, `POST /api/works`
 - **Messages**: `GET /api/messages`, `POST /api/messages`
 - **Acts**: `GET /api/acts`, `POST /api/acts/generate`, `GET /api/acts/:id`
+- **Schedules**: `GET /api/schedules/default`, `POST /api/schedules`, `GET /api/schedules/:id`, `POST /api/schedules/:id/bootstrap-from-works`
+- **Schedule Tasks**: `PATCH /api/schedule-tasks/:id`
 
 Дополнительно:
 - `POST /api/messages/:id/process` — принудительная повторная обработка (нормализация) сообщения по его `id` (реализовано в `server/routes.ts`).

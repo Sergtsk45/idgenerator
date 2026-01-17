@@ -264,6 +264,104 @@ export async function registerRoutes(
     res.json({ ...act, attachments });
   });
 
+  // Schedules (Gantt)
+  app.get(api.schedules.default.path, async (_req, res) => {
+    try {
+      const schedule = await storage.getOrCreateDefaultSchedule();
+      return res.status(200).json(schedule);
+    } catch (err) {
+      console.error("Get default schedule failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post(api.schedules.create.path, async (req, res) => {
+    try {
+      const input = api.schedules.create.input.parse(req.body);
+      const schedule = await storage.createSchedule(input);
+      return res.status(201).json(schedule);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("Create schedule failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get(api.schedules.get.path, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ message: "Invalid schedule id" });
+    }
+
+    const schedule = await storage.getScheduleWithTasks(id);
+    if (!schedule) {
+      return res.status(404).json({ message: "Schedule not found" });
+    }
+
+    return res.status(200).json(schedule);
+  });
+
+  app.post(api.schedules.bootstrapFromWorks.path, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ message: "Invalid schedule id" });
+      }
+
+      const input = api.schedules.bootstrapFromWorks.input.parse(req.body ?? {});
+
+      const schedule = await storage.getScheduleWithTasks(id);
+      if (!schedule) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const defaultStartDate = input.defaultStartDate ?? (schedule.calendarStart as any) ?? today;
+      const defaultDurationDays = input.defaultDurationDays ?? 1;
+
+      const result = await storage.bootstrapScheduleTasksFromWorks({
+        scheduleId: id,
+        workIds: input.workIds,
+        defaultStartDate,
+        defaultDurationDays,
+      });
+
+      return res.status(200).json(result);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("Schedule bootstrap failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.patch(api.scheduleTasks.patch.path, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ message: "Invalid schedule task id" });
+      }
+
+      const input = api.scheduleTasks.patch.input.parse(req.body);
+      const updated = await storage.patchScheduleTask(id, input);
+
+      if (!updated) {
+        return res.status(404).json({ message: "Schedule task not found" });
+      }
+
+      return res.status(200).json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("Schedule task patch failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // Act Templates
   app.get("/api/act-templates", async (_req, res) => {
     try {

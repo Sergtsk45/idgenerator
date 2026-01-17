@@ -1,12 +1,29 @@
 import { db } from "./db";
 import {
-  works, messages, acts, attachments, actTemplates, actTemplateSelections,
-  type InsertWork, type InsertMessage, type InsertAct,
-  type Work, type Message, type Act, type Attachment,
-  type ActTemplate, type InsertActTemplate,
-  type ActTemplateSelection, type InsertActTemplateSelection
+  works,
+  messages,
+  acts,
+  attachments,
+  actTemplates,
+  actTemplateSelections,
+  schedules,
+  scheduleTasks,
+  type InsertWork,
+  type InsertMessage,
+  type InsertAct,
+  type InsertSchedule,
+  type Work,
+  type Message,
+  type Act,
+  type Attachment,
+  type ActTemplate,
+  type InsertActTemplate,
+  type ActTemplateSelection,
+  type InsertActTemplateSelection,
+  type Schedule,
+  type ScheduleTask
 } from "@shared/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
   // Works
@@ -41,6 +58,21 @@ export interface IStorage {
   getActTemplateSelections(actId: number): Promise<ActTemplateSelection[]>;
   createActTemplateSelection(selection: InsertActTemplateSelection): Promise<ActTemplateSelection>;
   updateActTemplateSelectionStatus(id: number, status: string, pdfUrl?: string): Promise<ActTemplateSelection>;
+
+  // Schedules (Gantt)
+  getOrCreateDefaultSchedule(): Promise<Schedule>;
+  createSchedule(schedule: InsertSchedule): Promise<Schedule>;
+  getScheduleWithTasks(id: number): Promise<(Schedule & { tasks: ScheduleTask[] }) | undefined>;
+  bootstrapScheduleTasksFromWorks(params: {
+    scheduleId: number;
+    workIds?: number[];
+    defaultStartDate: string;
+    defaultDurationDays: number;
+  }): Promise<{ scheduleId: number; created: number; skipped: number }>;
+  patchScheduleTask(
+    id: number,
+    patch: Partial<Pick<ScheduleTask, "titleOverride" | "startDate" | "durationDays" | "orderIndex">>
+  ): Promise<ScheduleTask | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -215,6 +247,115 @@ export class DatabaseStorage implements IStorage {
       .set(updateData)
       .where(eq(actTemplateSelections.id, id))
       .returning();
+    return updated;
+  }
+
+  // Schedules (Gantt)
+  async getOrCreateDefaultSchedule(): Promise<Schedule> {
+    const defaultTitle = "График работ";
+    const [existing] = await db.select().from(schedules).where(eq(schedules.title, defaultTitle));
+    if (existing) return existing;
+
+    const [created] = await db
+      .insert(schedules)
+      .values({ title: defaultTitle, calendarStart: null })
+      .returning();
+    return created;
+  }
+
+  async createSchedule(schedule: InsertSchedule): Promise<Schedule> {
+    const [created] = await db.insert(schedules).values(schedule).returning();
+    return created;
+  }
+
+  async getScheduleWithTasks(id: number): Promise<(Schedule & { tasks: ScheduleTask[] }) | undefined> {
+    const [schedule] = await db.select().from(schedules).where(eq(schedules.id, id));
+    if (!schedule) return undefined;
+
+    const tasks = await db
+      .select()
+      .from(scheduleTasks)
+      .where(eq(scheduleTasks.scheduleId, id))
+      .orderBy(asc(scheduleTasks.orderIndex));
+
+    return { ...schedule, tasks };
+  }
+
+  async bootstrapScheduleTasksFromWorks(params: {
+    scheduleId: number;
+    workIds?: number[];
+    defaultStartDate: string;
+    defaultDurationDays: number;
+  }): Promise<{ scheduleId: number; created: number; skipped: number }> {
+    const { scheduleId, workIds, defaultStartDate, defaultDurationDays } = params;
+
+    return await db.transaction(async (tx) => {
+      const [schedule] = await tx.select().from(schedules).where(eq(schedules.id, scheduleId));
+      if (!schedule) {
+        // Let the route translate this to 404.
+        throw new Error("SCHEDULE_NOT_FOUND");
+      }
+
+      const worksList =
+        workIds && workIds.length > 0
+          ? await tx
+              .select()
+              .from(works)
+              .where(inArray(works.id, workIds))
+              .orderBy(works.code)
+          : await tx.select().from(works).orderBy(works.code);
+
+      const existingTasks = await tx
+        .select({ workId: scheduleTasks.workId, orderIndex: scheduleTasks.orderIndex })
+        .from(scheduleTasks)
+        .where(eq(scheduleTasks.scheduleId, scheduleId));
+
+      const existingWorkIds = new Set(existingTasks.map((t) => t.workId));
+      const maxOrderIndex =
+        existingTasks.length === 0
+          ? -1
+          : Math.max(...existingTasks.map((t) => Number(t.orderIndex ?? 0)));
+
+      let nextOrderIndex = maxOrderIndex + 1;
+      let created = 0;
+      let skipped = 0;
+
+      for (const w of worksList) {
+        if (existingWorkIds.has(w.id)) {
+          skipped++;
+          continue;
+        }
+
+        await tx.insert(scheduleTasks).values({
+          scheduleId,
+          workId: w.id,
+          titleOverride: null,
+          startDate: defaultStartDate,
+          durationDays: defaultDurationDays,
+          orderIndex: nextOrderIndex++,
+        });
+        created++;
+        existingWorkIds.add(w.id);
+      }
+
+      return { scheduleId, created, skipped };
+    });
+  }
+
+  async patchScheduleTask(
+    id: number,
+    patch: Partial<Pick<ScheduleTask, "titleOverride" | "startDate" | "durationDays" | "orderIndex">>
+  ): Promise<ScheduleTask | undefined> {
+    const updateData: Partial<typeof scheduleTasks.$inferInsert> = {};
+
+    if ("titleOverride" in patch) updateData.titleOverride = patch.titleOverride ?? null;
+    if (patch.startDate !== undefined) updateData.startDate = patch.startDate as any;
+    if (patch.durationDays !== undefined) updateData.durationDays = patch.durationDays as any;
+    if (patch.orderIndex !== undefined) updateData.orderIndex = patch.orderIndex as any;
+
+    if (Object.keys(updateData).length === 0) return undefined;
+
+    const [updated] = await db.update(scheduleTasks).set(updateData).where(eq(scheduleTasks.id, id)).returning();
     return updated;
   }
 }

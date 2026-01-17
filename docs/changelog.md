@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-01-17] - Schedule (Гант): сущности, API и рабочий экран
+### Добавлено
+- Таблицы `schedules` и `schedule_tasks` в `shared/schema.ts` (типизация + insert-схемы + индексы)
+- API графика работ в `shared/routes.ts`: default/get/create/bootstrap-from-works + patch задачи
+- Реализация schedule-роутов и storage в `server/routes.ts`/`server/storage.ts` (идемпотентный bootstrap из ВОР)
+- Хуки `client/src/hooks/use-schedules.ts` (React Query)
+- Рабочий экран `/schedule`: empty-state, bootstrap из ВОР, отрисовка Ганта, редактирование через диалог и сдвиг кнопками (-1/+1 день)
+
+### Изменено
+- `docs/project.md`: актуализированы сущности БД и список API-ресурсов (schedule)
+- `docs/tasktracker.md`: обновлён статус шагов P1-4
+- `client/src/lib/i18n.ts`: расширены строки для экрана “График работ”
+
+### Исправлено
+- Нет
+
+---
+
 ## [2026-01-17] - UI: перенос “Настройки” в меню и добавление “График работ”
 ### Добавлено
 - Страница `/schedule` (плейсхолдер) — “График работ”
