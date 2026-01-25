@@ -54,6 +54,7 @@ export default function Schedule() {
   const [selectedTask, setSelectedTask] = useState<ScheduleTask | null>(null);
   const [editStartDate, setEditStartDate] = useState<string>("");
   const [editDurationDays, setEditDurationDays] = useState<number>(1);
+  const [editActNumber, setEditActNumber] = useState<string>("");
 
   const calendarStart = useMemo(() => {
     if (schedule?.calendarStart) return String(schedule.calendarStart);
@@ -73,6 +74,7 @@ export default function Schedule() {
     setSelectedTask(task);
     setEditStartDate(String(task.startDate));
     setEditDurationDays(Number(task.durationDays || 1));
+    setEditActNumber(task.actNumber == null ? "" : String(task.actNumber));
     setEditOpen(true);
   };
 
@@ -115,11 +117,33 @@ export default function Schedule() {
   const saveEdit = async () => {
     if (!selectedTask) return;
     try {
+      const trimmed = editActNumber.trim();
+      const nextActNumber = trimmed === "" ? null : Number(trimmed);
+      if (trimmed !== "") {
+        const n = Number(trimmed);
+        if (!Number.isFinite(n) || n <= 0 || !Number.isInteger(n)) {
+          toast({
+            title: t.errorTitle,
+            description: language === "ru" ? "Номер акта должен быть целым числом > 0" : "Act number must be an integer > 0",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      if (trimmed !== "" && nextActNumber == null) {
+        toast({
+          title: t.errorTitle,
+          description: language === "ru" ? "Номер акта должен быть целым числом > 0" : "Act number must be an integer > 0",
+          variant: "destructive",
+        });
+        return;
+      }
       await patchTask.mutateAsync({
         id: selectedTask.id,
         patch: {
           startDate: editStartDate,
           durationDays: editDurationDays,
+          actNumber: nextActNumber,
         },
         scheduleId: scheduleId ?? undefined,
       });
@@ -237,6 +261,12 @@ export default function Schedule() {
                             <div className="text-xs text-muted-foreground font-mono truncate">
                               {w?.code || `ID:${task.workId}`}
                             </div>
+                        {task.actNumber != null ? (
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {language === "ru" ? "Акт №" : "Act #"}
+                            {task.actNumber}
+                          </div>
+                        ) : null}
                             <div className="text-sm font-medium truncate">{title}</div>
                           </div>
                           <div className="flex items-center gap-1">
@@ -322,6 +352,18 @@ export default function Schedule() {
           </DialogHeader>
 
           <div className="grid gap-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">{language === "ru" ? "Номер акта" : "Act number"}</label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={editActNumber}
+                onChange={(e) => setEditActNumber(e.target.value)}
+                placeholder={language === "ru" ? "Напр.: 5" : "e.g. 5"}
+              />
+            </div>
+
             <div className="grid gap-2">
               <label className="text-sm font-medium">{t.startDate}</label>
               <Input

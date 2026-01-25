@@ -13,6 +13,35 @@
 
 ---
 
+## Задача: АОСР — эталонный шаблон под `005_АОСР 4.pdf` (Times New Roman, материалы/приложения текстом)
+- **Статус**: В процессе
+- **Описание**: Привести `server/templates/aosr/aosr-template.json` к структуре и формулировкам эталона `attached_assets/005_АОСР 4.pdf`: расширить секции/роли/подписи, вывести материалы и приложения текстом (без таблицы), подключить шрифт Times New Roman, расширить модель данных и проброс `formData` с клиента при экспорте.
+- **Шаги выполнения**:
+  - [ ] Обновить документацию (tasktracker/changelog/project) и зафиксировать список плейсхолдеров
+  - [ ] Пересобрать `aosr-template.json` под порядок блоков эталона (табличная верстка бланков, hint-строки)
+  - [ ] Расширить `ActData` и `buildAosrPlaceholderValues()` под эталонные поля
+  - [ ] Убрать зависимость от таблицы материалов: генерировать `p3MaterialsText`
+  - [ ] Реализовать приложения строго нумерованным списком через `attachmentsText`
+  - [ ] Подключить шрифт Times New Roman (TTF) в `server/fonts/` и `fontDescriptors`
+  - [ ] Добавить/пробросить `formData` на клиенте для заполнения эталонных полей при `POST /api/acts/:id/export`
+- **Зависимости**: Задача "Генерация АОСР из JSON-шаблона (`aosr-template.json`)"
+
+---
+
+## Задача: P0 — Акты из графика работ (группировка по `actNumber`)
+- **Статус**: Завершена
+- **Описание**: Перевести создание актов на график работ: добавить в `schedule_tasks` поле принадлежности к акту (`actNumber`), формировать/обновлять записи `acts` по группировке задач графика и вычислять даты/состав работ автоматически. Примечание: после обновления кода нужно применить изменения схемы БД командой `npm run db:push` (drizzle-kit спросит подтверждение на добавление unique constraint).
+- **Шаги выполнения**:
+  - [x] Зафиксировать правила расчёта: `dateStart=min(startDate)`, `dateEnd=max(startDate+durationDays)`, “дата составления”=`dateEnd`, `worksData` агрегируется по `workId`, quantity берётся из `works.quantityTotal`
+  - [x] DB: добавить `schedule_tasks.act_number` (nullable) + индекс `(schedule_id, act_number)`
+  - [x] DB: добавить `acts.act_number` (unique, глобальный номер акта), сохранить `acts.id` как тех. ключ
+  - [x] Shared: расширить `PATCH /api/schedule-tasks/:id` полем `actNumber`, добавить `POST /api/schedules/:id/generate-acts`
+  - [x] Backend: реализовать upsert актов по `actNumber` и генерацию актов из графика (кнопка)
+  - [x] Frontend: добавить колонку/поле `actNumber` на экране `/schedule` + отправка patch
+  - [x] Frontend: обновить `/acts` — отображать `actNumber`, добавить кнопку «Сформировать/обновить из графика»
+  - [x] Export PDF: дефолт `actNumber` брать из `act.actNumber`, дефолт `actDate` — из `act.dateEnd`; обновить docs/changelog/project
+- **Зависимости**: Модуль “График работ” (Schedule/Gantt) (P1-4)
+
 ## Задача: P0 — синхронизация обработки сообщений (API `POST /api/messages/:id/process`)
 - **Статус**: Завершена
 - **Описание**: Привести в соответствие API-контракт и серверную реализацию обработки сообщений о работах. Цель — чтобы фронт мог “допроцессить” сообщение и получить нормализованные данные.
@@ -161,3 +190,10 @@
 - **Acceptance Criteria (smoke-test)**:
   - [x] Импортировать ВОР → открыть `/schedule` → bootstrap → отредактировать задачу → перезагрузить → изменения сохранены
 - **Зависимости**: P1-3 (желательно, чтобы ветка была “зелёной” до фичи)
+## Задача: P2
+
+Чтобы включить настоящий Times, положи файлы:
+server/fonts/TimesNewRoman.ttf
+server/fonts/TimesNewRomanBold.ttf
+server/fonts/TimesNewRomanItalic.ttf
+server/fonts/TimesNewRomanBoldItalic.ttf

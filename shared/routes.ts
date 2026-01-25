@@ -150,6 +150,22 @@ export const api = {
         404: z.object({ message: z.string() }),
       },
     },
+    generateActs: {
+      method: 'POST' as const,
+      path: '/api/schedules/:id/generate-acts',
+      input: z.object({}).optional(),
+      responses: {
+        200: z.object({
+          scheduleId: z.number(),
+          actNumbers: z.array(z.number().int().positive()),
+          created: z.number(),
+          updated: z.number(),
+          skippedNoActNumber: z.number(),
+        }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
   },
   scheduleTasks: {
     patch: {
@@ -161,6 +177,7 @@ export const api = {
           startDate: z.string().optional(), // YYYY-MM-DD
           durationDays: z.number().int().min(1).optional(),
           orderIndex: z.number().int().min(0).optional(),
+          actNumber: z.number().int().positive().nullable().optional(),
         })
         .refine((v) => Object.keys(v).length > 0, { message: 'Empty patch' }),
       responses: {

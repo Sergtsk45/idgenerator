@@ -38,6 +38,8 @@ export const messages = pgTable("messages", {
 // Acts (AOSR)
 export const acts = pgTable("acts", {
   id: serial("id").primaryKey(),
+  // Global act number (business identifier). Nullable for legacy records.
+  actNumber: integer("act_number").unique(),
   dateStart: date("date_start"),
   dateEnd: date("date_end"),
   location: text("location"),
@@ -102,6 +104,8 @@ export const scheduleTasks = pgTable(
     workId: integer("work_id")
       .notNull()
       .references(() => works.id),
+    // Act number this task belongs to (global). Nullable = not assigned to an act.
+    actNumber: integer("act_number"),
     titleOverride: text("title_override"),
     startDate: date("start_date").notNull(),
     durationDays: integer("duration_days").notNull(),
@@ -112,6 +116,7 @@ export const scheduleTasks = pgTable(
     scheduleIdIdx: index("schedule_tasks_schedule_id_idx").on(t.scheduleId),
     workIdIdx: index("schedule_tasks_work_id_idx").on(t.workId),
     scheduleOrderIdx: index("schedule_tasks_schedule_order_idx").on(t.scheduleId, t.orderIndex),
+    scheduleActNumberIdx: index("schedule_tasks_schedule_act_number_idx").on(t.scheduleId, t.actNumber),
   })
 );
 

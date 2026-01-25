@@ -30,6 +30,7 @@ export interface IStorage {
   getWorks(): Promise<Work[]>;
   createWork(work: InsertWork): Promise<Work>;
   getWorkByCode(code: string): Promise<Work | undefined>;
+  getWorksByIds(ids: number[]): Promise<Work[]>;
   clearWorks(): Promise<void>;
   importWorks(items: InsertWork[], mode: "merge" | "replace"): Promise<{ created: number; updated: number }>;
 
@@ -42,7 +43,16 @@ export interface IStorage {
   // Acts
   getActs(): Promise<Act[]>;
   getAct(id: number): Promise<Act | undefined>;
+  getActByNumber(actNumber: number): Promise<Act | undefined>;
   createAct(act: InsertAct): Promise<Act>;
+  upsertActByNumber(data: {
+    actNumber: number;
+    dateStart: string | null;
+    dateEnd: string | null;
+    location?: string | null;
+    status?: string | null;
+    worksData?: Array<{ workId: number; quantity: number; description: string }> | null;
+  }): Promise<{ act: Act; created: boolean }>;
   
   // Attachments
   getAttachments(actId: number): Promise<Attachment[]>;
@@ -71,7 +81,7 @@ export interface IStorage {
   }): Promise<{ scheduleId: number; created: number; skipped: number }>;
   patchScheduleTask(
     id: number,
-    patch: Partial<Pick<ScheduleTask, "titleOverride" | "startDate" | "durationDays" | "orderIndex">>
+    patch: Partial<Pick<ScheduleTask, "titleOverride" | "startDate" | "durationDays" | "orderIndex" | "actNumber">>
   ): Promise<ScheduleTask | undefined>;
 }
 
@@ -88,6 +98,11 @@ export class DatabaseStorage implements IStorage {
   async getWorkByCode(code: string): Promise<Work | undefined> {
     const [work] = await db.select().from(works).where(eq(works.code, code));
     return work;
+  }
+
+  async getWorksByIds(ids: number[]): Promise<Work[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(works).where(inArray(works.id, ids));
   }
 
   async clearWorks(): Promise<void> {
@@ -189,9 +204,59 @@ export class DatabaseStorage implements IStorage {
     return act;
   }
 
+  async getActByNumber(actNumber: number): Promise<Act | undefined> {
+    const [act] = await db.select().from(acts).where(eq(acts.actNumber, actNumber as any));
+    return act;
+  }
+
   async createAct(act: InsertAct): Promise<Act> {
     const [newAct] = await db.insert(acts).values(act).returning();
     return newAct;
+  }
+
+  async upsertActByNumber(data: {
+    actNumber: number;
+    dateStart: string | null;
+    dateEnd: string | null;
+    location?: string | null;
+    status?: string | null;
+    worksData?: Array<{ workId: number; quantity: number; description: string }> | null;
+  }): Promise<{ act: Act; created: boolean }> {
+    const existing = await this.getActByNumber(data.actNumber);
+
+    if (existing) {
+      const nextStatus =
+        existing.status === "signed"
+          ? existing.status
+          : ((data.status ?? existing.status ?? null) as any);
+      const [updated] = await db
+        .update(acts)
+        .set({
+          actNumber: data.actNumber as any,
+          dateStart: (data.dateStart ?? null) as any,
+          dateEnd: (data.dateEnd ?? null) as any,
+          location: (data.location ?? existing.location ?? null) as any,
+          status: nextStatus,
+          worksData: (data.worksData ?? existing.worksData ?? null) as any,
+        })
+        .where(eq(acts.id, existing.id))
+        .returning();
+      return { act: updated, created: false };
+    }
+
+    const [created] = await db
+      .insert(acts)
+      .values({
+        actNumber: data.actNumber as any,
+        dateStart: (data.dateStart ?? null) as any,
+        dateEnd: (data.dateEnd ?? null) as any,
+        location: (data.location ?? null) as any,
+        status: (data.status ?? "draft") as any,
+        worksData: (data.worksData ?? []) as any,
+      })
+      .returning();
+
+    return { act: created, created: true };
   }
 
   async getAttachments(actId: number): Promise<Attachment[]> {
@@ -344,7 +409,7 @@ export class DatabaseStorage implements IStorage {
 
   async patchScheduleTask(
     id: number,
-    patch: Partial<Pick<ScheduleTask, "titleOverride" | "startDate" | "durationDays" | "orderIndex">>
+    patch: Partial<Pick<ScheduleTask, "titleOverride" | "startDate" | "durationDays" | "orderIndex" | "actNumber">>
   ): Promise<ScheduleTask | undefined> {
     const updateData: Partial<typeof scheduleTasks.$inferInsert> = {};
 
@@ -352,6 +417,7 @@ export class DatabaseStorage implements IStorage {
     if (patch.startDate !== undefined) updateData.startDate = patch.startDate as any;
     if (patch.durationDays !== undefined) updateData.durationDays = patch.durationDays as any;
     if (patch.orderIndex !== undefined) updateData.orderIndex = patch.orderIndex as any;
+    if ("actNumber" in patch) updateData.actNumber = (patch.actNumber ?? null) as any;
 
     if (Object.keys(updateData).length === 0) return undefined;
 

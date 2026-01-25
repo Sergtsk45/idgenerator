@@ -143,9 +143,15 @@ export default function Works() {
       event.target.value = ""; // Reset input
     } catch (error) {
       console.error("Error in handleFileUpload:", error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : (error as any)?.message || String(error);
+      
       toast({
         title: language === 'ru' ? "Ошибка импорта" : "Import Error",
-        description: language === 'ru' ? "Произошла ошибка при импорте" : "An error occurred during import",
+        description: language === 'ru' 
+          ? `Произошла ошибка при импорте: ${errorMessage}` 
+          : `An error occurred during import: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {

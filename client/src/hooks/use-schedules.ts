@@ -79,6 +79,7 @@ export function usePatchScheduleTask() {
         startDate?: string; // YYYY-MM-DD
         durationDays?: number;
         orderIndex?: number;
+        actNumber?: number | null;
       };
       scheduleId?: number;
     }) => {

@@ -40,16 +40,27 @@ export function useImportWorks() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: { mode?: "merge" | "replace"; items: InsertWork[] }) => {
-      const res = await fetch(api.works.import.path, {
-        method: api.works.import.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
+      let res: Response;
+      try {
+        res = await fetch(api.works.import.path, {
+          method: api.works.import.method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+          credentials: "include",
+        });
+      } catch (networkError) {
+        throw new Error(`Network error: ${networkError instanceof Error ? networkError.message : String(networkError)}`);
+      }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to import works");
+        let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // Если не удалось прочитать JSON, используем статус
+        }
+        throw new Error(errorMessage);
       }
 
       return api.works.import.responses[200].parse(await res.json());

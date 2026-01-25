@@ -1,5 +1,48 @@
 # Changelog
 
+## [2026-01-25] - UI: исправление заголовка колонки в графике работ
+### Добавлено
+- Нет
+
+### Изменено
+- Нет
+
+### Исправлено
+- Заголовок колонки в таблице "График работ" изменён с "Работа" на "Наименование работ" (`client/src/lib/i18n.ts`)
+
+---
+
+## [2026-01-25] - Акты: формирование из графика работ (actNumber)
+### Добавлено
+- Поле принадлежности задачи к акту: `schedule_tasks.act_number` (nullable) + индекс `(schedule_id, act_number)` (`shared/schema.ts`)
+- Глобальный номер акта: `acts.act_number` (unique, nullable для legacy) (`shared/schema.ts`)
+- API: `POST /api/schedules/:id/generate-acts` — сформировать/обновить акты из графика (`shared/routes.ts`, `server/routes.ts`)
+- UI графика `/schedule`: отображение и редактирование номера акта у задачи (`client/src/pages/Schedule.tsx`)
+- UI актов `/acts`: кнопка “Сформировать/обновить из графика” (`client/src/pages/Acts.tsx`)
+- UI актов `/acts`: кнопка “Скачать” экспортирует PDF даже без выбора шаблонов (fallback к одному PDF по `worksData`)
+
+### Изменено
+- Расчёт периода акта: `dateStart=min(startDate)`, `dateEnd=max(startDate+durationDays)`; `worksData` агрегируется по `workId`, quantity берётся из `works.quantityTotal` (`server/routes.ts`)
+- Экспорт PDF: дефолт `actNumber` берётся из `act.actNumber`, а дефолт `actDate` — из `act.dateEnd` (`server/routes.ts`)
+
+### Исправлено
+- Нет
+
+---
+
+## [2026-01-25] - АОСР: приведение шаблона к эталону `005_АОСР 4.pdf`
+### Добавлено
+- Планируемые плейсхолдеры и секции под эталонную форму АОСР (расширение модели `ActData`, новые роли/подписи, приложения)
+
+### Изменено
+- Будет обновлён `server/templates/aosr/aosr-template.json`: материалы и приложения — **текстом** (как в эталоне), без таблицы “Наименование”
+- Будет подключён шрифт **Times New Roman** для максимально близкого визуального совпадения
+
+### Исправлено
+- Нет
+
+---
+
 ## [2026-01-24] - АОСР: генерация PDF по JSON-шаблону (pdfmake)
 ### Добавлено
 - `server/templates/aosr/aosr-template.json` используется как источник `docDefinition` для pdfmake (шаблон с плейсхолдерами `{{...}}`)

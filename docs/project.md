@@ -10,8 +10,9 @@
 ## Ключевые сценарии (как сейчас)
 - **Импорт ВОР из Excel**: пользователь загружает `.xlsx`, клиент парсит файл и отправляет позиции на сервер одним запросом `POST /api/works/import` в режиме **merge** (без авто-удаления данных).
 - **Журнал работ**: пользователь отправляет сообщение о выполненной работе; сервер сохраняет raw-текст и пытается извлечь структуру через OpenAI (workCode/quantity/date/location и т.д.).
-- **Генерация акта**: по диапазону дат выбираются обработанные сообщения, группируются по `workCode`, суммируются количества и создаётся запись акта.
-- **Экспорт PDF АОСР**: `POST /api/acts/:id/export` генерирует один или несколько PDF по выбранным шаблонам. Для АОСР используется pdfmake-шаблон `server/templates/aosr/aosr-template.json` с плейсхолдерами `{{...}}` и динамической таблицей материалов.
+- **Генерация акта (legacy)**: по диапазону дат выбираются обработанные сообщения, группируются по `workCode`, суммируются количества и создаётся запись акта.
+- **Генерация актов из графика работ (новое)**: на экране `/schedule` каждой задаче задаётся номер принадлежности `actNumber`. По кнопке “Сформировать/обновить акты из графика” сервер группирует задачи по `actNumber`, вычисляет `dateStart/dateEnd` и формирует `worksData` (агрегация по `workId`, quantity — из `works.quantityTotal`).
+- **Экспорт PDF АОСР**: `POST /api/acts/:id/export` генерирует один или несколько PDF по выбранным шаблонам. Для АОСР используется pdfmake-шаблон `server/templates/aosr/aosr-template.json` с плейсхолдерами `{{...}}` (в эталонном варианте под `005_АОСР 4.pdf` материалы и приложения формируются **текстом**, а не таблицей; данные приходят через `formData`).
 
 ## Архитектура (высокоуровневая)
 
@@ -61,10 +62,10 @@ flowchart LR
 Основные таблицы:
 - `works`: позиции ВОР/ВОИР (код, описание, единицы, плановый объём, синонимы).
 - `messages`: исходный текст, нормализованные поля (json), флаги обработки.
-- `acts`: акты (период, локация, статус, агрегированные работы в json).
+- `acts`: акты (глобальный номер акта `actNumber`, период `dateStart/dateEnd`, локация, статус, агрегированные работы в `worksData` (json)).
 - `attachments`: вложения к актам (url/name/type).
 - `schedules`: графики работ (контейнеры диаграммы Ганта; в MVP обычно используется дефолтный).
-- `schedule_tasks`: задачи графика (полосы Ганта), привязанные к `works` и содержащие `startDate`/`durationDays`/`orderIndex`.
+- `schedule_tasks`: задачи графика (полосы Ганта), привязанные к `works` и содержащие `startDate`/`durationDays`/`orderIndex` и номер принадлежности к акту `actNumber`.
 
 Дополнительно (задел под AI-чат):
 - `conversations` и chat-`messages` (см. `shared/schema.ts` + `server/replit_integrations/chat/*`).
@@ -75,9 +76,9 @@ flowchart LR
 Текущие ресурсы:
 - **Works**: `GET /api/works`, `POST /api/works`
 - **Messages**: `GET /api/messages`, `POST /api/messages`
-- **Acts**: `GET /api/acts`, `POST /api/acts/generate`, `GET /api/acts/:id`, `POST /api/acts/create-with-templates`, `POST /api/acts/:id/export`
+- **Acts**: `GET /api/acts`, `POST /api/acts/generate` (legacy), `GET /api/acts/:id`, `POST /api/acts/create-with-templates` (legacy), `POST /api/acts/:id/export`
 - **Act Templates**: `GET /api/act-templates`
-- **Schedules**: `GET /api/schedules/default`, `POST /api/schedules`, `GET /api/schedules/:id`, `POST /api/schedules/:id/bootstrap-from-works`
+- **Schedules**: `GET /api/schedules/default`, `POST /api/schedules`, `GET /api/schedules/:id`, `POST /api/schedules/:id/bootstrap-from-works`, `POST /api/schedules/:id/generate-acts`
 - **Schedule Tasks**: `PATCH /api/schedule-tasks/:id`
 
 Дополнительно:

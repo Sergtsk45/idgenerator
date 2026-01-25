@@ -8,6 +8,16 @@ import { generateAosrPdf, loadTemplateCatalog, type ActData } from "./pdfGenerat
 import * as fs from "fs";
 import * as path from "path";
 
+function addDaysISO(dateStr: string, days: number): string {
+  // Expect YYYY-MM-DD. Work in UTC to avoid timezone shifts.
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`Invalid date: ${dateStr}`);
+  }
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 // OpenAI is optional for local/dev runs. Only initialize when credentials exist.
 let openaiClient: OpenAI | null = null;
 function getOpenAIClient(): OpenAI | null {
@@ -338,6 +348,103 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.schedules.generateActs.path, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ message: "Invalid schedule id" });
+      }
+
+      api.schedules.generateActs.input.parse(req.body ?? {});
+
+      const schedule = await storage.getScheduleWithTasks(id);
+      if (!schedule) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+
+      const groups = new Map<number, typeof schedule.tasks>();
+      let skippedNoActNumber = 0;
+
+      for (const task of schedule.tasks) {
+        const actNumber = (task as any).actNumber as number | null | undefined;
+        if (actNumber == null) {
+          skippedNoActNumber++;
+          continue;
+        }
+        if (!Number.isFinite(actNumber) || actNumber <= 0) {
+          return res.status(400).json({ message: `Invalid actNumber for task ${task.id}` });
+        }
+
+        const list = groups.get(actNumber) ?? [];
+        list.push(task);
+        groups.set(actNumber, list);
+      }
+
+      const actNumbers = Array.from(groups.keys()).sort((a, b) => a - b);
+      let created = 0;
+      let updated = 0;
+
+      for (const actNumber of actNumbers) {
+        const tasks = groups.get(actNumber) ?? [];
+        if (tasks.length === 0) continue;
+
+        let minStart: string | null = null;
+        let maxEnd: string | null = null;
+
+        const workIdsSet = new Set<number>();
+        for (const t of tasks) {
+          const start = String(t.startDate);
+          const durationDays = Number(t.durationDays ?? 0);
+          const end = addDaysISO(start, durationDays);
+
+          if (!minStart || start < minStart) minStart = start;
+          if (!maxEnd || end > maxEnd) maxEnd = end;
+
+          workIdsSet.add(Number(t.workId));
+        }
+
+        const workIds = Array.from(workIdsSet);
+        const works = await storage.getWorksByIds(workIds);
+        works.sort((a, b) => String(a.code).localeCompare(String(b.code)));
+
+        const worksData = works.map((w) => {
+          const rawQty: any = (w as any).quantityTotal;
+          const qty = rawQty == null ? 0 : Number(rawQty);
+          return {
+            workId: w.id,
+            quantity: Number.isFinite(qty) ? qty : 0,
+            description: w.description,
+          };
+        });
+
+        const result = await storage.upsertActByNumber({
+          actNumber,
+          dateStart: minStart,
+          dateEnd: maxEnd,
+          status: "draft",
+          worksData,
+        });
+
+        if (result.created) created++;
+        else updated++;
+      }
+
+      return res.status(200).json({
+        scheduleId: id,
+        actNumbers,
+        created,
+        updated,
+        skippedNoActNumber,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("Generate acts from schedule failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   app.patch(api.scheduleTasks.patch.path, async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -402,10 +509,20 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Act not found" });
       }
 
-      const { templateIds, formData } = req.body;
+      const { templateIds, formData } = req.body ?? {};
 
-      if (!templateIds || !Array.isArray(templateIds) || templateIds.length === 0) {
-        return res.status(400).json({ message: "No templates selected" });
+      // Allow exporting without explicit templates (for acts generated from schedule).
+      // Strategy:
+      // - if templateIds provided -> use them
+      // - else try act_template_selections
+      // - else generate a single "default" AOSR PDF using worksData aggregated from the act
+      let effectiveTemplateIds: string[] = Array.isArray(templateIds) ? templateIds : [];
+      if (effectiveTemplateIds.length === 0) {
+        const selections = await storage.getActTemplateSelections(actId);
+        for (const s of selections) {
+          const tpl = await storage.getActTemplate(Number((s as any).templateId));
+          if (tpl?.templateId) effectiveTemplateIds.push(tpl.templateId);
+        }
       }
 
       // Ensure generated PDFs directory exists
@@ -416,29 +533,134 @@ export async function registerRoutes(
 
       const generatedFiles: { templateId: string; filename: string; url: string }[] = [];
 
-      for (const templateId of templateIds) {
+      if (effectiveTemplateIds.length === 0) {
+        const actNumber = formData?.actNumber || String(act.actNumber ?? act.id);
+        const actDate = formData?.actDate || String(act.dateEnd ?? new Date().toISOString().split("T")[0]);
+        const p1Works =
+          Array.isArray(act.worksData) && act.worksData.length > 0
+            ? act.worksData
+                .map((w, idx) => {
+                  const qty = typeof (w as any).quantity === "number" ? (w as any).quantity : 0;
+                  const desc = String((w as any).description ?? "").trim();
+                  const line = desc || `workId ${(w as any).workId ?? ""}`.trim();
+                  return `${idx + 1}. ${line}${qty ? ` — ${qty}` : ""}`;
+                })
+                .join("\n")
+            : "";
+
+        const actData: ActData = {
+          actNumber,
+          actDate,
+          city: formData?.city || "Москва",
+          objectName: formData?.objectName || "Объект строительства",
+          objectAddress: formData?.objectAddress || act.location || "Адрес объекта",
+          workDescription: formData?.workDescription || "Работы по акту (из графика)",
+          dateStart: act.dateStart || new Date().toISOString().split("T")[0],
+          dateEnd: act.dateEnd || new Date().toISOString().split("T")[0],
+          p1Works,
+
+          // эталонные поля (005_АОСР 4)
+          objectFullName: formData?.objectFullName,
+          developerOrgFull: formData?.developerOrgFull,
+          builderOrgFull: formData?.builderOrgFull,
+          designerOrgFull: formData?.designerOrgFull,
+          repCustomerControlLine: formData?.repCustomerControlLine,
+          repCustomerControlOrder: formData?.repCustomerControlOrder,
+          repBuilderLine: formData?.repBuilderLine,
+          repBuilderOrder: formData?.repBuilderOrder,
+          repBuilderControlLine: formData?.repBuilderControlLine,
+          repBuilderControlOrder: formData?.repBuilderControlOrder,
+          repDesignerLine: formData?.repDesignerLine,
+          repDesignerOrder: formData?.repDesignerOrder,
+          repWorkPerformerLine: formData?.repWorkPerformerLine,
+          repWorkPerformerOrder: formData?.repWorkPerformerOrder,
+          p2ProjectDocs: formData?.p2ProjectDocs,
+          p3MaterialsText: formData?.p3MaterialsText,
+          p4AsBuiltDocs: formData?.p4AsBuiltDocs,
+          p6NormativeRefs: formData?.p6NormativeRefs,
+          p7NextWorks: formData?.p7NextWorks,
+          additionalInfo: formData?.additionalInfo,
+          copiesCount: formData?.copiesCount,
+          attachments: Array.isArray(formData?.attachments) ? formData.attachments : undefined,
+          attachmentsText: formData?.attachmentsText,
+          sigCustomerControl: formData?.sigCustomerControl,
+          sigBuilder: formData?.sigBuilder,
+          sigBuilderControl: formData?.sigBuilderControl,
+          sigDesigner: formData?.sigDesigner,
+          sigWorkPerformer: formData?.sigWorkPerformer,
+        };
+
+        const pdfBuffer = await generateAosrPdf(actData);
+        const safeActNumber = String(actNumber).replace(/[^0-9A-Za-z_-]+/g, "_");
+        const filename = `aosr-act-${safeActNumber}.pdf`;
+        const filePath = path.join(pdfDir, filename);
+        fs.writeFileSync(filePath, pdfBuffer);
+        generatedFiles.push({ templateId: "default", filename, url: `/api/pdfs/${filename}` });
+
+        return res.json({ files: generatedFiles });
+      }
+
+      for (const templateId of effectiveTemplateIds) {
         const template = await storage.getActTemplateByTemplateId(templateId);
         if (!template) continue;
 
         // Build act data from form and database
         const actData: ActData = {
-          actNumber: formData?.actNumber || `${act.id}`,
-          actDate: formData?.actDate || new Date().toISOString().split("T")[0],
+          actNumber: formData?.actNumber || String(act.actNumber ?? act.id),
+          // "Дата составления" по умолчанию = дата окончания акта (если есть)
+          actDate: formData?.actDate || String(act.dateEnd ?? new Date().toISOString().split("T")[0]),
+
+          // legacy fields (оставляем для обратной совместимости/фолбэков)
           city: formData?.city || "Москва",
           objectName: formData?.objectName || "Объект строительства",
           objectAddress: formData?.objectAddress || act.location || "Адрес объекта",
-          developerRepName: formData?.developerRepName || "Иванов И.И.",
-          developerRepPosition: formData?.developerRepPosition || "Главный инженер",
-          contractorRepName: formData?.contractorRepName || "Петров П.П.",
-          contractorRepPosition: formData?.contractorRepPosition || "Прораб",
-          supervisorRepName: formData?.supervisorRepName || "Сидоров С.С.",
-          supervisorRepPosition: formData?.supervisorRepPosition || "Инженер стройконтроля",
+          developerRepName: formData?.developerRepName || "",
+          developerRepPosition: formData?.developerRepPosition || "",
+          contractorRepName: formData?.contractorRepName || "",
+          contractorRepPosition: formData?.contractorRepPosition || "",
+          supervisorRepName: formData?.supervisorRepName || "",
+          supervisorRepPosition: formData?.supervisorRepPosition || "",
+
           workDescription: template.description || template.title,
           projectDocumentation: formData?.projectDocumentation || "Рабочая документация",
           dateStart: act.dateStart || new Date().toISOString().split("T")[0],
           dateEnd: act.dateEnd || new Date().toISOString().split("T")[0],
           qualityDocuments: formData?.qualityDocuments || "Сертификаты, паспорта качества",
           materials: formData?.materials,
+
+          // эталонные поля (005_АОСР 4)
+          objectFullName: formData?.objectFullName,
+          developerOrgFull: formData?.developerOrgFull,
+          builderOrgFull: formData?.builderOrgFull,
+          designerOrgFull: formData?.designerOrgFull,
+
+          repCustomerControlLine: formData?.repCustomerControlLine,
+          repCustomerControlOrder: formData?.repCustomerControlOrder,
+          repBuilderLine: formData?.repBuilderLine,
+          repBuilderOrder: formData?.repBuilderOrder,
+          repBuilderControlLine: formData?.repBuilderControlLine,
+          repBuilderControlOrder: formData?.repBuilderControlOrder,
+          repDesignerLine: formData?.repDesignerLine,
+          repDesignerOrder: formData?.repDesignerOrder,
+          repWorkPerformerLine: formData?.repWorkPerformerLine,
+          repWorkPerformerOrder: formData?.repWorkPerformerOrder,
+
+          p2ProjectDocs: formData?.p2ProjectDocs,
+          p3MaterialsText: formData?.p3MaterialsText,
+          p4AsBuiltDocs: formData?.p4AsBuiltDocs,
+          p6NormativeRefs: formData?.p6NormativeRefs,
+          p7NextWorks: formData?.p7NextWorks,
+          additionalInfo: formData?.additionalInfo,
+          copiesCount: formData?.copiesCount,
+
+          attachments: Array.isArray(formData?.attachments) ? formData.attachments : undefined,
+          attachmentsText: formData?.attachmentsText,
+
+          sigCustomerControl: formData?.sigCustomerControl,
+          sigBuilder: formData?.sigBuilder,
+          sigBuilderControl: formData?.sigBuilderControl,
+          sigDesigner: formData?.sigDesigner,
+          sigWorkPerformer: formData?.sigWorkPerformer,
         };
 
         try {
@@ -478,7 +700,7 @@ export async function registerRoutes(
     }
     
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
     res.sendFile(filePath);
   });
 

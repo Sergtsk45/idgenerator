@@ -20,6 +20,11 @@ import { useLanguageStore, translations } from "@/lib/i18n";
 import { ru, enUS } from "date-fns/locale";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useDefaultSchedule } from "@/hooks/use-schedules";
+import { api, buildUrl } from "@shared/routes";
 
 interface ActTemplate {
   id: number;
@@ -49,11 +54,56 @@ export default function Acts() {
   const { data: acts = [], isLoading } = useActs();
   const generateAct = useGenerateAct();
   const { toast } = useToast();
+  const { data: defaultSchedule } = useDefaultSchedule();
+  const scheduleId = defaultSchedule?.id;
   const [dateStart, setDateStart] = useState<Date>();
   const [dateEnd, setDateEnd] = useState<Date>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTemplates, setSelectedTemplates] = useState<Set<string>>(new Set());
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Эталонный АОСР (005_АОСР 4): данные, которые пойдут в formData при экспорте PDF
+  const [aosrForm, setAosrForm] = useState({
+    actNumber: "",
+    actDate: "",
+
+    objectName: "",
+    objectAddress: "",
+    objectFullName: "",
+
+    developerOrgFull: "",
+    builderOrgFull: "",
+    designerOrgFull: "",
+
+    repCustomerControlLine: "",
+    repCustomerControlOrder: "",
+    repBuilderLine: "",
+    repBuilderOrder: "",
+    repBuilderControlLine: "",
+    repBuilderControlOrder: "",
+    repDesignerLine: "",
+    repDesignerOrder: "",
+    repWorkPerformerLine: "",
+    repWorkPerformerOrder: "",
+
+    p2ProjectDocs: "",
+    p3MaterialsText: "",
+    p4AsBuiltDocs: "",
+    p6NormativeRefs: "",
+    p7NextWorks: "",
+    additionalInfo: "",
+    copiesCount: "",
+
+    // Каждая строка = один пункт приложения (нумерацию выставит сервер)
+    attachmentsLines: "",
+
+    // Подписи (ФИО с инициалами)
+    sigCustomerControl: "",
+    sigBuilder: "",
+    sigBuilderControl: "",
+    sigDesigner: "",
+    sigWorkPerformer: "",
+  });
 
   const { data: templatesData, isLoading: templatesLoading } = useQuery<TemplatesResponse>({
     queryKey: ["/api/act-templates"],
@@ -71,11 +121,81 @@ export default function Acts() {
 
   const exportAct = useMutation({
     mutationFn: async (data: { actId: number; templateIds: string[] }) => {
+      const attachments = aosrForm.attachmentsLines
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+
       const response = await apiRequest("POST", `/api/acts/${data.actId}/export`, {
         templateIds: data.templateIds,
-        formData: {},
+        formData: {
+          actNumber: aosrForm.actNumber || undefined,
+          actDate: aosrForm.actDate || undefined,
+          objectName: aosrForm.objectName || undefined,
+          objectAddress: aosrForm.objectAddress || undefined,
+          objectFullName: aosrForm.objectFullName || undefined,
+
+          developerOrgFull: aosrForm.developerOrgFull || undefined,
+          builderOrgFull: aosrForm.builderOrgFull || undefined,
+          designerOrgFull: aosrForm.designerOrgFull || undefined,
+
+          repCustomerControlLine: aosrForm.repCustomerControlLine || undefined,
+          repCustomerControlOrder: aosrForm.repCustomerControlOrder || undefined,
+          repBuilderLine: aosrForm.repBuilderLine || undefined,
+          repBuilderOrder: aosrForm.repBuilderOrder || undefined,
+          repBuilderControlLine: aosrForm.repBuilderControlLine || undefined,
+          repBuilderControlOrder: aosrForm.repBuilderControlOrder || undefined,
+          repDesignerLine: aosrForm.repDesignerLine || undefined,
+          repDesignerOrder: aosrForm.repDesignerOrder || undefined,
+          repWorkPerformerLine: aosrForm.repWorkPerformerLine || undefined,
+          repWorkPerformerOrder: aosrForm.repWorkPerformerOrder || undefined,
+
+          p2ProjectDocs: aosrForm.p2ProjectDocs || undefined,
+          p3MaterialsText: aosrForm.p3MaterialsText || undefined,
+          p4AsBuiltDocs: aosrForm.p4AsBuiltDocs || undefined,
+          p6NormativeRefs: aosrForm.p6NormativeRefs || undefined,
+          p7NextWorks: aosrForm.p7NextWorks || undefined,
+          additionalInfo: aosrForm.additionalInfo || undefined,
+          copiesCount: aosrForm.copiesCount || undefined,
+
+          attachments,
+
+          sigCustomerControl: aosrForm.sigCustomerControl || undefined,
+          sigBuilder: aosrForm.sigBuilder || undefined,
+          sigBuilderControl: aosrForm.sigBuilderControl || undefined,
+          sigDesigner: aosrForm.sigDesigner || undefined,
+          sigWorkPerformer: aosrForm.sigWorkPerformer || undefined,
+        },
       });
       return response.json();
+    },
+  });
+
+  const generateActsFromSchedule = useMutation({
+    mutationFn: async () => {
+      if (!scheduleId) throw new Error("Schedule id is required");
+      const url = buildUrl(api.schedules.generateActs.path, { id: scheduleId });
+      const res = await fetch(url, {
+        method: api.schedules.generateActs.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to generate acts from schedule");
+      }
+      return api.schedules.generateActs.responses[200].parse(await res.json());
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.acts.list.path] });
+      toast({
+        title: language === "ru" ? "Акты обновлены" : "Acts updated",
+        description:
+          language === "ru"
+            ? `Создано: ${data.created}, обновлено: ${data.updated}. Пропущено (без номера): ${data.skippedNoActNumber}`
+            : `Created: ${data.created}, updated: ${data.updated}. Skipped (no number): ${data.skippedNoActNumber}`,
+      });
     },
   });
 
@@ -130,6 +250,39 @@ export default function Acts() {
       setSelectedTemplates(new Set());
       setDateStart(undefined);
       setDateEnd(undefined);
+      setAosrForm({
+        actNumber: "",
+        actDate: "",
+        objectName: "",
+        objectAddress: "",
+        objectFullName: "",
+        developerOrgFull: "",
+        builderOrgFull: "",
+        designerOrgFull: "",
+        repCustomerControlLine: "",
+        repCustomerControlOrder: "",
+        repBuilderLine: "",
+        repBuilderOrder: "",
+        repBuilderControlLine: "",
+        repBuilderControlOrder: "",
+        repDesignerLine: "",
+        repDesignerOrder: "",
+        repWorkPerformerLine: "",
+        repWorkPerformerOrder: "",
+        p2ProjectDocs: "",
+        p3MaterialsText: "",
+        p4AsBuiltDocs: "",
+        p6NormativeRefs: "",
+        p7NextWorks: "",
+        additionalInfo: "",
+        copiesCount: "",
+        attachmentsLines: "",
+        sigCustomerControl: "",
+        sigBuilder: "",
+        sigBuilderControl: "",
+        sigDesigner: "",
+        sigWorkPerformer: "",
+      });
 
       if (exportResult.files && exportResult.files.length > 0) {
         toast({
@@ -164,11 +317,26 @@ export default function Acts() {
   );
 
   const handleDownloadAct = async (actId: number) => {
-    const selections = await fetch(`/api/act-template-selections?actId=${actId}`).catch(() => null);
     toast({
       title: language === "ru" ? "Скачивание" : "Downloading",
       description: language === "ru" ? "Подготовка документов..." : "Preparing documents...",
     });
+    try {
+      const exportResult = await exportAct.mutateAsync({ actId, templateIds: [] });
+      if (exportResult.files && exportResult.files.length > 0) {
+        exportResult.files.forEach((file: { url: string; filename: string }) => {
+          window.open(file.url, "_blank");
+        });
+      } else {
+        throw new Error("No files");
+      }
+    } catch (_e) {
+      toast({
+        title: language === "ru" ? "Ошибка" : "Error",
+        description: language === "ru" ? "Не удалось скачать акт" : "Failed to download act",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -176,6 +344,30 @@ export default function Acts() {
       <Header title={t.title} />
 
       <div className="flex-1 px-4 py-6 pb-24 max-w-md mx-auto w-full">
+        <div className="mb-3">
+          <Button
+            variant="outline"
+            className="w-full h-11 rounded-xl"
+            disabled={!scheduleId || generateActsFromSchedule.isPending}
+            onClick={async () => {
+              toast({
+                title: language === "ru" ? "Синхронизация" : "Sync",
+                description: language === "ru" ? "Формирование актов из графика..." : "Generating acts from schedule...",
+              });
+              await generateActsFromSchedule.mutateAsync();
+            }}
+          >
+            {generateActsFromSchedule.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                {language === "ru" ? "Формирование..." : "Generating..."}
+              </>
+            ) : (
+              <>{language === "ru" ? "Сформировать/обновить из графика" : "Generate/update from schedule"}</>
+            )}
+          </Button>
+        </div>
+
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -206,10 +398,14 @@ export default function Acts() {
                         <div>
                           <CardTitle className="text-base">
                             {language === "ru" ? "Акт №" : "Act #"}
-                            {act.id}
+                            {act.actNumber ?? act.id}
                           </CardTitle>
                           <CardDescription className="text-xs">
-                            {act.dateStart ? format(new Date(act.dateStart), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS }) : "No date"}
+                            {act.dateEnd
+                              ? format(new Date(act.dateEnd), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
+                              : act.dateStart
+                                ? format(new Date(act.dateStart), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
+                                : "No date"}
                           </CardDescription>
                         </div>
                       </div>
@@ -347,6 +543,282 @@ export default function Acts() {
                     </Accordion>
                   )}
                 </div>
+
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="aosrForm" className="border rounded-lg px-3">
+                    <AccordionTrigger className="py-3 hover:no-underline">
+                      <span className="text-sm font-medium">
+                        {language === "ru" ? "Данные для АОСР (эталон 005_АОСР 4)" : "AOSR form data (reference template)"}
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-4">
+                      <div className="space-y-4">
+                        <div className="grid gap-3 grid-cols-2">
+                          <div className="grid gap-1.5">
+                            <Label>№ акта</Label>
+                            <Input
+                              value={aosrForm.actNumber}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, actNumber: e.target.value }))}
+                              placeholder={language === "ru" ? "Например: 4" : "e.g. 4"}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>Дата акта</Label>
+                            <Input
+                              value={aosrForm.actDate}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, actDate: e.target.value }))}
+                              placeholder={language === "ru" ? "YYYY-MM-DD" : "YYYY-MM-DD"}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3">
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Объект (полная строка)" : "Object (full line)"}</Label>
+                            <Textarea
+                              value={aosrForm.objectFullName}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, objectFullName: e.target.value }))}
+                              placeholder={language === "ru" ? "Строительство ... по адресу: ..." : "Construction ... at address ..."}
+                              className="min-h-[72px]"
+                            />
+                          </div>
+                          <div className="grid gap-3 grid-cols-2">
+                            <div className="grid gap-1.5">
+                              <Label>{language === "ru" ? "Объект (кратко)" : "Object name"}</Label>
+                              <Input
+                                value={aosrForm.objectName}
+                                onChange={(e) => setAosrForm((s) => ({ ...s, objectName: e.target.value }))}
+                                placeholder={language === "ru" ? "Наименование" : "Name"}
+                              />
+                            </div>
+                            <div className="grid gap-1.5">
+                              <Label>{language === "ru" ? "Адрес объекта" : "Object address"}</Label>
+                              <Input
+                                value={aosrForm.objectAddress}
+                                onChange={(e) => setAosrForm((s) => ({ ...s, objectAddress: e.target.value }))}
+                                placeholder={language === "ru" ? "Адрес" : "Address"}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3">
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Застройщик/техзаказчик (реквизиты одной строкой)" : "Developer/customer (one line)"}</Label>
+                            <Textarea
+                              value={aosrForm.developerOrgFull}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, developerOrgFull: e.target.value }))}
+                              className="min-h-[60px]"
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Лицо, осуществляющее строительство (реквизиты)" : "Builder org (details)"}</Label>
+                            <Textarea
+                              value={aosrForm.builderOrgFull}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, builderOrgFull: e.target.value }))}
+                              className="min-h-[60px]"
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Проектировщик (реквизиты)" : "Designer org (details)"}</Label>
+                            <Textarea
+                              value={aosrForm.designerOrgFull}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, designerOrgFull: e.target.value }))}
+                              className="min-h-[60px]"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3">
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Представитель заказчика по стройконтролю (строка)" : "Customer control rep (line)"}</Label>
+                            <Input
+                              value={aosrForm.repCustomerControlLine}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repCustomerControlLine: e.target.value }))}
+                              placeholder={language === "ru" ? "инженер ... Фамилия И.О." : "position ... Name I.O."}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Основание/приказ" : "Order/basis"}</Label>
+                            <Input
+                              value={aosrForm.repCustomerControlOrder}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repCustomerControlOrder: e.target.value }))}
+                              placeholder={language === "ru" ? "приказ № ... от ..." : "order # ..."}
+                            />
+                          </div>
+
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Представитель строителя (строка)" : "Builder rep (line)"}</Label>
+                            <Input
+                              value={aosrForm.repBuilderLine}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repBuilderLine: e.target.value }))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Основание/приказ" : "Order/basis"}</Label>
+                            <Input
+                              value={aosrForm.repBuilderOrder}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repBuilderOrder: e.target.value }))}
+                            />
+                          </div>
+
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Строитель по стройконтролю (строка)" : "Builder control rep (line)"}</Label>
+                            <Input
+                              value={aosrForm.repBuilderControlLine}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repBuilderControlLine: e.target.value }))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Основание/приказ" : "Order/basis"}</Label>
+                            <Input
+                              value={aosrForm.repBuilderControlOrder}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repBuilderControlOrder: e.target.value }))}
+                            />
+                          </div>
+
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Представитель проектировщика (строка)" : "Designer rep (line)"}</Label>
+                            <Input
+                              value={aosrForm.repDesignerLine}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repDesignerLine: e.target.value }))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Основание/приказ" : "Order/basis"}</Label>
+                            <Input
+                              value={aosrForm.repDesignerOrder}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repDesignerOrder: e.target.value }))}
+                            />
+                          </div>
+
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Лицо, выполнившее работы (строка)" : "Work performer rep (line)"}</Label>
+                            <Input
+                              value={aosrForm.repWorkPerformerLine}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repWorkPerformerLine: e.target.value }))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Основание/приказ" : "Order/basis"}</Label>
+                            <Input
+                              value={aosrForm.repWorkPerformerOrder}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, repWorkPerformerOrder: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3">
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "П.2 Проектная документация" : "P.2 Project docs"}</Label>
+                            <Input
+                              value={aosrForm.p2ProjectDocs}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, p2ProjectDocs: e.target.value }))}
+                              placeholder={language === "ru" ? "Напр.: АЗП-... лист ..." : "e.g. drawing ref"}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "П.3 Материалы (как в эталоне, текстом)" : "P.3 Materials (text)"}</Label>
+                            <Textarea
+                              value={aosrForm.p3MaterialsText}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, p3MaterialsText: e.target.value }))}
+                              className="min-h-[88px]"
+                              placeholder={language === "ru" ? "ФБС ... — паспорт ...; ..." : "Material — doc; ..."}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "П.4 Исполнительные документы" : "P.4 As-built docs"}</Label>
+                            <Textarea
+                              value={aosrForm.p4AsBuiltDocs}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, p4AsBuiltDocs: e.target.value }))}
+                              className="min-h-[72px]"
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "П.6 Соответствие (НД/разделам ПД)" : "P.6 Normative refs"}</Label>
+                            <Input
+                              value={aosrForm.p6NormativeRefs}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, p6NormativeRefs: e.target.value }))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "П.7 Последующие работы" : "P.7 Next works"}</Label>
+                            <Input
+                              value={aosrForm.p7NextWorks}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, p7NextWorks: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 grid-cols-2">
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Экземпляров" : "Copies count"}</Label>
+                            <Input
+                              value={aosrForm.copiesCount}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, copiesCount: e.target.value }))}
+                              placeholder={language === "ru" ? "Напр.: 3" : "e.g. 3"}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Доп. сведения" : "Additional info"}</Label>
+                            <Input
+                              value={aosrForm.additionalInfo}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, additionalInfo: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-1.5">
+                          <Label>{language === "ru" ? "Приложения (каждая строка — отдельный пункт)" : "Attachments (one per line)"}</Label>
+                          <Textarea
+                            value={aosrForm.attachmentsLines}
+                            onChange={(e) => setAosrForm((s) => ({ ...s, attachmentsLines: e.target.value }))}
+                            className="min-h-[100px]"
+                            placeholder={language === "ru" ? "паспорт ...\nпротокол ...\nсертификат ..." : "doc...\ndoc..."}
+                          />
+                        </div>
+
+                        <div className="grid gap-3">
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Подпись: заказчик (Фамилия И.О.)" : "Signature: customer (Name I.O.)"}</Label>
+                            <Input
+                              value={aosrForm.sigCustomerControl}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, sigCustomerControl: e.target.value }))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Подпись: строитель (Фамилия И.О.)" : "Signature: builder"}</Label>
+                            <Input
+                              value={aosrForm.sigBuilder}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, sigBuilder: e.target.value }))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Подпись: стройконтроль строителя" : "Signature: builder control"}</Label>
+                            <Input
+                              value={aosrForm.sigBuilderControl}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, sigBuilderControl: e.target.value }))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Подпись: проектировщик" : "Signature: designer"}</Label>
+                            <Input
+                              value={aosrForm.sigDesigner}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, sigDesigner: e.target.value }))}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "Подпись: выполнивший работы" : "Signature: work performer"}</Label>
+                            <Input
+                              value={aosrForm.sigWorkPerformer}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, sigWorkPerformer: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </div>
             </ScrollArea>
             <div className="pt-4 border-t">
