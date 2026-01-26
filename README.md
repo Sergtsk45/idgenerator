@@ -1,5 +1,17 @@
 # AOSR Document Automation System
 
+## 🚀 Быстрый старт
+
+После перезагрузки системы для запуска приложения выполните:
+
+```bash
+tjr-dev
+```
+
+Или смотрите [QUICKSTART.md](QUICKSTART.md) для других вариантов запуска.
+
+---
+
 ## Temporary Debugging Measures
 
 - **BoQ Import Overwrite**: For debugging purposes, importing a new Bill of Quantities (BoQ) from Excel will overwrite all existing records in the database. This behavior is intended to allow quick resets during development.

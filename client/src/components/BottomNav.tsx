@@ -10,10 +10,10 @@ export function BottomNav() {
 
   const navItems = [
     { href: "/works", icon: ListTodo, label: t.works },
-    { href: "/worklog", icon: ClipboardList, label: t.worklog },
-    { href: "/", icon: Mic, label: t.home },
     { href: "/schedule", icon: GanttChartSquare, label: t.schedule },
     { href: "/acts", icon: FileText, label: t.acts },
+    { href: "/", icon: Mic, label: t.home },
+    { href: "/worklog", icon: ClipboardList, label: t.worklog },
   ];
 
   return (

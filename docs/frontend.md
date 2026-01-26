@@ -26,6 +26,7 @@ client/
 │   │   ├── Home.tsx   # Журнал работ (чат-интерфейс)
 │   │   ├── Works.tsx  # Ведомость объемов работ (ВОР)
 │   │   ├── WorkLog.tsx # Общий журнал работ (таблицы)
+│   │   ├── Schedule.tsx # График работ (диаграмма Ганта)
 │   │   ├── Acts.tsx   # Акты АОСР
 │   │   └── Settings.tsx # Настройки (язык)
 │   ├── components/    # Переиспользуемые компоненты
@@ -71,6 +72,7 @@ client/
 /          → Home (журнал работ)
 /works     → Works (ВОР/ВОИР)
 /worklog   → WorkLog (общий журнал)
+/schedule  → Schedule (график работ)
 /acts      → Acts (акты АОСР)
 /settings  → Settings (настройки)
 ```

@@ -22,6 +22,7 @@
 - **База данных**: PostgreSQL + Drizzle ORM. Схема описана в `shared/schema.ts`.
 - **AI**: OpenAI API (через переменные окружения интеграции), используется для нормализации сообщений.
 - **Навигация UI**: основные разделы в `BottomNav`, доступ к `Settings` — через выпадающее меню “гамбургера” в `Header`.
+  - Порядок вкладок `BottomNav` (слева направо): **ВОР → График работ → Главная → Акты → ЖР**
 
 ### Диаграмма взаимодействий
 ```mermaid
@@ -42,7 +43,7 @@ flowchart LR
 
 ## Структура репозитория (важное)
 - `client/` — фронтенд (Vite root)
-  - `client/src/pages/*` — страницы: `Home` (журнал), `Works` (ВОР/ВОИР), `WorkLog` (ОЖР), `Acts` (акты), `Schedule` (график работ), `Settings` (язык).
+  - `client/src/pages/*` — страницы: `Works` (ВОР/ВОИР), `Schedule` (график работ), `Home` (главная/чат-журнал), `Acts` (акты), `WorkLog` (ЖР/ОЖР), `Settings` (язык).
   - `client/src/components/*` — общие компоненты (включая нижнюю навигацию).
   - `client/src/hooks/*` — react-query хуки для API.
   - `client/src/lib/*` — queryClient, i18n, utils.
