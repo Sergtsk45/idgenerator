@@ -22,7 +22,8 @@
 - **База данных**: PostgreSQL + Drizzle ORM. Схема описана в `shared/schema.ts`.
 - **AI**: OpenAI API (через переменные окружения интеграции), используется для нормализации сообщений.
 - **Навигация UI**: основные разделы в `BottomNav`, доступ к `Settings` — через выпадающее меню “гамбургера” в `Header`.
-  - Порядок вкладок `BottomNav` (слева направо): **ВОР → График работ → Главная → Акты → ЖР**
+  - Порядок вкладок `BottomNav` (слева направо): **ВОР → График работ → Акты → ЖР → Исходные**
+  - **Главная** (`/`) вынесена в кнопку в правом верхнем углу `Header` (иконка микрофона).
 
 ### Диаграмма взаимодействий
 ```mermaid
@@ -38,6 +39,9 @@ flowchart LR
     DB --> AT[attachments]
     DB --> S[schedules (gantt)]
     DB --> ST[schedule_tasks (gantt)]
+    DB --> O[objects (construction objects)]
+    DB --> OP[object_parties]
+    DB --> ORP[object_responsible_persons]
   end
 ```
 
@@ -61,9 +65,12 @@ flowchart LR
 
 ## Модель данных (текущее состояние)
 Основные таблицы:
+- `objects`: объект строительства (MVP: один «текущий объект»), используется как якорь для исходных данных плейсхолдеров.
+- `object_parties`: стороны объекта (заказчик/подрядчик/проектировщик) с реквизитами (минимум — `fullName`).
+- `object_responsible_persons`: ответственные лица/подписанты по ролям (ФИО/должность/основание + опционально line/sign).
 - `works`: позиции ВОР/ВОИР (код, описание, единицы, плановый объём, синонимы).
 - `messages`: исходный текст, нормализованные поля (json), флаги обработки.
-- `acts`: акты (глобальный номер акта `actNumber`, период `dateStart/dateEnd`, локация, статус, агрегированные работы в `worksData` (json)).
+- `acts`: акты (глобальный номер акта `actNumber`, период `dateStart/dateEnd`, локация, статус, агрегированные работы в `worksData` (json)) + `objectId` (FK → `objects.id`, может быть `NULL` для legacy).
 - `attachments`: вложения к актам (url/name/type).
 - `schedules`: графики работ (контейнеры диаграммы Ганта; в MVP обычно используется дефолтный).
 - `schedule_tasks`: задачи графика (полосы Ганта), привязанные к `works` и содержащие `startDate`/`durationDays`/`orderIndex` и номер принадлежности к акту `actNumber`.
@@ -75,6 +82,7 @@ flowchart LR
 Определён в `shared/routes.ts`, реализован в `server/routes.ts`.
 
 Текущие ресурсы:
+- **Object (MVP current)**: `GET /api/object/current`, `PATCH /api/object/current`, `GET /api/object/current/source-data`, `PUT /api/object/current/source-data`
 - **Works**: `GET /api/works`, `POST /api/works`
 - **Messages**: `GET /api/messages`, `POST /api/messages`
 - **Acts**: `GET /api/acts`, `POST /api/acts/generate` (legacy), `GET /api/acts/:id`, `POST /api/acts/create-with-templates` (legacy), `POST /api/acts/:id/export`

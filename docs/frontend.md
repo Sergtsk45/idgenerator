@@ -28,6 +28,7 @@ client/
 │   │   ├── WorkLog.tsx # Общий журнал работ (таблицы)
 │   │   ├── Schedule.tsx # График работ (диаграмма Ганта)
 │   │   ├── Acts.tsx   # Акты АОСР
+│   │   ├── SourceData.tsx # Исходные данные (анкета по объекту)
 │   │   └── Settings.tsx # Настройки (язык)
 │   ├── components/    # Переиспользуемые компоненты
 │   │   ├── Header.tsx
@@ -74,6 +75,7 @@ client/
 /worklog   → WorkLog (общий журнал)
 /schedule  → Schedule (график работ)
 /acts      → Acts (акты АОСР)
+/source-data → SourceData (исходные данные по объекту)
 /settings  → Settings (настройки)
 ```
 

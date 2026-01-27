@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-01-27] - MVP: объект строительства и исходные данные
+### Добавлено
+- DB: таблицы `objects`, `object_parties`, `object_responsible_persons` + связь `acts.object_id` (подготовка к multi-object в будущем)
+- API (MVP current object): `GET/PATCH /api/object/current`, `GET/PUT /api/object/current/source-data`
+- PDF: сборка плейсхолдеров из исходных данных объекта при `POST /api/acts/:id/export` (приоритет: formData overrides → object source data)
+- UI: новая вкладка “Исходные” (`/source-data`) с анкетой (Accordion) и сохранением
+
+### Изменено
+- Навигация: “Главная” убрана из `BottomNav` и перенесена в кнопку в правом верхнем углу `Header`
+- `Header`: в бургер-меню отображается текущий объект
+
+### Исправлено
+- Нет
+
+---
+
 ## [2026-01-26] - Настройка базы данных и автозапуск
 ### Добавлено
 - Документация по настройке после перезагрузки системы (`docs/setup-after-reboot.md`)
