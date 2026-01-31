@@ -10,7 +10,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileText, CalendarIcon, Download, Loader2, Plus, ChevronRight, Check, FileDown } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -439,11 +438,11 @@ export default function Acts() {
               <span className="font-semibold">{t.generate}</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg max-h-[90vh] rounded-2xl flex flex-col">
+          <DialogContent className="sm:max-w-lg max-h-[90vh] rounded-2xl flex flex-col overflow-hidden">
             <DialogHeader>
               <DialogTitle>{language === "ru" ? "Создать акты АОСР" : "Generate AOSR Acts"}</DialogTitle>
             </DialogHeader>
-            <ScrollArea className="flex-1 max-h-[60vh]">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="py-4 space-y-4 pr-4">
                 <div className="grid gap-4 grid-cols-2">
                   <div className="grid gap-2">
@@ -820,7 +819,7 @@ export default function Acts() {
                   </AccordionItem>
                 </Accordion>
               </div>
-            </ScrollArea>
+            </div>
             <div className="pt-4 border-t">
               <Button onClick={handleGenerate} className="w-full h-12 rounded-xl gap-2" disabled={!dateStart || !dateEnd || selectedTemplates.size === 0 || isGenerating} data-testid="button-submit-generate">
                 {isGenerating ? (
