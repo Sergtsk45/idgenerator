@@ -17,7 +17,6 @@ import { formatIsoToDmy } from "@/lib/dateFormat";
 type BatchModel = {
   id: number;
   supplierName?: string | null;
-  manufacturer?: string | null;
   batchNumber?: string | null;
   deliveryDate?: string | null;
   quantity?: string | null;

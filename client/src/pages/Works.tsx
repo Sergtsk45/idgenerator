@@ -13,6 +13,16 @@ import {
   DialogTrigger,
   DialogDescription
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Loader2, FileUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +50,8 @@ export default function Works() {
   const [tab, setTab] = useState<"works" | "estimate">("works");
   const [selectedEstimateId, setSelectedEstimateId] = useState<number | null>(null);
   const estimateQuery = useEstimate(selectedEstimateId);
+  const [isDeleteEstimateDialogOpen, setIsDeleteEstimateDialogOpen] = useState(false);
+  const [pendingDeleteEstimateId, setPendingDeleteEstimateId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     code: "",
@@ -413,7 +425,7 @@ export default function Works() {
                     disabled={deleteEstimate.isPending}
                     onClick={async () => {
                       try {
-                        await deleteEstimate.mutateAsync(selectedEstimateId);
+                        await deleteEstimate.mutateAsync({ id: selectedEstimateId });
                         toast({
                           title: language === "ru" ? "Удалено" : "Deleted",
                       description: te?.deleted ?? (language === "ru" ? "Смета удалена" : "Estimate deleted"),
@@ -421,6 +433,12 @@ export default function Works() {
                         await estimatesQuery.refetch();
                         setSelectedEstimateId(null);
                       } catch (e) {
+                        const status = (e as any)?.status;
+                        if (status === 409) {
+                          setPendingDeleteEstimateId(selectedEstimateId);
+                          setIsDeleteEstimateDialogOpen(true);
+                          return;
+                        }
                         toast({
                           title: language === "ru" ? "Ошибка" : "Error",
                           description: e instanceof Error ? e.message : String(e),
@@ -433,6 +451,59 @@ export default function Works() {
                   </Button>
                 </div>
               ) : null}
+
+              <AlertDialog open={isDeleteEstimateDialogOpen} onOpenChange={setIsDeleteEstimateDialogOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {language === "ru" ? "Смета используется графиком" : "Estimate is used by the schedule"}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {language === "ru"
+                        ? "Эта смета выбрана как источник графика работ. Если продолжить, будут удалены все задачи графика и очищены списки работ в затронутых актах. Затем смета будет удалена. После этого вы сможете выбрать новый источник на вкладке «График работ»."
+                        : "This estimate is selected as the schedule source. If you continue, all schedule tasks will be deleted and work lists in affected acts will be cleared. Then the estimate will be deleted. After that you can pick a new source on the Schedule page."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel
+                      onClick={() => {
+                        setIsDeleteEstimateDialogOpen(false);
+                        setPendingDeleteEstimateId(null);
+                      }}
+                    >
+                      {language === "ru" ? "Отмена" : "Cancel"}
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={deleteEstimate.isPending || !pendingDeleteEstimateId}
+                      onClick={async () => {
+                        if (!pendingDeleteEstimateId) return;
+                        try {
+                          await deleteEstimate.mutateAsync({ id: pendingDeleteEstimateId, resetSchedule: true });
+                          toast({
+                            title: language === "ru" ? "Удалено" : "Deleted",
+                            description:
+                              language === "ru"
+                                ? "Смета удалена, график и акты сброшены"
+                                : "Estimate deleted, schedule and acts reset",
+                          });
+                          await estimatesQuery.refetch();
+                          setSelectedEstimateId(null);
+                          setIsDeleteEstimateDialogOpen(false);
+                          setPendingDeleteEstimateId(null);
+                        } catch (e) {
+                          toast({
+                            title: language === "ru" ? "Ошибка" : "Error",
+                            description: e instanceof Error ? e.message : String(e),
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      {language === "ru" ? "Удалить и сбросить" : "Delete and reset"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           )}
         </div>

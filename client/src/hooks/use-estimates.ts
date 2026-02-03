@@ -8,6 +8,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 
+export type DeleteEstimateInput = {
+  id: number;
+  resetSchedule?: boolean;
+};
+
 export function useEstimates() {
   return useQuery({
     queryKey: [api.estimates.list.path],
@@ -60,17 +65,25 @@ export function useImportEstimate() {
 export function useDeleteEstimate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
-      const url = buildUrl(api.estimates.delete.path, { id });
+    mutationFn: async (input: DeleteEstimateInput) => {
+      const baseUrl = buildUrl(api.estimates.delete.path, { id: input.id });
+      const url = input.resetSchedule ? `${baseUrl}?resetSchedule=1` : baseUrl;
       const res = await fetch(url, { method: api.estimates.delete.method, credentials: "include" });
       if (!res.ok && res.status !== 204) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Failed to delete estimate");
+        const message = err.message || "Failed to delete estimate";
+        const error = new Error(message) as Error & { status?: number };
+        error.status = res.status;
+        throw error;
       }
       return true;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.estimates.list.path] });
+      // If the deleted estimate was used as a schedule source and we reset it,
+      // the schedule state (source/tasks) should be refetched.
+      queryClient.invalidateQueries({ queryKey: [api.schedules.default.path] });
+      queryClient.invalidateQueries({ queryKey: [api.schedules.get.path] });
     },
   });
 }

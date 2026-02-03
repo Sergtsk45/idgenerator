@@ -188,7 +188,6 @@ export default function SourceData() {
     title: "",
     docNumber: "",
     docDate: "",
-    issuer: "",
     fileUrl: "",
   });
 
@@ -269,7 +268,6 @@ export default function SourceData() {
         title: docForm.title || null,
         docNumber: docForm.docNumber || null,
         docDate: docForm.docDate || null,
-        issuer: docForm.issuer || null,
         validFrom: null,
         validTo: null,
         meta: {},
@@ -277,7 +275,7 @@ export default function SourceData() {
       } as any);
       toast({ title: language === "ru" ? "Создано" : "Created", description: language === "ru" ? "Документ добавлен в реестр" : "Document created" });
       setDocDialogOpen(false);
-      setDocForm({ docType: "certificate", scope: "project", title: "", docNumber: "", docDate: "", issuer: "", fileUrl: "" });
+      setDocForm({ docType: "certificate", scope: "project", title: "", docNumber: "", docDate: "", fileUrl: "" });
     } catch (e) {
       toast({
         title: language === "ru" ? "Ошибка" : "Error",
@@ -929,10 +927,6 @@ export default function SourceData() {
                 onChange={(e) => setDocForm((p) => ({ ...p, docDate: e.target.value }))}
                 className="rounded-xl"
               />
-            </div>
-            <div className="grid gap-2">
-              <Label>{language === "ru" ? "Кем выдан" : "Issuer"}</Label>
-              <Input value={docForm.issuer} onChange={(e) => setDocForm((p) => ({ ...p, issuer: e.target.value }))} className="rounded-xl" />
             </div>
             <div className="grid gap-2">
               <Label>{language === "ru" ? "URL файла (опц.)" : "File URL (opt.)"}</Label>

@@ -28,7 +28,6 @@ type DocDraft = {
   title?: string;
   docNumber?: string;
   docDate?: string; // YYYY-MM-DD
-  issuer?: string;
   fileUrl?: string;
   useInActs: boolean;
 };
@@ -110,7 +109,6 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             supplierName: batch.supplierName || null,
-            manufacturer: batch.manufacturer || null,
             plant: batch.plant || null,
             batchNumber: batch.batchNumber || null,
             deliveryDate: batch.deliveryDate || null,
@@ -135,7 +133,6 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
           title: doc.title || null,
           docNumber: doc.docNumber || null,
           docDate: doc.docDate || null,
-          issuer: doc.issuer || null,
           validFrom: null,
           validTo: null,
           meta: {},
@@ -333,11 +330,6 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
                 <div className="grid gap-2">
                   <Label>Дата</Label>
                   <Input type="date" value={doc.docDate ?? ""} onChange={(e) => setDoc((p) => ({ ...p, docDate: e.target.value }))} />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label>Кем выдан</Label>
-                  <Input value={doc.issuer ?? ""} onChange={(e) => setDoc((p) => ({ ...p, issuer: e.target.value }))} />
                 </div>
 
                 <div className="grid gap-2">

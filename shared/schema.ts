@@ -299,7 +299,6 @@ export const materialBatches = pgTable(
       .notNull()
       .references(() => projectMaterials.id, { onDelete: "cascade" }),
     supplierName: text("supplier_name"),
-    manufacturer: text("manufacturer"),
     plant: text("plant"),
     batchNumber: text("batch_number"),
     deliveryDate: date("delivery_date"),
@@ -324,7 +323,6 @@ export const documents = pgTable(
     title: text("title"),
     docNumber: text("doc_number"),
     docDate: date("doc_date"),
-    issuer: text("issuer"),
     validFrom: date("valid_from"),
     validTo: date("valid_to"),
     meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),

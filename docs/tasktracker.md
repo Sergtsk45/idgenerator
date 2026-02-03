@@ -1,5 +1,37 @@
 # Task Tracker
 
+## Задача: Партии материалов — удалить поле «Производитель» (manufacturer)
+- **Статус**: Завершена
+- **Описание**: Поле «Производитель» в окне «Добавить партию» не использовалось в бизнес-логике и экспорте. Удалить из БД, API, storage и UI.
+- **Шаги выполнения**:
+  - [x] БД: миграция `0009_drop_material_batches_manufacturer.sql` — идемпотентное удаление колонки `manufacturer` из `material_batches`
+  - [x] Shared: удалить поле из схемы `material_batches` и из контракта API (create/patch партии)
+  - [x] Backend: убрать `manufacturer` из типов и патча в `server/storage.ts`
+  - [x] UI: удалить поле из `BatchForm.tsx`, `MaterialWizard.tsx`, `SourceMaterialDetail.tsx`, тип в `MaterialDetailView.tsx`
+  - [x] Документация: обновить `docs/changelog.md`, `docs/tasktracker.md`
+- **Зависимости**: миграции, shared/schema.ts, shared/routes.ts, server/storage.ts, клиентские компоненты партий
+
+---
+
+## Задача: Документы — удалить поле «Кем выдан» (issuer)
+- **Статус**: Завершена
+- **Описание**: Поле «Кем выдан» не нужно в проекте. Необходимо удалить его из БД, API, поиска документов и всех форм/экранов (включая окно «привязать документ», мастер добавления материала, реестр документов, страница «Исходные данные»).
+- **Шаги выполнения**:
+  - [x] БД: создать миграцию `0008_drop_documents_issuer.sql` — `ALTER TABLE documents DROP COLUMN IF EXISTS issuer`
+  - [x] Shared: удалить поле `issuer` из схемы таблицы `documents` (`shared/schema.ts`)
+  - [x] API: удалить поле `issuer` из API-контракта создания документа (`shared/routes.ts`)
+  - [x] Backend: удалить `ilike(documents.issuer, ...)` из поиска документов (`server/storage.ts`)
+  - [x] UI: удалить тип и отображение `issuer` из `DocumentCard.tsx`
+  - [x] UI: удалить поле «Кем выдан» из формы «Привязать документ» (`SourceMaterialDetail.tsx`)
+  - [x] UI: удалить поле «Кем выдан» из мастера добавления материала (`MaterialWizard.tsx`)
+  - [x] UI: удалить поле «Кем выдан» из страницы «Исходные данные» (`SourceData.tsx`)
+  - [x] UI: удалить поле «Кем выдан» из реестра документов (`SourceDocuments.tsx`)
+  - [x] Smoke-test: `npm run check`
+  - [x] Документация: обновить `docs/changelog.md`, `docs/tasktracker.md`
+- **Зависимости**: `migrations/0008_drop_documents_issuer.sql`, `shared/schema.ts`, `shared/routes.ts`, `server/storage.ts`, `client/src/components/documents/DocumentCard.tsx`, `client/src/pages/SourceMaterialDetail.tsx`, `client/src/components/materials/MaterialWizard.tsx`, `client/src/pages/SourceData.tsx`, `client/src/pages/SourceDocuments.tsx`
+
+---
+
 ## Задача: График работ — статусы документов качества по подстрокам сметы (MVP)
 - **Статус**: Завершена
 - **Описание**: На экране `/schedule` для подстрок сметы (`estimate_positions`, вспомогательные позиции) показывать вычисляемый статус документов качества (`none|partial|ok`). Привязка подстроки к материалу должна быть детерминированной (ручной выбор `project_materials`), статус вычисляется по `document_bindings` + `documents`.
@@ -25,6 +57,19 @@
   - [x] Shared: расширить контракт `api.estimates.delete` (добавить ответ `409`)
   - [x] Документация: обновить `docs/changelog.md`, `docs/tasktracker.md`
 - **Зависимости**: `server/storage.ts`, `server/routes.ts`, `shared/routes.ts`, миграция `0006_schedule_estimate_source.sql`
+
+---
+
+## Задача: ВОР — удаление сметы-источника с предупреждением и сбросом графика/актов
+- **Статус**: Завершена
+- **Описание**: Если смета выбрана источником графика работ, пользователю нужно дать возможность удалить смету без ручной смены источника. При подтверждении удаления должны быть сброшены задачи графика и очищены списки работ в затронутых актах, затем смета удаляется. После этого пользователь может выбрать новый источник на экране `/schedule`.
+- **Шаги выполнения**:
+  - [x] Backend: расширить `storage.deleteEstimate` — опция `resetScheduleIfInUse` (сброс schedule_tasks + очистка worksData + перевод источника на ВОР)
+  - [x] Backend: `DELETE /api/estimates/:id` — поддержка query `resetSchedule=1`
+  - [x] Frontend: `useDeleteEstimate` — флаг `resetSchedule` + проброс `status` ошибки (для 409)
+  - [x] UI `/works`: диалог предупреждения при 409 и повторный delete с `resetSchedule=1`
+  - [x] Документация: `docs/changelog.md`, `docs/project.md`, `docs/tasktracker.md`
+- **Зависимости**: `server/storage.ts`, `server/routes.ts`, `client/src/hooks/use-estimates.ts`, `client/src/pages/Works.tsx`, `shared/routes.ts`
 
 ---
 

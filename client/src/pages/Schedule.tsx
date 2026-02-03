@@ -13,10 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguageStore, translations } from "@/lib/i18n";
 import { useWorks } from "@/hooks/use-works";
 import { useEstimate, useEstimates } from "@/hooks/use-estimates";
+import { useEstimateSubrowStatuses } from "@/hooks/use-estimate-position-links";
+import { useUpsertEstimatePositionLink, useDeleteEstimatePositionLink } from "@/hooks/use-estimate-position-links";
 import { 
   useBootstrapScheduleFromWorks, 
   useBootstrapScheduleFromEstimate,
@@ -27,6 +31,8 @@ import {
   useScheduleSourceInfo,
   useGenerateActsFromSchedule
 } from "@/hooks/use-schedules";
+import { useCurrentObject } from "@/hooks/use-source-data";
+import { useProjectMaterials } from "@/hooks/use-materials";
 import type { ScheduleTask, Work } from "@shared/schema";
 import { GanttChartSquare, Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Pencil, RotateCcw, AlertTriangle } from "lucide-react";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
@@ -57,6 +63,7 @@ export default function Schedule() {
 
   const tasks: ScheduleTask[] = schedule?.tasks ?? [];
   const sourceType = schedule?.sourceType ?? 'works';
+  const scheduleEstimateId = sourceType === "estimate" ? (schedule?.estimateId ?? null) : null;
   
   const [changeSourceDialogOpen, setChangeSourceDialogOpen] = useState(false);
   const [confirmationInput, setConfirmationInput] = useState("");
@@ -78,8 +85,31 @@ export default function Schedule() {
   const [editActNumber, setEditActNumber] = useState<string>("");
 
   const { data: estimates = [] } = useEstimates();
-  const activeEstimateId = sourceType === "estimate" ? (schedule?.estimateId ?? null) : null;
+  const activeEstimateId = scheduleEstimateId;
   const { data: activeEstimateDetail } = useEstimate(activeEstimateId);
+
+  const { data: subrowStatuses } = useEstimateSubrowStatuses(sourceType === "estimate" ? scheduleId : null);
+
+  const { data: currentObject } = useCurrentObject();
+  const objectId = currentObject?.id;
+  const { data: projectMaterials = [] } = useProjectMaterials(objectId);
+
+  const upsertLink = useUpsertEstimatePositionLink(scheduleId);
+  const deleteLink = useDeleteEstimatePositionLink(scheduleId);
+
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkTargetAux, setLinkTargetAux] = useState<any | null>(null);
+  const [linkMaterialId, setLinkMaterialId] = useState<number | null>(null);
+  const [linkMaterialSearch, setLinkMaterialSearch] = useState("");
+
+  const openLinkDialog = (aux: any) => {
+    setLinkTargetAux(aux);
+    const s = (subrowStatuses as any)?.byEstimatePositionId?.[String(aux?.id)];
+    const existingMaterialId = typeof s?.projectMaterialId === "number" ? s.projectMaterialId : null;
+    setLinkMaterialId(existingMaterialId);
+    setLinkMaterialSearch("");
+    setLinkDialogOpen(true);
+  };
 
   // Helper: check if estimate position is "main" (ГЭСН/ФЕР/ТЕР)
   const isMainEstimatePosition = (pos: { code?: string | null }): boolean => {
@@ -163,6 +193,34 @@ export default function Schedule() {
   const visibleDays = 60;
   const timelineWidth = visibleDays * dayWidth;
   const rowHeight = 44;
+
+  // When auxiliary rows are expanded (estimate source), the left table grows,
+  // so the timeline must also grow and shift bars down accordingly.
+  const scheduleRowLayout = useMemo(() => {
+    const expandedAuxCountByTaskId = new Map<number, number>();
+    if (sourceType === "estimate") {
+      for (const task of tasks) {
+        const auxiliaries = task.estimatePositionId
+          ? (auxiliaryPositionsByMainId.get(task.estimatePositionId) ?? [])
+          : [];
+        const isExpanded = expandedTaskIds.has(task.id);
+        expandedAuxCountByTaskId.set(task.id, isExpanded ? auxiliaries.length : 0);
+      }
+    }
+
+    const taskTopRowIndexByTaskId = new Map<number, number>();
+    let rowIndex = 0;
+    for (const task of tasks) {
+      taskTopRowIndexByTaskId.set(task.id, rowIndex);
+      rowIndex += 1 + (expandedAuxCountByTaskId.get(task.id) ?? 0);
+    }
+
+    return {
+      expandedAuxCountByTaskId,
+      taskTopRowIndexByTaskId,
+      totalRows: rowIndex,
+    };
+  }, [tasks, sourceType, expandedTaskIds, auxiliaryPositionsByMainId]);
 
   const openEdit = (task: ScheduleTask) => {
     setSelectedTask(task);
@@ -520,10 +578,10 @@ export default function Schedule() {
                       const isExpanded = expandedTaskIds.has(task.id);
 
                       return (
-                        <div key={task.id} className="border-b last:border-b-0">
+                        <div key={task.id}>
                           {/* Main task row */}
                           <div
-                            className="px-3 py-2 flex items-center gap-2"
+                            className="px-3 py-2 flex items-center gap-2 border-b border-border/60"
                             style={{ height: rowHeight }}
                           >
                             {/* Expand/collapse button (only for estimate with auxiliaries) */}
@@ -591,11 +649,64 @@ export default function Schedule() {
                           {isExpanded && auxiliaries.map((aux: any, idx: number) => (
                             <div
                               key={`aux-${task.id}-${idx}`}
-                              className="pl-12 pr-3 py-1 bg-muted/20 border-t text-xs text-muted-foreground"
+                              className="pl-12 pr-3 py-1 bg-muted/20 border-b border-border/40 text-xs text-muted-foreground flex items-center"
+                              style={{ height: rowHeight }}
                             >
                               <div className="flex items-start gap-2">
                                 <span className="font-mono shrink-0">{aux.lineNo || aux.code}</span>
                                 <span className="truncate">{aux.name}</span>
+                              </div>
+                              {/* Quality documents status */}
+                              <div className="ml-auto pl-2 shrink-0">
+                                {(() => {
+                                  const s = (subrowStatuses as any)?.byEstimatePositionId?.[String(aux?.id)];
+                                  const status: "none" | "partial" | "ok" = (s?.status ?? "none") as any;
+                                  const reason: string | undefined = typeof s?.reason === "string" ? s.reason : undefined;
+
+                                  const label =
+                                    status === "ok"
+                                      ? (language === "ru" ? "ок" : "ok")
+                                      : status === "partial"
+                                        ? (language === "ru" ? "частично" : "partial")
+                                        : (language === "ru" ? "нет" : "none");
+
+                                  const className =
+                                    status === "ok"
+                                      ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                      : status === "partial"
+                                        ? "border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                                        : "border-destructive/30 bg-destructive/10 text-destructive";
+
+                                  const tooltip =
+                                    reason ??
+                                    (status === "ok"
+                                      ? (language === "ru" ? "Документы качества: ок" : "Quality docs: ok")
+                                      : status === "partial"
+                                        ? (language === "ru" ? "Документы качества: частично" : "Quality docs: partial")
+                                        : (language === "ru" ? "Документы качества: нет" : "Quality docs: none"));
+
+                                  return (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            type="button"
+                                            className="cursor-pointer"
+                                            onClick={() => openLinkDialog(aux)}
+                                            aria-label={language === "ru" ? "Привязка материала" : "Link material"}
+                                          >
+                                            <Badge variant="outline" className={className}>
+                                              {label}
+                                            </Badge>
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="left">
+                                          {tooltip}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  );
+                                })()}
                               </div>
                             </div>
                           ))}
@@ -609,17 +720,18 @@ export default function Schedule() {
                       className="relative"
                       style={{
                         width: timelineWidth,
-                        height: tasks.length * rowHeight,
+                        height: scheduleRowLayout.totalRows * rowHeight,
                         backgroundImage:
                           `repeating-linear-gradient(to right, rgba(0,0,0,0.06) 0, rgba(0,0,0,0.06) 1px, transparent 1px, transparent ${dayWidth}px),` +
                           `repeating-linear-gradient(to bottom, rgba(0,0,0,0.04) 0, rgba(0,0,0,0.04) 1px, transparent 1px, transparent ${rowHeight}px)`,
                       }}
                     >
-                      {tasks.map((task, idx) => {
+                      {tasks.map((task) => {
                         const start = differenceInCalendarDays(parseISO(String(task.startDate)), parseISO(calendarStart));
                         const left = Math.max(0, start) * dayWidth;
                         const width = Math.max(1, Number(task.durationDays || 1)) * dayWidth;
-                        const top = idx * rowHeight + 10;
+                        const topRow = scheduleRowLayout.taskTopRowIndexByTaskId.get(task.id) ?? 0;
+                        const top = topRow * rowHeight + 10;
                         return (
                           <button
                             key={task.id}
@@ -789,6 +901,154 @@ export default function Schedule() {
             <Button onClick={saveEdit} disabled={patchTask.isPending}>
               {patchTask.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {t.save}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link estimate subrow to project material (MVP) */}
+      <Dialog
+        open={linkDialogOpen}
+        onOpenChange={(open) => {
+          setLinkDialogOpen(open);
+          if (!open) {
+            setLinkTargetAux(null);
+            setLinkMaterialSearch("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{language === "ru" ? "Документы качества: привязка материала" : "Quality docs: material link"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            {linkTargetAux ? (
+              <div className="text-xs text-muted-foreground">
+                <div className="font-mono">
+                  {String(linkTargetAux.lineNo ?? linkTargetAux.code ?? linkTargetAux.id)}
+                </div>
+                <div className="text-sm text-foreground">{String(linkTargetAux.name ?? "")}</div>
+              </div>
+            ) : null}
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">{language === "ru" ? "Поиск материала" : "Search material"}</label>
+              <Input
+                value={linkMaterialSearch}
+                onChange={(e) => setLinkMaterialSearch(e.target.value)}
+                placeholder={language === "ru" ? "Введите часть названия..." : "Type to filter..."}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">{language === "ru" ? "Материал проекта" : "Project material"}</label>
+              <Select
+                value={linkMaterialId == null ? "" : String(linkMaterialId)}
+                onValueChange={(v) => {
+                  const id = Number(v);
+                  setLinkMaterialId(Number.isFinite(id) && id > 0 ? id : null);
+                }}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder={language === "ru" ? "Выберите материал" : "Select material"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(projectMaterials as any[])
+                    .map((m) => {
+                      const name =
+                        String((m as any).nameOverride ?? "").trim() ||
+                        ((m as any).catalogMaterialId ? `${language === "ru" ? "Каталог" : "Catalog"} #${(m as any).catalogMaterialId}` : "") ||
+                        `${language === "ru" ? "Материал" : "Material"} #${(m as any).id}`;
+                      return { id: Number((m as any).id), name };
+                    })
+                    .filter((m) => {
+                      const q = linkMaterialSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return m.name.toLowerCase().includes(q);
+                    })
+                    .slice(0, 200)
+                    .map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <div className="text-[11px] text-muted-foreground">
+                {language === "ru"
+                  ? "Привязка нужна, чтобы вычислять статус документов качества по подстроке сметы."
+                  : "Link is used to compute quality documents status for this estimate subrow."}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLinkDialogOpen(false)}
+              disabled={upsertLink.isPending || deleteLink.isPending}
+            >
+              {language === "ru" ? "Отмена" : "Cancel"}
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                const auxId = Number(linkTargetAux?.id);
+                if (!Number.isFinite(auxId) || auxId <= 0) return;
+                try {
+                  await deleteLink.mutateAsync(auxId);
+                  setLinkMaterialId(null);
+                  setLinkDialogOpen(false);
+                } catch (err: any) {
+                  toast({
+                    title: t.errorTitle,
+                    description: err?.message || (language === "ru" ? "Не удалось убрать привязку" : "Failed to remove link"),
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={upsertLink.isPending || deleteLink.isPending || !linkTargetAux}
+            >
+              {deleteLink.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {language === "ru" ? "Убрать привязку" : "Remove link"}
+            </Button>
+
+            <Button
+              onClick={async () => {
+                const auxId = Number(linkTargetAux?.id);
+                const estimateId = Number(scheduleEstimateId);
+                const projectMaterialId = Number(linkMaterialId);
+                if (!Number.isFinite(auxId) || auxId <= 0) return;
+                if (!Number.isFinite(estimateId) || estimateId <= 0) return;
+                if (!Number.isFinite(projectMaterialId) || projectMaterialId <= 0) return;
+                try {
+                  await upsertLink.mutateAsync({
+                    estimateId,
+                    estimatePositionId: auxId,
+                    projectMaterialId,
+                    batchId: null,
+                  });
+                  setLinkDialogOpen(false);
+                } catch (err: any) {
+                  toast({
+                    title: t.errorTitle,
+                    description: err?.message || (language === "ru" ? "Не удалось сохранить привязку" : "Failed to save link"),
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={
+                upsertLink.isPending ||
+                deleteLink.isPending ||
+                !linkTargetAux ||
+                linkMaterialId == null ||
+                scheduleEstimateId == null
+              }
+            >
+              {upsertLink.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {language === "ru" ? "Сохранить" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

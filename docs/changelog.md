@@ -1,5 +1,50 @@
 # Changelog
 
+## [2026-02-03] - Партии материалов: подпись поля «Завод» → «Завод изготовитель»
+### Добавлено
+- Нет
+
+### Изменено
+- В форме партии (`BatchForm.tsx`) подпись поля изменена с «Завод» на «Завод изготовитель». Имя переменной и колонки БД `plant` без изменений.
+
+### Исправлено
+- Нет
+
+---
+
+## [2026-02-03] - Партии материалов: удалено поле «Производитель»
+### Добавлено
+- Нет
+
+### Изменено
+- БД: миграция `migrations/0009_drop_material_batches_manufacturer.sql` — удалена колонка `manufacturer` из таблицы `material_batches` (идемпотентный DROP)
+- `shared/schema.ts`: удалено поле `manufacturer` из схемы таблицы `material_batches`
+- `shared/routes.ts`: удалено поле `manufacturer` из API создания и обновления партии (`POST /api/project-materials/:id/batches`, `PATCH /api/material-batches/:id`)
+- `server/storage.ts`: удалён `manufacturer` из типов и патча при создании/обновлении партии
+- UI: удалено поле «Производитель» из формы партии (`BatchForm.tsx`), мастера добавления материала (`MaterialWizard.tsx`), страницы материала (`SourceMaterialDetail.tsx`), типа партии в `MaterialDetailView.tsx`
+
+### Исправлено
+- Нет
+
+---
+
+## [2026-02-03] - Документы: удалено поле «Кем выдан»
+### Добавлено
+- Нет
+
+### Изменено
+- БД: миграция `migrations/0008_drop_documents_issuer.sql` — удалена колонка `issuer` из таблицы `documents`
+- `shared/schema.ts`: удалено поле `issuer` из схемы таблицы `documents`
+- `shared/routes.ts`: удалено поле `issuer` из API-контракта создания документа
+- `server/storage.ts`: удалён поиск по `issuer` в методе поиска документов (оставлен поиск только по номеру и названию)
+- UI: удалено поле «Кем выдан» из всех форм документов (`SourceMaterialDetail`, `MaterialWizard`, `SourceData`, `SourceDocuments`)
+- `client/src/components/documents/DocumentCard.tsx`: удалено отображение `issuer` из карточки документа
+
+### Исправлено
+- Нет
+
+---
+
 ## [2026-02-03] - Карточка материала: удалены неиспользуемые кнопки
 ### Добавлено
 - Нет
@@ -21,6 +66,20 @@
 - `client/src/components/materials/MaterialDetailView.tsx`: документы теперь отображаются по привязкам (с подписью области «На все партии» / «Партия …»), добавлена кнопка привязки документа к конкретной партии
 - `client/src/pages/SourceMaterialDetail.tsx`: добавлен выбор цели привязки (к материалу или к партии) и передача `batchId` в `POST /api/document-bindings`
 - `client/src/components/materials/MaterialWizard.tsx`: добавлен выбор «к материалу / к добавленной партии» и передача `batchId` при создании привязки
+
+### Исправлено
+- Нет
+
+---
+
+## [2026-02-03] - Смета: удаление с предупреждением и сбросом графика/актов
+### Добавлено
+- UI `/works`: диалог подтверждения удаления сметы, если она используется как источник графика («Удалить и сбросить»)
+
+### Изменено
+- API: `DELETE /api/estimates/:id?resetSchedule=1` — если смета используется графиком, сбрасывает задачи графика и очищает списки работ в затронутых актах, затем удаляет смету
+- `server/storage.ts`: `deleteEstimate(..., { resetScheduleIfInUse: true })` — безопасное удаление сметы-источника через сброс графика
+- `client/src/hooks/use-estimates.ts`: `useDeleteEstimate` поддерживает флаг `resetSchedule` и пробрасывает `status` ошибки для UX-ветвления (409)
 
 ### Исправлено
 - Нет

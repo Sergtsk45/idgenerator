@@ -18,7 +18,6 @@ export type DocumentCardModel = {
   title?: string | null;
   docNumber?: string | null;
   docDate?: string | null;
-  issuer?: string | null;
   fileUrl?: string | null;
 };
 
@@ -40,7 +39,6 @@ export function DocumentCard(props: { doc: DocumentCardModel; onOpen?: () => voi
               <Badge variant="secondary">{doc.docType}</Badge>
               <Badge variant="outline">{doc.scope}</Badge>
               {doc.docDate ? <Badge variant="secondary">{doc.docDate}</Badge> : null}
-              {doc.issuer ? <Badge variant="secondary">{doc.issuer}</Badge> : null}
             </div>
           </div>
 

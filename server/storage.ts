@@ -143,7 +143,7 @@ export interface IStorage {
   updateBatch(
     id: number,
     patch: Partial<
-      Pick<MaterialBatch, "supplierName" | "manufacturer" | "plant" | "batchNumber" | "deliveryDate" | "quantity" | "unit" | "notes">
+      Pick<MaterialBatch, "supplierName" | "plant" | "batchNumber" | "deliveryDate" | "quantity" | "unit" | "notes">
     >
   ): Promise<MaterialBatch | undefined>;
   deleteBatch(id: number): Promise<boolean>;
@@ -207,7 +207,7 @@ export interface IStorage {
     positions: Array<Omit<InsertEstimatePosition, "estimateId" | "sectionId"> & { sectionNumber?: string | null }>;
     resources: Array<Omit<InsertPositionResource, "positionId"> & { positionLineNo: string }>;
   }): Promise<{ estimateId: number; sections: number; positions: number; resources: number }>;
-  deleteEstimate(id: number): Promise<boolean>;
+  deleteEstimate(id: number, options?: { resetScheduleIfInUse?: boolean }): Promise<boolean>;
 
   // Messages
   getMessages(): Promise<Message[]>;
@@ -738,7 +738,7 @@ export class DatabaseStorage implements IStorage {
   async updateBatch(
     id: number,
     patch: Partial<
-      Pick<MaterialBatch, "supplierName" | "manufacturer" | "plant" | "batchNumber" | "deliveryDate" | "quantity" | "unit" | "notes">
+      Pick<MaterialBatch, "supplierName" | "plant" | "batchNumber" | "deliveryDate" | "quantity" | "unit" | "notes">
     >
   ): Promise<MaterialBatch | undefined> {
     if (Object.keys(patch).length === 0) return undefined;
@@ -746,7 +746,6 @@ export class DatabaseStorage implements IStorage {
       .update(materialBatches)
       .set({
         ...(patch.supplierName !== undefined ? { supplierName: patch.supplierName as any } : {}),
-        ...(patch.manufacturer !== undefined ? { manufacturer: patch.manufacturer as any } : {}),
         ...(patch.plant !== undefined ? { plant: patch.plant as any } : {}),
         ...(patch.batchNumber !== undefined ? { batchNumber: patch.batchNumber as any } : {}),
         ...(patch.deliveryDate !== undefined ? { deliveryDate: patch.deliveryDate as any } : {}),
@@ -778,8 +777,7 @@ export class DatabaseStorage implements IStorage {
       q
         ? or(
             ilike(documents.docNumber, `%${q}%`),
-            ilike(documents.title, `%${q}%`),
-            ilike(documents.issuer, `%${q}%`)
+            ilike(documents.title, `%${q}%`)
           )
         : undefined,
     ].filter(Boolean) as any[];
@@ -1188,7 +1186,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async deleteEstimate(id: number): Promise<boolean> {
+  async deleteEstimate(id: number, options?: { resetScheduleIfInUse?: boolean }): Promise<boolean> {
     return await db.transaction(async (tx) => {
       const [existing] = await tx.select({ id: estimates.id }).from(estimates).where(eq(estimates.id, id));
       if (!existing) return false;
@@ -1200,8 +1198,44 @@ export class DatabaseStorage implements IStorage {
         .select({ id: schedules.id, sourceType: schedules.sourceType })
         .from(schedules)
         .where(eq(schedules.estimateId, id));
-      if (schedulesUsing.length > 0) {
+      if (schedulesUsing.length > 0 && !options?.resetScheduleIfInUse) {
         throw new Error("ESTIMATE_IN_USE_BY_SCHEDULE");
+      }
+
+      // If explicitly requested, reset any schedules that use this estimate
+      // (same effect as changing source to "works": delete tasks and clear worksData in affected acts),
+      // then proceed with deletion.
+      if (schedulesUsing.length > 0 && options?.resetScheduleIfInUse) {
+        for (const s of schedulesUsing) {
+          const scheduleId = s.id;
+
+          // 1) Find affected acts via tasks
+          const tasks = await tx
+            .select({ actNumber: scheduleTasks.actNumber })
+            .from(scheduleTasks)
+            .where(eq(scheduleTasks.scheduleId, scheduleId));
+
+          const affectedActNumbers = Array.from(
+            new Set(tasks.map((t) => t.actNumber).filter((n): n is number => n != null))
+          );
+
+          // 2) Clear worksData in affected acts
+          if (affectedActNumbers.length > 0) {
+            await tx
+              .update(acts)
+              .set({ worksData: [] as any })
+              .where(inArray(acts.actNumber, affectedActNumbers));
+          }
+
+          // 3) Delete schedule tasks
+          await tx.delete(scheduleTasks).where(eq(scheduleTasks.scheduleId, scheduleId));
+
+          // 4) Reset schedule source to works
+          await tx
+            .update(schedules)
+            .set({ sourceType: "works" as any, estimateId: null })
+            .where(eq(schedules.id, scheduleId));
+        }
       }
 
       const positions = await tx

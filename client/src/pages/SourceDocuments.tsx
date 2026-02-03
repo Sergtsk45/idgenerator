@@ -36,7 +36,6 @@ export default function SourceDocuments() {
     title: "",
     docNumber: "",
     docDate: "",
-    issuer: "",
     fileUrl: "",
   });
 
@@ -48,7 +47,6 @@ export default function SourceDocuments() {
         title: form.title || null,
         docNumber: form.docNumber || null,
         docDate: form.docDate || null,
-        issuer: form.issuer || null,
         validFrom: null,
         validTo: null,
         meta: {},
@@ -56,7 +54,7 @@ export default function SourceDocuments() {
       } as any);
       toast({ title: "Создано", description: "Документ добавлен в реестр" });
       setDialogOpen(false);
-      setForm({ docType: "certificate", scope: "project", title: "", docNumber: "", docDate: "", issuer: "", fileUrl: "" });
+      setForm({ docType: "certificate", scope: "project", title: "", docNumber: "", docDate: "", fileUrl: "" });
     } catch (e) {
       toast({
         title: "Ошибка",
@@ -143,7 +141,6 @@ export default function SourceDocuments() {
                       title: d.title ?? null,
                       docNumber: d.docNumber ?? null,
                       docDate: d.docDate ?? null,
-                      issuer: d.issuer ?? null,
                       fileUrl: d.fileUrl ?? null,
                     }}
                     onOpen={d.fileUrl ? () => window.open(d.fileUrl, "_blank") : undefined}
@@ -221,10 +218,6 @@ export default function SourceDocuments() {
                   onChange={(e) => setForm((p) => ({ ...p, docDate: e.target.value }))}
                   className="rounded-xl"
                 />
-              </div>
-              <div className="grid gap-2">
-                <Label>Кем выдан</Label>
-                <Input value={form.issuer} onChange={(e) => setForm((p) => ({ ...p, issuer: e.target.value }))} className="rounded-xl" />
               </div>
               <div className="grid gap-2">
                 <Label>URL файла (опц.)</Label>

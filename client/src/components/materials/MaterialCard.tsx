@@ -25,8 +25,6 @@ export function MaterialCard(props: {
   material: ProjectMaterialListItem;
   title?: string;
   onOpen?: () => void;
-  onOpenBatches?: () => void;
-  onOpenDocuments?: () => void;
 }) {
   const { material } = props;
 
@@ -67,15 +65,6 @@ export function MaterialCard(props: {
               Открыть
             </Button>
           </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" onClick={props.onOpenBatches} disabled={!props.onOpenBatches}>
-            Партии
-          </Button>
-          <Button variant="secondary" size="sm" onClick={props.onOpenDocuments} disabled={!props.onOpenDocuments}>
-            Документы
-          </Button>
         </div>
       </CardContent>
     </Card>

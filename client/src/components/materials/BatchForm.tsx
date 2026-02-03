@@ -17,7 +17,6 @@ import { format } from "date-fns";
 
 export type BatchDraft = {
   supplierName?: string;
-  manufacturer?: string;
   plant?: string;
   batchNumber?: string;
   deliveryDate?: string; // YYYY-MM-DD
@@ -63,12 +62,7 @@ export function BatchForm(props: {
       </div>
 
       <div className="grid gap-2">
-        <Label>Производитель</Label>
-        <Input value={v.manufacturer ?? ""} onChange={(e) => set({ manufacturer: e.target.value })} disabled={props.disabled} />
-      </div>
-
-      <div className="grid gap-2">
-        <Label>Завод</Label>
+        <Label>Завод изготовитель</Label>
         <Input value={v.plant ?? ""} onChange={(e) => set({ plant: e.target.value })} disabled={props.disabled} />
       </div>
 

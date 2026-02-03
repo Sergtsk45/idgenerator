@@ -36,7 +36,6 @@ type DocDraft = {
   title?: string;
   docNumber?: string;
   docDate?: string; // YYYY-MM-DD
-  issuer?: string;
   fileUrl?: string;
   useInActs: boolean;
 };
@@ -182,7 +181,6 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
                   title: d.title ?? null,
                   docNumber: d.docNumber ?? null,
                   docDate: d.docDate ?? null,
-                  issuer: d.issuer ?? null,
                   fileUrl: d.fileUrl ?? null,
                 }))}
                 bindings={(data.bindings ?? []).map((b: any) => ({
@@ -243,7 +241,6 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
                 try {
                   await createBatch.mutateAsync({
                     supplierName: batchDraft.supplierName || null,
-                    manufacturer: batchDraft.manufacturer || null,
                     plant: batchDraft.plant || null,
                     batchNumber: batchDraft.batchNumber || null,
                     deliveryDate: batchDraft.deliveryDate || null,
@@ -522,11 +519,6 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
                     </div>
 
                     <div className="grid gap-2">
-                      <Label>Кем выдан</Label>
-                      <Input value={newDoc.issuer ?? ""} onChange={(e) => setNewDoc((p) => ({ ...p, issuer: e.target.value }))} />
-                    </div>
-
-                    <div className="grid gap-2">
                       <Label>URL файла (опц.)</Label>
                       <Input value={newDoc.fileUrl ?? ""} onChange={(e) => setNewDoc((p) => ({ ...p, fileUrl: e.target.value }))} />
                     </div>
@@ -560,7 +552,6 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
                             title: newDoc.title || null,
                             docNumber: newDoc.docNumber || null,
                             docDate: newDoc.docDate || null,
-                            issuer: newDoc.issuer || null,
                             validFrom: null,
                             validTo: null,
                             meta: {},

@@ -245,7 +245,6 @@ export const api = {
       path: "/api/project-materials/:id/batches",
       input: z.object({
         supplierName: z.string().nullable().optional(),
-        manufacturer: z.string().nullable().optional(),
         plant: z.string().nullable().optional(),
         batchNumber: z.string().nullable().optional(),
         deliveryDate: z.string().nullable().optional(), // YYYY-MM-DD
@@ -265,7 +264,6 @@ export const api = {
       input: z
         .object({
           supplierName: z.string().nullable().optional(),
-          manufacturer: z.string().nullable().optional(),
           plant: z.string().nullable().optional(),
           batchNumber: z.string().nullable().optional(),
           deliveryDate: z.string().nullable().optional(), // YYYY-MM-DD
@@ -307,7 +305,6 @@ export const api = {
         title: z.string().nullable().optional(),
         docNumber: z.string().nullable().optional(),
         docDate: z.string().nullable().optional(), // YYYY-MM-DD
-        issuer: z.string().nullable().optional(),
         validFrom: z.string().nullable().optional(),
         validTo: z.string().nullable().optional(),
         meta: z.record(z.any()).optional(),
@@ -547,6 +544,9 @@ export const api = {
     delete: {
       method: "DELETE" as const,
       path: "/api/estimates/:id",
+      // Optional query:
+      // - resetSchedule=1: if this estimate is used as a schedule source, reset schedule (tasks + affected acts worksData)
+      //   and then delete the estimate.
       responses: {
         204: z.any(),
         404: z.object({ message: z.string() }),

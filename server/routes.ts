@@ -499,8 +499,12 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Invalid id" });
     }
 
+    const resetScheduleRaw = (req.query as any)?.resetSchedule;
+    const resetSchedule =
+      resetScheduleRaw === "1" || resetScheduleRaw === "true";
+
     try {
-      const ok = await storage.deleteEstimate(id);
+      const ok = await storage.deleteEstimate(id, { resetScheduleIfInUse: resetSchedule });
       if (!ok) return res.status(404).json({ message: "Not found" });
       return res.status(204).send();
     } catch (err) {
