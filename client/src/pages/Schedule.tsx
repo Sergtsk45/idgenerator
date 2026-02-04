@@ -243,7 +243,7 @@ export default function Schedule() {
   const dayWidth = 24;
   const visibleDays = 60;
   const timelineWidth = visibleDays * dayWidth;
-  const rowHeight = 44;
+  const rowHeight = 72;
 
   // When auxiliary rows are expanded (estimate source), the left table grows,
   // so the timeline must also grow and shift bars down accordingly.
@@ -590,7 +590,7 @@ export default function Schedule() {
               <CardContent className="p-0">
                 {/* Header */}
                 <div className="flex border-b bg-muted/20">
-                  <div className="w-[360px] shrink-0 flex">
+                  <div className="w-[420px] shrink-0 flex">
                     <div className="flex-1 px-3 py-2 text-xs font-medium text-muted-foreground">
                       {t.taskColumn}
                     </div>
@@ -622,7 +622,7 @@ export default function Schedule() {
 
                 {/* Body */}
                 <div className="flex">
-                  <div className="w-[360px] shrink-0 border-r">
+                  <div className="w-[420px] shrink-0 border-r">
                     {tasks.map((task) => {
                       const w = task.workId ? worksById.get(task.workId) : null;
                       const p = task.estimatePositionId ? estimatePositionsById.get(task.estimatePositionId) : null;
@@ -640,99 +640,118 @@ export default function Schedule() {
                         <div key={task.id}>
                           {/* Main task row */}
                           <div
-                            className="px-3 py-2 flex items-center gap-2 border-b border-border/60"
+                            className="px-3 py-2 border-b border-border/60"
                             style={{ height: rowHeight }}
                           >
-                            {/* Expand/collapse button (only for estimate with auxiliaries) */}
-                            {sourceType === "estimate" && hasAuxiliaries ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 shrink-0"
-                                onClick={() => toggleTaskExpanded(task.id)}
-                              >
-                                <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-0" : "-rotate-90"}`} />
-                              </Button>
-                            ) : (
-                              <div className="w-6 shrink-0" />
-                            )}
+                            <div className="grid h-full grid-cols-[24px_minmax(0,1fr)_4rem_4rem_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1">
+                              {/* Expand/collapse button (only for estimate with auxiliaries) */}
+                              <div className="row-start-1 col-start-1 flex items-start justify-start">
+                                {sourceType === "estimate" && hasAuxiliaries ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0"
+                                    onClick={() => toggleTaskExpanded(task.id)}
+                                  >
+                                    <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-0" : "-rotate-90"}`} />
+                                  </Button>
+                                ) : (
+                                  <div className="w-6 shrink-0" />
+                                )}
+                              </div>
 
-                            <div className="min-w-0 flex-1">
-                              {/* Row 1: Code + Act/Unit */}
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <div className="font-mono truncate">
-                                  {sourceType === "estimate"
-                                    ? (p?.lineNo || p?.code || `ID:${task.estimatePositionId ?? task.id}`)
-                                    : (w?.code || `ID:${task.workId ?? task.id}`)}
-                                </div>
+                              {/* Row 1: № позиции | Акт № | ед. изм. */}
+                              <div className="row-start-1 col-start-2 min-w-0">
                                 {(() => {
+                                  const codeLabel =
+                                    sourceType === "estimate"
+                                      ? (p?.lineNo || p?.code || `ID:${task.estimatePositionId ?? task.id}`)
+                                      : (w?.code || `ID:${task.workId ?? task.id}`);
+                                  const actLabel =
+                                    task.actNumber != null
+                                      ? `${language === "ru" ? "Акт №" : "Act #"}${task.actNumber}`
+                                      : null;
                                   const unit = sourceType === "estimate" ? String(p?.unit ?? "").trim() : "";
-                                  const parts: string[] = [];
-                                  if (task.actNumber != null) {
-                                    parts.push(`${language === "ru" ? "Акт №" : "Act #"}${task.actNumber}`);
-                                  }
-                                  if (sourceType === "estimate" && unit) {
-                                    parts.push(`${language === "ru" ? "Ед." : "Unit"}: ${unit}`);
-                                  }
-                                  if (parts.length === 0) return null;
+
+                                  const sep = (
+                                    <span className="px-1 text-muted-foreground/60" aria-hidden="true">
+                                      |
+                                    </span>
+                                  );
+
                                   return (
-                                    <div className="text-[10px] shrink-0">
-                                      {parts.join(" | ")}
+                                    <div className="flex items-center text-xs text-muted-foreground min-w-0">
+                                      <span className="font-mono truncate">{String(codeLabel)}</span>
+                                      {actLabel ? (
+                                        <>
+                                          {sep}
+                                          <span className="truncate">{actLabel}</span>
+                                        </>
+                                      ) : null}
+                                      {unit ? (
+                                        <>
+                                          {sep}
+                                          <span className="truncate">{unit}</span>
+                                        </>
+                                      ) : null}
                                     </div>
                                   );
                                 })()}
                               </div>
 
-                              {/* Row 2: Title only */}
-                              <div className="text-sm font-medium truncate">{title}</div>
-                            </div>
+                              {/* Quantity column (Row 1) */}
+                              <div className="row-start-1 col-start-3 w-16 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
+                                {sourceType === "estimate" ? (() => {
+                                  const qty = parseNumeric(p?.quantity);
+                                  return qty != null ? qty.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—";
+                                })() : "—"}
+                              </div>
 
-                            {/* Quantity column */}
-                            <div className="w-16 shrink-0 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
-                              {sourceType === "estimate" ? (() => {
-                                const qty = parseNumeric(p?.quantity);
-                                return qty != null ? qty.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—";
-                              })() : "—"}
-                            </div>
+                              {/* Labor column (Row 1) */}
+                              <div className="row-start-1 col-start-4 w-16 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
+                                {sourceType === "estimate" ? (() => {
+                                  const labor = getLaborManHours(p);
+                                  return labor != null ? labor.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—";
+                                })() : "—"}
+                              </div>
 
-                            {/* Labor column */}
-                            <div className="w-16 shrink-0 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
-                              {sourceType === "estimate" ? (() => {
-                                const labor = getLaborManHours(p);
-                                return labor != null ? labor.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—";
-                              })() : "—"}
-                            </div>
+                              {/* Buttons (Row 1) */}
+                              <div className="row-start-1 col-start-5 flex items-center gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => shiftTask(task, -1)}
+                                  disabled={patchTask.isPending}
+                                  aria-label={t.shiftLeft}
+                                >
+                                  <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => shiftTask(task, +1)}
+                                  disabled={patchTask.isPending}
+                                  aria-label={t.shiftRight}
+                                >
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openEdit(task)}
+                                  aria-label={t.edit}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </div>
 
-                            <div className="flex items-center gap-1 shrink-0">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => shiftTask(task, -1)}
-                                disabled={patchTask.isPending}
-                                aria-label={t.shiftLeft}
-                              >
-                                <ChevronLeft className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => shiftTask(task, +1)}
-                                disabled={patchTask.isPending}
-                                aria-label={t.shiftRight}
-                              >
-                                <ChevronRight className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEdit(task)}
-                                aria-label={t.edit}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
+                              {/* Row 2: Title spans under Qty + Labor */}
+                              <div className="row-start-2 col-start-2 col-end-5 min-w-0 text-sm font-medium leading-snug whitespace-normal break-words line-clamp-2">
+                                {title}
+                              </div>
                             </div>
                           </div>
 
@@ -822,7 +841,8 @@ export default function Schedule() {
                         const left = Math.max(0, start) * dayWidth;
                         const width = Math.max(1, Number(task.durationDays || 1)) * dayWidth;
                         const topRow = scheduleRowLayout.taskTopRowIndexByTaskId.get(task.id) ?? 0;
-                        const top = topRow * rowHeight + 10;
+                        const barHeight = 24; // h-6
+                        const top = topRow * rowHeight + Math.max(0, Math.floor((rowHeight - barHeight) / 2));
                         return (
                           <button
                             key={task.id}
