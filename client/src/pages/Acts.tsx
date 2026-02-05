@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Header } from "@/components/Header";
-import { useActs, useGenerateAct } from "@/hooks/use-acts";
+import { useActs } from "@/hooks/use-acts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { FileText, CalendarIcon, Download, Loader2, Plus, ChevronRight, Check, FileDown } from "lucide-react";
+import { FileText, CalendarIcon, Download, Loader2, ChevronRight, Check, FileDown } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -54,18 +54,19 @@ export default function Acts() {
   const { language } = useLanguageStore();
   const t = translations[language].acts;
   const { data: acts = [], isLoading } = useActs();
-  const generateAct = useGenerateAct();
   const { toast } = useToast();
   const { data: defaultSchedule } = useDefaultSchedule();
   const scheduleId = defaultSchedule?.id;
   const currentObject = useCurrentObject();
   const objectId = currentObject.data?.id;
   const projectMaterialsQuery = useProjectMaterials(objectId);
+  // Legacy UI state (kept temporarily for backward compatibility of layout)
   const [dateStart, setDateStart] = useState<Date>();
   const [dateEnd, setDateEnd] = useState<Date>();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTemplates, setSelectedTemplates] = useState<Set<string>>(new Set());
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [exportActId, setExportActId] = useState<number | null>(null);
 
   // Эталонный АОСР (005_АОСР 4): данные, которые пойдут в formData при экспорте PDF
   const [aosrForm, setAosrForm] = useState({
@@ -179,16 +180,6 @@ export default function Acts() {
     queryKey: ["/api/act-templates"],
   });
 
-  const createActWithTemplates = useMutation({
-    mutationFn: async (data: { dateStart: string; dateEnd: string; templateIds: string[] }) => {
-      const response = await apiRequest("POST", "/api/acts/create-with-templates", data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/acts"] });
-    },
-  });
-
   const exportAct = useMutation({
     mutationFn: async (data: { actId: number; templateIds: string[] }) => {
       const attachments = aosrForm.attachmentsLines
@@ -263,142 +254,28 @@ export default function Acts() {
         title: language === "ru" ? "Акты обновлены" : "Acts updated",
         description:
           language === "ru"
-            ? `Создано: ${data.created}, обновлено: ${data.updated}. Пропущено (без номера): ${data.skippedNoActNumber}`
-            : `Created: ${data.created}, updated: ${data.updated}. Skipped (no number): ${data.skippedNoActNumber}`,
+            ? `Создано: ${data.created}, обновлено: ${data.updated}, удалено: ${data.deletedActNumbers?.length ?? 0}. Предупреждений: ${data.warnings?.length ?? 0}`
+            : `Created: ${data.created}, updated: ${data.updated}, deleted: ${data.deletedActNumbers?.length ?? 0}. Warnings: ${data.warnings?.length ?? 0}`,
       });
     },
   });
 
-  const handleTemplateToggle = (templateId: string) => {
-    const newSelected = new Set(selectedTemplates);
-    if (newSelected.has(templateId)) {
-      newSelected.delete(templateId);
-    } else {
-      newSelected.add(templateId);
-    }
-    setSelectedTemplates(newSelected);
+  const openExportDialog = (actId: number) => {
+    setExportActId(actId);
+    setIsDialogOpen(true);
   };
 
-  const handleSelectAll = (category: string) => {
-    if (!templatesData) return;
-    const categoryTemplates = templatesData.templates.filter((t) => t.category === category);
-    const allSelected = categoryTemplates.every((t) => selectedTemplates.has(t.templateId));
-
-    const newSelected = new Set(selectedTemplates);
-    if (allSelected) {
-      categoryTemplates.forEach((t) => newSelected.delete(t.templateId));
-    } else {
-      categoryTemplates.forEach((t) => newSelected.add(t.templateId));
-    }
-    setSelectedTemplates(newSelected);
-  };
-
-  const handleGenerate = async () => {
-    if (!dateStart || !dateEnd || selectedTemplates.size === 0) {
-      toast({
-        title: language === "ru" ? "Ошибка" : "Error",
-        description: language === "ru" ? "Выберите период и хотя бы один шаблон" : "Select date range and at least one template",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleExport = async () => {
+    if (!exportActId) return;
     setIsGenerating(true);
     try {
-      const act = await createActWithTemplates.mutateAsync({
-        dateStart: format(dateStart, "yyyy-MM-dd"),
-        dateEnd: format(dateEnd, "yyyy-MM-dd"),
-        templateIds: Array.from(selectedTemplates),
-      });
-
-      // Persist p.3 materials & formal attachments to DB (used by PDF export defaults)
-      if (p3Materials.length > 0) {
-        const usagesUrl = buildUrl(api.actMaterialUsages.replace.path, { id: act.id });
-        const usagesRes = await fetch(usagesUrl, {
-          method: api.actMaterialUsages.replace.method,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            items: p3Materials.map((m, idx) => ({
-              projectMaterialId: m.projectMaterialId,
-              workId: null,
-              batchId: null,
-              qualityDocumentId: m.qualityDocumentId,
-              note: null,
-              orderIndex: idx,
-            })),
-          }),
-          credentials: "include",
-        });
-        if (!usagesRes.ok) {
-          const err = await usagesRes.json().catch(() => ({}));
-          throw new Error(err.message || "Failed to save act material usages");
-        }
-
-        const docIds = Array.from(
-          new Set(p3Materials.map((m) => m.qualityDocumentId).filter((x): x is number => Number.isFinite(x) && (x as number) > 0))
-        );
-
-        const attachmentsUrl = buildUrl(api.actDocumentAttachments.replace.path, { id: act.id });
-        const attachmentsRes = await fetch(attachmentsUrl, {
-          method: api.actDocumentAttachments.replace.method,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            items: docIds.map((documentId, idx) => ({
-              documentId,
-              orderIndex: idx,
-            })),
-          }),
-          credentials: "include",
-        });
-        if (!attachmentsRes.ok) {
-          const err = await attachmentsRes.json().catch(() => ({}));
-          throw new Error(err.message || "Failed to save act document attachments");
-        }
-      }
-
       const exportResult = await exportAct.mutateAsync({
-        actId: act.id,
-        templateIds: Array.from(selectedTemplates),
+        actId: exportActId,
+        templateIds: [],
       });
 
       setIsDialogOpen(false);
-      setSelectedTemplates(new Set());
-      setDateStart(undefined);
-      setDateEnd(undefined);
-      setP3Materials([]);
-      setAosrForm({
-        actNumber: "",
-        actDate: "",
-        objectName: "",
-        objectAddress: "",
-        objectFullName: "",
-        developerOrgFull: "",
-        builderOrgFull: "",
-        designerOrgFull: "",
-        repCustomerControlLine: "",
-        repCustomerControlOrder: "",
-        repBuilderLine: "",
-        repBuilderOrder: "",
-        repBuilderControlLine: "",
-        repBuilderControlOrder: "",
-        repDesignerLine: "",
-        repDesignerOrder: "",
-        repWorkPerformerLine: "",
-        repWorkPerformerOrder: "",
-        p2ProjectDocs: "",
-        p3MaterialsText: "",
-        p4AsBuiltDocs: "",
-        p6NormativeRefs: "",
-        p7NextWorks: "",
-        additionalInfo: "",
-        copiesCount: "",
-        attachmentsLines: "",
-        sigCustomerControl: "",
-        sigBuilder: "",
-        sigBuilderControl: "",
-        sigDesigner: "",
-        sigWorkPerformer: "",
-      });
+      setExportActId(null);
 
       if (exportResult.files && exportResult.files.length > 0) {
         toast({
@@ -410,10 +287,10 @@ export default function Acts() {
           window.open(file.url, "_blank");
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: language === "ru" ? "Ошибка" : "Error",
-        description: language === "ru" ? "Не удалось создать акты" : "Failed to generate acts",
+        description: error?.message || (language === "ru" ? "Не удалось экспортировать акт" : "Failed to export act"),
         variant: "destructive",
       });
     } finally {
@@ -421,39 +298,40 @@ export default function Acts() {
     }
   };
 
-  const groupedTemplates = templatesData?.templates.reduce(
-    (acc, template) => {
-      if (!acc[template.category]) {
-        acc[template.category] = [];
-      }
-      acc[template.category].push(template);
-      return acc;
-    },
-    {} as Record<string, ActTemplate[]>
-  );
+  const templatesById = useMemo(() => {
+    const m = new Map<number, ActTemplate>();
+    (templatesData?.templates ?? []).forEach((tpl) => m.set(tpl.id, tpl));
+    return m;
+  }, [templatesData]);
 
-  const handleDownloadAct = async (actId: number) => {
-    toast({
-      title: language === "ru" ? "Скачивание" : "Downloading",
-      description: language === "ru" ? "Подготовка документов..." : "Preparing documents...",
-    });
-    try {
-      const exportResult = await exportAct.mutateAsync({ actId, templateIds: [] });
-      if (exportResult.files && exportResult.files.length > 0) {
-        exportResult.files.forEach((file: { url: string; filename: string }) => {
-          window.open(file.url, "_blank");
-        });
-      } else {
-        throw new Error("No files");
-      }
-    } catch (_e) {
-      toast({
-        title: language === "ru" ? "Ошибка" : "Error",
-        description: language === "ru" ? "Не удалось скачать акт" : "Failed to download act",
-        variant: "destructive",
-      });
+  // Legacy template selection helpers (UI will be removed in next cleanup)
+  const groupedTemplates = useMemo(() => {
+    const acc: Record<string, ActTemplate[]> = {};
+    for (const template of templatesData?.templates ?? []) {
+      if (!acc[template.category]) acc[template.category] = [];
+      acc[template.category].push(template);
     }
+    return acc;
+  }, [templatesData]);
+
+  const handleTemplateToggle = (templateId: string) => {
+    const next = new Set(selectedTemplates);
+    if (next.has(templateId)) next.delete(templateId);
+    else next.add(templateId);
+    setSelectedTemplates(next);
   };
+
+  const handleSelectAll = (category: string) => {
+    const templates = groupedTemplates[category] ?? [];
+    if (templates.length === 0) return;
+    const allSelected = templates.every((t) => selectedTemplates.has(t.templateId));
+    const next = new Set(selectedTemplates);
+    if (allSelected) templates.forEach((t) => next.delete(t.templateId));
+    else templates.forEach((t) => next.add(t.templateId));
+    setSelectedTemplates(next);
+  };
+
+  const handleGenerate = handleExport;
 
   return (
     <div className="flex flex-col min-h-screen bg-background bg-grain">
@@ -517,11 +395,23 @@ export default function Acts() {
                             {act.actNumber ?? act.id}
                           </CardTitle>
                           <CardDescription className="text-xs">
-                            {act.dateEnd
-                              ? format(new Date(act.dateEnd), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
-                              : act.dateStart
-                                ? format(new Date(act.dateStart), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
-                                : "No date"}
+                            <div>
+                              {act.dateEnd
+                                ? format(new Date(act.dateEnd), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
+                                : act.dateStart
+                                  ? format(new Date(act.dateStart), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
+                                  : language === "ru"
+                                    ? "Без даты"
+                                    : "No date"}
+                            </div>
+                            <div className="text-muted-foreground">
+                              {(() => {
+                                const tpl = templatesById.get(Number((act as any).actTemplateId ?? -1));
+                                if (!tpl) return language === "ru" ? "Тип: не выбран" : "Type: not set";
+                                const title = language === "ru" ? tpl.title : tpl.titleEn ?? tpl.title;
+                                return `Тип: ${tpl.code} — ${title}`;
+                              })()}
+                            </div>
                           </CardDescription>
                         </div>
                       </div>
@@ -534,7 +424,13 @@ export default function Acts() {
                         <span className="text-xs text-muted-foreground">
                           {act.worksData?.length || 0} {language === "ru" ? "работ" : "work items"}
                         </span>
-                        <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 group-hover:text-primary" onClick={() => handleDownloadAct(act.id)} data-testid={`button-download-act-${act.id}`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs gap-1 group-hover:text-primary"
+                          onClick={() => openExportDialog(act.id)}
+                          data-testid={`button-download-act-${act.id}`}
+                        >
                           {language === "ru" ? "Скачать" : "Download"} <Download className="h-3 w-3" />
                         </Button>
                       </div>
@@ -548,16 +444,16 @@ export default function Acts() {
       </div>
 
       <div className="fixed bottom-20 right-4 z-40 md:right-[max(1rem,calc(50vw-220px))]">
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="h-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 pl-5 pr-6 gap-2" data-testid="button-generate-act">
-              <Plus className="h-5 w-5" />
-              <span className="font-semibold">{t.generate}</span>
-            </Button>
-          </DialogTrigger>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) setExportActId(null);
+          }}
+        >
           <DialogContent className="sm:max-w-lg max-h-[90vh] rounded-2xl flex flex-col overflow-hidden">
             <DialogHeader>
-              <DialogTitle>{language === "ru" ? "Создать акты АОСР" : "Generate AOSR Acts"}</DialogTitle>
+              <DialogTitle>{language === "ru" ? "Экспорт АОСР" : "Export AOSR"}</DialogTitle>
             </DialogHeader>
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="py-4 space-y-4 pr-4">
@@ -1016,16 +912,21 @@ export default function Acts() {
               </div>
             </div>
             <div className="pt-4 border-t">
-              <Button onClick={handleGenerate} className="w-full h-12 rounded-xl gap-2" disabled={!dateStart || !dateEnd || selectedTemplates.size === 0 || isGenerating} data-testid="button-submit-generate">
+              <Button
+                onClick={handleExport}
+                className="w-full h-12 rounded-xl gap-2"
+                disabled={!exportActId || isGenerating || exportAct.isPending}
+                data-testid="button-submit-export"
+              >
                 {isGenerating ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {language === "ru" ? "Создание..." : "Generating..."}
+                    {language === "ru" ? "Экспорт..." : "Exporting..."}
                   </>
                 ) : (
                   <>
                     <FileDown className="h-4 w-4" />
-                    {language === "ru" ? `Создать ${selectedTemplates.size} актов` : `Generate ${selectedTemplates.size} acts`}
+                    {language === "ru" ? "Скачать PDF" : "Download PDF"}
                   </>
                 )}
               </Button>

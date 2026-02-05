@@ -215,18 +215,28 @@ export type ActWorkItem = {
   code?: string;                      // Work code/GESN code (optional)
 };
 
+export type ExecutiveSchemeLink = {
+  title: string;
+  fileUrl?: string;
+};
+
 // Acts (AOSR)
 export const acts = pgTable("acts", {
   id: serial("id").primaryKey(),
   objectId: integer("object_id").references(() => objects.id),
   // Global act number (business identifier). Nullable for legacy records.
   actNumber: integer("act_number").unique(),
+  actTemplateId: integer("act_template_id").references(() => actTemplates.id, { onDelete: "set null" }),
   dateStart: date("date_start"),
   dateEnd: date("date_end"),
   location: text("location"),
   status: text("status").default("draft"), // draft, generated, signed
   // Aggregated works for this act (with explicit source reference)
   worksData: jsonb("works_data").$type<ActWorkItem[]>(),
+  // Aggregated documentation (copied/merged from schedule tasks during generate-acts)
+  projectDrawingsAgg: text("project_drawings_agg"),
+  normativeRefsAgg: text("normative_refs_agg"),
+  executiveSchemesAgg: jsonb("executive_schemes_agg").$type<ExecutiveSchemeLink[]>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -474,6 +484,11 @@ export const scheduleTasks = pgTable(
     }),
     // Act number this task belongs to (global). Nullable = not assigned to an act.
     actNumber: integer("act_number"),
+    actTemplateId: integer("act_template_id").references(() => actTemplates.id, { onDelete: "set null" }),
+    // Task-scoped docs for act generation
+    projectDrawings: text("project_drawings"),
+    normativeRefs: text("normative_refs"),
+    executiveSchemes: jsonb("executive_schemes").$type<ExecutiveSchemeLink[]>(),
     titleOverride: text("title_override"),
     startDate: date("start_date").notNull(),
     durationDays: integer("duration_days").notNull(),
@@ -486,7 +501,38 @@ export const scheduleTasks = pgTable(
     estimatePositionIdIdx: index("schedule_tasks_estimate_position_id_idx").on(t.estimatePositionId),
     scheduleOrderIdx: index("schedule_tasks_schedule_order_idx").on(t.scheduleId, t.orderIndex),
     scheduleActNumberIdx: index("schedule_tasks_schedule_act_number_idx").on(t.scheduleId, t.actNumber),
+    scheduleActTemplateIdx: index("schedule_tasks_schedule_act_template_idx").on(t.scheduleId, t.actTemplateId),
   })
+);
+
+// Materials linked to a specific schedule task (used for p.3 AOSR and attachments)
+export const taskMaterials = pgTable(
+  "task_materials",
+  {
+    id: serial("id").primaryKey(),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => scheduleTasks.id, { onDelete: "cascade" }),
+    projectMaterialId: bigint("project_material_id", { mode: "number" })
+      .notNull()
+      .references(() => projectMaterials.id, { onDelete: "restrict" }),
+    batchId: bigint("batch_id", { mode: "number" }).references(() => materialBatches.id, { onDelete: "set null" }),
+    qualityDocumentId: bigint("quality_document_id", { mode: "number" }).references(() => documents.id, {
+      onDelete: "restrict",
+    }),
+    note: text("note"),
+    orderIndex: integer("order_index").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    taskIdIdx: index("task_materials_task_id_idx").on(t.taskId),
+    orderIdx: index("task_materials_order_idx").on(t.taskId, t.orderIndex),
+    taskMaterialBatchUq: uniqueIndex("task_materials_task_material_batch_uq").on(
+      t.taskId,
+      t.projectMaterialId,
+      t.batchId,
+    ),
+  }),
 );
 
 export const estimatePositionMaterialLinks = pgTable(
@@ -540,6 +586,7 @@ export const insertActTemplateSchema = createInsertSchema(actTemplates).omit({ i
 export const insertActTemplateSelectionSchema = createInsertSchema(actTemplateSelections).omit({ id: true, generatedAt: true });
 export const insertScheduleSchema = createInsertSchema(schedules).omit({ id: true, createdAt: true });
 export const insertScheduleTaskSchema = createInsertSchema(scheduleTasks).omit({ id: true, createdAt: true });
+export const insertTaskMaterialSchema = createInsertSchema(taskMaterials).omit({ id: true, createdAt: true });
 export const insertEstimatePositionMaterialLinkSchema = createInsertSchema(estimatePositionMaterialLinks).omit({
   createdAt: true,
   updatedAt: true,
@@ -618,6 +665,9 @@ export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
 
 export type ScheduleTask = typeof scheduleTasks.$inferSelect;
 export type InsertScheduleTask = z.infer<typeof insertScheduleTaskSchema>;
+
+export type TaskMaterial = typeof taskMaterials.$inferSelect;
+export type InsertTaskMaterial = z.infer<typeof insertTaskMaterialSchema>;
 
 export type EstimatePositionMaterialLink = typeof estimatePositionMaterialLinks.$inferSelect;
 export type InsertEstimatePositionMaterialLink = z.infer<typeof insertEstimatePositionMaterialLinkSchema>;

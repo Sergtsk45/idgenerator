@@ -23,6 +23,7 @@ import {
   actTemplateSelections,
   schedules,
   scheduleTasks,
+  taskMaterials,
   type InsertWork,
   type InsertEstimate,
   type InsertEstimateSection,
@@ -66,7 +67,9 @@ import {
   type ActTemplateSelection,
   type InsertActTemplateSelection,
   type Schedule,
-  type ScheduleTask
+  type ScheduleTask,
+  type TaskMaterial,
+  type InsertTaskMaterial
 } from "@shared/schema";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
@@ -222,12 +225,18 @@ export interface IStorage {
   createAct(act: InsertAct): Promise<Act>;
   upsertActByNumber(data: {
     actNumber: number;
+    actTemplateId?: number | null;
     dateStart: string | null;
     dateEnd: string | null;
     location?: string | null;
     status?: string | null;
     worksData?: Array<{ workId: number; quantity: number; description: string }> | null;
+    projectDrawingsAgg?: string | null;
+    normativeRefsAgg?: string | null;
+    executiveSchemesAgg?: Array<{ title: string; fileUrl?: string }> | null;
   }): Promise<{ act: Act; created: boolean }>;
+
+  deleteActByNumber(actNumber: number): Promise<boolean>;
   
   // Attachments
   getAttachments(actId: number): Promise<Attachment[]>;
@@ -248,6 +257,7 @@ export interface IStorage {
   getOrCreateDefaultSchedule(): Promise<Schedule>;
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
   getScheduleWithTasks(id: number): Promise<(Schedule & { tasks: ScheduleTask[] }) | undefined>;
+  getScheduleTask(id: number): Promise<ScheduleTask | undefined>;
   bootstrapScheduleTasksFromWorks(params: {
     scheduleId: number;
     workIds?: number[];
@@ -256,8 +266,32 @@ export interface IStorage {
   }): Promise<{ scheduleId: number; created: number; skipped: number }>;
   patchScheduleTask(
     id: number,
-    patch: Partial<Pick<ScheduleTask, "titleOverride" | "startDate" | "durationDays" | "orderIndex" | "actNumber">>
+    patch: Partial<
+      Pick<
+        ScheduleTask,
+        | "titleOverride"
+        | "startDate"
+        | "durationDays"
+        | "orderIndex"
+        | "actNumber"
+        | "actTemplateId"
+        | "projectDrawings"
+        | "normativeRefs"
+        | "executiveSchemes"
+      >
+    >
   ): Promise<ScheduleTask | undefined>;
+
+  getTasksByActNumber(scheduleId: number, actNumber: number): Promise<ScheduleTask[]>;
+  updateActTemplateForActNumber(params: { scheduleId: number; actNumber: number; actTemplateId: number | null }): Promise<number>;
+
+  // Task materials (materials linked to a specific schedule task)
+  getTaskMaterials(
+    taskId: number
+  ): Promise<Array<TaskMaterial & { projectMaterial?: ProjectMaterial; catalogMaterial?: MaterialCatalog | null; batch?: MaterialBatch | null; qualityDocument?: Document | null }>>;
+  replaceTaskMaterials(taskId: number, items: Array<Omit<InsertTaskMaterial, "taskId">>): Promise<void>;
+  createTaskMaterial(taskId: number, item: Omit<InsertTaskMaterial, "taskId">): Promise<TaskMaterial>;
+  deleteTaskMaterial(taskMaterialId: number): Promise<boolean>;
   
   // Schedule source (works vs estimate)
   getScheduleSourceInfo(scheduleId: number): Promise<{
@@ -906,6 +940,126 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async getTaskMaterials(
+    taskId: number
+  ): Promise<
+    Array<
+      TaskMaterial & {
+        projectMaterial?: ProjectMaterial;
+        catalogMaterial?: MaterialCatalog | null;
+        batch?: MaterialBatch | null;
+        qualityDocument?: Document | null;
+      }
+    >
+  > {
+    const rows = await db
+      .select()
+      .from(taskMaterials)
+      .where(eq(taskMaterials.taskId, taskId))
+      .orderBy(asc(taskMaterials.orderIndex));
+
+    const materialIds = Array.from(new Set(rows.map((r) => r.projectMaterialId)));
+    const batchIds = Array.from(new Set(rows.map((r) => r.batchId).filter((v): v is any => v != null)));
+    const qualityDocIds = Array.from(new Set(rows.map((r) => r.qualityDocumentId).filter((v): v is any => v != null)));
+
+    const materials =
+      materialIds.length === 0
+        ? []
+        : await db
+            .select({
+              material: projectMaterials,
+              catalog: materialsCatalog,
+            })
+            .from(projectMaterials)
+            .leftJoin(materialsCatalog, eq(materialsCatalog.id, projectMaterials.catalogMaterialId))
+            .where(inArray(projectMaterials.id, materialIds as any));
+
+    const batches =
+      batchIds.length === 0 ? [] : await db.select().from(materialBatches).where(inArray(materialBatches.id, batchIds as any));
+
+    const docs =
+      qualityDocIds.length === 0
+        ? []
+        : await db.select().from(documents).where(and(inArray(documents.id, qualityDocIds as any), isNull(documents.deletedAt)));
+
+    const materialById = new Map<number, { material: ProjectMaterial; catalog: MaterialCatalog | null }>();
+    for (const row of materials) {
+      const mat = (row as any).material as ProjectMaterial;
+      const cat = (row as any).catalog as MaterialCatalog | null;
+      materialById.set(Number(mat.id), { material: mat, catalog: cat });
+    }
+
+    const batchById = new Map<number, MaterialBatch>();
+    for (const b of batches) batchById.set(Number(b.id), b);
+
+    const docById = new Map<number, Document>();
+    for (const d of docs) docById.set(Number(d.id), d);
+
+    return rows.map((r) => {
+      const mat = materialById.get(Number(r.projectMaterialId));
+      const batch = r.batchId == null ? null : (batchById.get(Number(r.batchId)) ?? null);
+      const qd = r.qualityDocumentId == null ? null : (docById.get(Number(r.qualityDocumentId)) ?? null);
+      return {
+        ...(r as any),
+        projectMaterial: mat?.material,
+        catalogMaterial: mat?.catalog ?? null,
+        batch,
+        qualityDocument: qd,
+      };
+    });
+  }
+
+  async replaceTaskMaterials(taskId: number, items: Array<Omit<InsertTaskMaterial, "taskId">>): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(taskMaterials).where(eq(taskMaterials.taskId, taskId));
+      if (items.length === 0) return;
+
+      const values = items.map((it, idx) => ({
+        ...(it as any),
+        taskId,
+        orderIndex: (it as any).orderIndex ?? idx,
+      }));
+      await tx.insert(taskMaterials).values(values as any);
+    });
+  }
+
+  async createTaskMaterial(taskId: number, item: Omit<InsertTaskMaterial, "taskId">): Promise<TaskMaterial> {
+    const orderIndex =
+      (item as any).orderIndex != null
+        ? Number((item as any).orderIndex)
+        : (() => {
+            // append to end
+            return 0;
+          })();
+
+    // If orderIndex not provided, compute max(order_index)+1
+    let finalOrderIndex = orderIndex;
+    if ((item as any).orderIndex == null) {
+      const [row] = await db
+        .select({ max: sql<number>`COALESCE(MAX(${taskMaterials.orderIndex}), -1)` })
+        .from(taskMaterials)
+        .where(eq(taskMaterials.taskId, taskId));
+      finalOrderIndex = Number((row as any)?.max ?? -1) + 1;
+    }
+
+    const [created] = await db
+      .insert(taskMaterials)
+      .values({
+        ...(item as any),
+        taskId,
+        orderIndex: finalOrderIndex as any,
+      })
+      .returning();
+    return created;
+  }
+
+  async deleteTaskMaterial(taskMaterialId: number): Promise<boolean> {
+    const [existing] = await db.select({ id: taskMaterials.id }).from(taskMaterials).where(eq(taskMaterials.id, taskMaterialId));
+    if (!existing) return false;
+    await db.delete(taskMaterials).where(eq(taskMaterials.id, taskMaterialId));
+    return true;
+  }
+
   async getActDocAttachments(actId: number): Promise<Array<ActDocumentAttachment & { document?: Document | null }>> {
     const attachmentsRows = await db
       .select()
@@ -1357,11 +1511,15 @@ export class DatabaseStorage implements IStorage {
 
   async upsertActByNumber(data: {
     actNumber: number;
+    actTemplateId?: number | null;
     dateStart: string | null;
     dateEnd: string | null;
     location?: string | null;
     status?: string | null;
     worksData?: Array<{ workId: number; quantity: number; description: string }> | null;
+    projectDrawingsAgg?: string | null;
+    normativeRefsAgg?: string | null;
+    executiveSchemesAgg?: Array<{ title: string; fileUrl?: string }> | null;
   }): Promise<{ act: Act; created: boolean }> {
     const existing = await this.getActByNumber(data.actNumber);
     const defaultObject = await this.getOrCreateDefaultObject();
@@ -1377,11 +1535,15 @@ export class DatabaseStorage implements IStorage {
           // Backfill objectId for legacy/older records if missing.
           objectId: ((existing as any).objectId ?? defaultObject.id) as any,
           actNumber: data.actNumber as any,
+          actTemplateId: (data.actTemplateId ?? (existing as any).actTemplateId ?? null) as any,
           dateStart: (data.dateStart ?? null) as any,
           dateEnd: (data.dateEnd ?? null) as any,
           location: (data.location ?? existing.location ?? null) as any,
           status: nextStatus,
           worksData: (data.worksData ?? existing.worksData ?? null) as any,
+          projectDrawingsAgg: (data.projectDrawingsAgg ?? (existing as any).projectDrawingsAgg ?? null) as any,
+          normativeRefsAgg: (data.normativeRefsAgg ?? (existing as any).normativeRefsAgg ?? null) as any,
+          executiveSchemesAgg: (data.executiveSchemesAgg ?? (existing as any).executiveSchemesAgg ?? null) as any,
         })
         .where(eq(acts.id, existing.id))
         .returning();
@@ -1393,15 +1555,26 @@ export class DatabaseStorage implements IStorage {
       .values({
         objectId: defaultObject.id,
         actNumber: data.actNumber as any,
+        actTemplateId: (data.actTemplateId ?? null) as any,
         dateStart: (data.dateStart ?? null) as any,
         dateEnd: (data.dateEnd ?? null) as any,
         location: (data.location ?? null) as any,
         status: (data.status ?? "draft") as any,
         worksData: (data.worksData ?? []) as any,
+        projectDrawingsAgg: (data.projectDrawingsAgg ?? null) as any,
+        normativeRefsAgg: (data.normativeRefsAgg ?? null) as any,
+        executiveSchemesAgg: (data.executiveSchemesAgg ?? null) as any,
       })
       .returning();
 
     return { act: created, created: true };
+  }
+
+  async deleteActByNumber(actNumber: number): Promise<boolean> {
+    const [existing] = await db.select({ id: acts.id }).from(acts).where(eq(acts.actNumber, actNumber as any));
+    if (!existing) return false;
+    await db.delete(acts).where(eq(acts.id, existing.id));
+    return true;
   }
 
   async getAttachments(actId: number): Promise<Attachment[]> {
@@ -1491,6 +1664,11 @@ export class DatabaseStorage implements IStorage {
     return { ...schedule, tasks };
   }
 
+  async getScheduleTask(id: number): Promise<ScheduleTask | undefined> {
+    const [task] = await db.select().from(scheduleTasks).where(eq(scheduleTasks.id, id));
+    return task;
+  }
+
   async bootstrapScheduleTasksFromWorks(params: {
     scheduleId: number;
     workIds?: number[];
@@ -1554,7 +1732,20 @@ export class DatabaseStorage implements IStorage {
 
   async patchScheduleTask(
     id: number,
-    patch: Partial<Pick<ScheduleTask, "titleOverride" | "startDate" | "durationDays" | "orderIndex" | "actNumber">>
+    patch: Partial<
+      Pick<
+        ScheduleTask,
+        | "titleOverride"
+        | "startDate"
+        | "durationDays"
+        | "orderIndex"
+        | "actNumber"
+        | "actTemplateId"
+        | "projectDrawings"
+        | "normativeRefs"
+        | "executiveSchemes"
+      >
+    >
   ): Promise<ScheduleTask | undefined> {
     const updateData: Partial<typeof scheduleTasks.$inferInsert> = {};
 
@@ -1563,11 +1754,36 @@ export class DatabaseStorage implements IStorage {
     if (patch.durationDays !== undefined) updateData.durationDays = patch.durationDays as any;
     if (patch.orderIndex !== undefined) updateData.orderIndex = patch.orderIndex as any;
     if ("actNumber" in patch) updateData.actNumber = (patch.actNumber ?? null) as any;
+    if ("actTemplateId" in patch) updateData.actTemplateId = (patch.actTemplateId ?? null) as any;
+    if ("projectDrawings" in patch) updateData.projectDrawings = patch.projectDrawings ?? null;
+    if ("normativeRefs" in patch) updateData.normativeRefs = patch.normativeRefs ?? null;
+    if ("executiveSchemes" in patch) updateData.executiveSchemes = (patch.executiveSchemes ?? null) as any;
 
     if (Object.keys(updateData).length === 0) return undefined;
 
     const [updated] = await db.update(scheduleTasks).set(updateData).where(eq(scheduleTasks.id, id)).returning();
     return updated;
+  }
+
+  async getTasksByActNumber(scheduleId: number, actNumber: number): Promise<ScheduleTask[]> {
+    return await db
+      .select()
+      .from(scheduleTasks)
+      .where(and(eq(scheduleTasks.scheduleId, scheduleId), eq(scheduleTasks.actNumber, actNumber as any)))
+      .orderBy(asc(scheduleTasks.orderIndex));
+  }
+
+  async updateActTemplateForActNumber(params: {
+    scheduleId: number;
+    actNumber: number;
+    actTemplateId: number | null;
+  }): Promise<number> {
+    const res = await db
+      .update(scheduleTasks)
+      .set({ actTemplateId: (params.actTemplateId ?? null) as any })
+      .where(and(eq(scheduleTasks.scheduleId, params.scheduleId), eq(scheduleTasks.actNumber, params.actNumber as any)))
+      .returning({ id: scheduleTasks.id });
+    return res.length;
   }
 
   // Schedule source management (works vs estimate)

@@ -670,64 +670,11 @@ export async function registerRoutes(
     res.json(acts);
   });
 
-  app.post(api.acts.generate.path, async (req, res) => {
-    try {
-      const input = api.acts.generate.input.parse(req.body);
-      
-      // Simple logic: Find all normalized messages in date range and group them
-      const messages = await storage.getMessages();
-      const filtered = messages.filter(m => {
-        if (!m.isProcessed || !m.normalizedData) return false;
-        const d = (m.normalizedData as any).date;
-        return d >= input.dateStart && d <= input.dateEnd;
-      });
-
-      if (filtered.length === 0) {
-        return res.status(400).json({ message: "No works found for this period" });
-      }
-
-      // Group by workCode
-      const worksMap = new Map<string, number>();
-      filtered.forEach(m => {
-        const data = m.normalizedData as any;
-        if (data.workCode && data.quantity) {
-          const current = worksMap.get(data.workCode) || 0;
-          worksMap.set(data.workCode, current + data.quantity);
-        }
-      });
-
-      const worksData = [];
-      for (const entry of Array.from(worksMap.entries())) {
-        const [code, quantity] = entry;
-        const work = await storage.getWorkByCode(code);
-        if (work) {
-          worksData.push({
-            sourceType: 'works' as const,
-            sourceId: work.id,
-            quantity,
-            description: work.description,
-            unit: work.unit,
-            code: work.code,
-          });
-        }
-      }
-
-      const act = await storage.createAct({
-        dateStart: input.dateStart,
-        dateEnd: input.dateEnd,
-        status: "generated",
-        worksData: worksData,
-        location: (filtered[0].normalizedData as any)?.location || "Site"
-      });
-
-      res.status(201).json(act);
-
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
-      }
-      res.status(500).json({ message: "Internal Server Error" });
-    }
+  // Deprecated: acts can be created only from schedule now.
+  app.post(api.acts.generate.path, async (_req, res) => {
+    return res.status(410).json({
+      message: "Эндпоинт устарел: акты АОСР теперь создаются только из графика работ (/schedule).",
+    });
   });
 
   app.get(api.acts.get.path, async (req, res) => {
@@ -847,10 +794,51 @@ export async function registerRoutes(
       const actNumbers = Array.from(groups.keys()).sort((a, b) => a - b);
       let created = 0;
       let updated = 0;
+      const deletedActNumbers: number[] = [];
+      const warnings: Array<{ actNumber: number; type: string; message: string }> = [];
+
+      const mergeFreeText = (values: Array<string | null | undefined>): string => {
+        const tokens: string[] = [];
+        const seen = new Set<string>();
+        for (const v of values) {
+          const raw = String(v ?? "").trim();
+          if (!raw) continue;
+          const parts = raw
+            .split(/[\n,;]+/g)
+            .map((p) => p.trim())
+            .filter(Boolean);
+          for (const p of parts) {
+            const key = p.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            tokens.push(p);
+          }
+        }
+        return tokens.join(", ");
+      };
 
       for (const actNumber of actNumbers) {
-        const tasks = groups.get(actNumber) ?? [];
+        const tasks = (groups.get(actNumber) ?? []).slice().sort((a: any, b: any) => Number(a.orderIndex ?? 0) - Number(b.orderIndex ?? 0));
         if (tasks.length === 0) continue;
+
+        // Determine act template type (one per actNumber)
+        const distinctTemplateIds = Array.from(
+          new Set(tasks.map((t: any) => (t as any).actTemplateId).filter((v: any) => v != null)),
+        ).map((v: any) => Number(v));
+        const actTemplateId = distinctTemplateIds.length > 0 ? distinctTemplateIds[0] : null;
+        if (distinctTemplateIds.length === 0) {
+          warnings.push({
+            actNumber,
+            type: "no_template_type",
+            message: `Акт №${actNumber}: не выбран тип акта (шаблон) ни у одной задачи`,
+          });
+        } else if (distinctTemplateIds.length > 1) {
+          warnings.push({
+            actNumber,
+            type: "mixed_template_types",
+            message: `Акт №${actNumber}: в задачах выбрано несколько типов актов (${distinctTemplateIds.join(", ")}). Используется первый.`,
+          });
+        }
 
         let minStart: string | null = null;
         let maxEnd: string | null = null;
@@ -862,6 +850,25 @@ export async function registerRoutes(
 
           if (!minStart || start < minStart) minStart = start;
           if (!maxEnd || end > maxEnd) maxEnd = end;
+        }
+
+        // Aggregate task-scoped docs
+        const projectDrawingsAgg = mergeFreeText(tasks.map((t: any) => (t as any).projectDrawings));
+        const normativeRefsAgg = mergeFreeText(tasks.map((t: any) => (t as any).normativeRefs));
+        const schemeSeen = new Set<string>();
+        const executiveSchemesAgg: Array<{ title: string; fileUrl?: string }> = [];
+        for (const t of tasks) {
+          const list = (t as any).executiveSchemes;
+          if (!Array.isArray(list)) continue;
+          for (const s of list) {
+            const title = String((s as any)?.title ?? "").trim();
+            const fileUrl = String((s as any)?.fileUrl ?? "").trim();
+            if (!title) continue;
+            const key = `${title.toLowerCase()}|${fileUrl}`;
+            if (schemeSeen.has(key)) continue;
+            schemeSeen.add(key);
+            executiveSchemesAgg.push(fileUrl ? { title, fileUrl } : { title });
+          }
         }
 
         // Generate worksData based on schedule source type
@@ -926,14 +933,83 @@ export async function registerRoutes(
 
         const result = await storage.upsertActByNumber({
           actNumber,
+          actTemplateId,
           dateStart: minStart,
           dateEnd: maxEnd,
           status: "draft",
           worksData: worksData as any,
+          projectDrawingsAgg: projectDrawingsAgg || null,
+          normativeRefsAgg: normativeRefsAgg || null,
+          executiveSchemesAgg: executiveSchemesAgg.length > 0 ? executiveSchemesAgg : null,
         });
 
         if (result.created) created++;
         else updated++;
+
+        // Replace act materials and formal attachments from task_materials
+        const taskIdToWorkId = new Map<number, number | null>();
+        for (const t of tasks) taskIdToWorkId.set(Number((t as any).id), (t as any).workId != null ? Number((t as any).workId) : null);
+
+        const taskMaterialsLists = await Promise.all(tasks.map((t: any) => storage.getTaskMaterials(Number(t.id))));
+        const flatTaskMaterials = taskMaterialsLists.flat();
+
+        const actUsageItems: any[] = [];
+        const attachmentDocIds: number[] = [];
+        const attachmentDocSeen = new Set<number>();
+        let missingQualityDocs = 0;
+
+        for (const row of flatTaskMaterials) {
+          const qdId = (row as any).qualityDocumentId == null ? null : Number((row as any).qualityDocumentId);
+          if (qdId == null) missingQualityDocs++;
+          if (qdId != null && !attachmentDocSeen.has(qdId)) {
+            attachmentDocSeen.add(qdId);
+            attachmentDocIds.push(qdId);
+          }
+          actUsageItems.push({
+            projectMaterialId: Number((row as any).projectMaterialId),
+            workId: taskIdToWorkId.get(Number((row as any).taskId)) ?? null,
+            batchId: (row as any).batchId == null ? null : Number((row as any).batchId),
+            qualityDocumentId: qdId,
+            note: (row as any).note ?? null,
+            orderIndex: Number((row as any).orderIndex ?? 0),
+          });
+        }
+
+        // Persist to DB for PDF defaults
+        await storage.replaceActMaterialUsages(result.act.id, actUsageItems as any);
+        await storage.replaceActDocAttachments(
+          result.act.id,
+          attachmentDocIds.map((documentId, orderIndex) => ({ documentId, orderIndex })) as any,
+        );
+
+        if (actUsageItems.length === 0) {
+          warnings.push({ actNumber, type: "no_materials", message: `Акт №${actNumber}: нет материалов ни в одной задаче` });
+        } else if (missingQualityDocs > 0) {
+          warnings.push({
+            actNumber,
+            type: "no_quality_docs",
+            message: `Акт №${actNumber}: у ${missingQualityDocs} материалов не указан документ качества`,
+          });
+        }
+        if (!projectDrawingsAgg) {
+          warnings.push({ actNumber, type: "no_drawings", message: `Акт №${actNumber}: не заполнены номера чертежей проекта` });
+        }
+        if (!normativeRefsAgg) {
+          warnings.push({ actNumber, type: "no_normatives", message: `Акт №${actNumber}: не заполнены СНиП/ГОСТ/РД` });
+        }
+      }
+
+      // Delete acts which no longer have any tasks (global actNumber uniqueness is assumed).
+      const actNumbersSet = new Set<number>(actNumbers);
+      const existingActs = await storage.getActs();
+      for (const a of existingActs as any[]) {
+        const n = (a as any).actNumber;
+        if (n == null) continue;
+        const num = Number(n);
+        if (actNumbersSet.has(num)) continue;
+        if (String((a as any).status ?? "") === "signed") continue;
+        const ok = await storage.deleteActByNumber(num);
+        if (ok) deletedActNumbers.push(num);
       }
 
       return res.status(200).json({
@@ -942,6 +1018,8 @@ export async function registerRoutes(
         created,
         updated,
         skippedNoActNumber,
+        deletedActNumbers,
+        warnings,
       });
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1083,7 +1161,63 @@ export async function registerRoutes(
       }
 
       const input = api.scheduleTasks.patch.input.parse(req.body);
-      const updated = await storage.patchScheduleTask(id, input);
+      const existing = await storage.getScheduleTask(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Schedule task not found" });
+      }
+
+      const nextActNumber = input.actNumber !== undefined ? input.actNumber : (existing as any).actNumber;
+      const nextTemplateId =
+        input.actTemplateId !== undefined ? input.actTemplateId : ((existing as any).actTemplateId ?? null);
+
+      // If changing actTemplateId for a task inside an actNumber group, enforce one template per actNumber.
+      if (input.actTemplateId !== undefined && nextActNumber != null) {
+        const tasksInAct = await storage.getTasksByActNumber(Number((existing as any).scheduleId), Number(nextActNumber));
+        const distinct = Array.from(
+          new Set(tasksInAct.map((t: any) => (t as any).actTemplateId).filter((v: any) => v != null)),
+        );
+
+        const conflict = distinct.length > 0 && (distinct.length > 1 || distinct[0] !== nextTemplateId);
+        if (conflict && !input.updateAllTasks) {
+          return res.status(409).json({
+            message:
+              "В этом акте уже выбран другой тип. Включите updateAllTasks=true, чтобы изменить тип для всех задач акта.",
+            actNumber: nextActNumber,
+            currentTemplateId: distinct[0] ?? null,
+            otherTasksCount: Math.max(0, tasksInAct.length - 1),
+          });
+        }
+
+        // Sync templateId across all tasks of the same actNumber if confirmed.
+        if (conflict && input.updateAllTasks) {
+          await storage.updateActTemplateForActNumber({
+            scheduleId: Number((existing as any).scheduleId),
+            actNumber: Number(nextActNumber),
+            actTemplateId: nextTemplateId,
+          });
+        }
+
+        // Also update act record (if exists) to keep list view consistent before next generate-acts.
+        const act = await storage.getActByNumber(Number(nextActNumber));
+        if (act && (act as any).status !== "signed") {
+          await storage.upsertActByNumber({
+            actNumber: Number(nextActNumber),
+            actTemplateId: nextTemplateId,
+            dateStart: (act as any).dateStart ?? null,
+            dateEnd: (act as any).dateEnd ?? null,
+            location: (act as any).location ?? null,
+            status: (act as any).status ?? "draft",
+            worksData: ((act as any).worksData ?? []) as any,
+            projectDrawingsAgg: (act as any).projectDrawingsAgg ?? null,
+            normativeRefsAgg: (act as any).normativeRefsAgg ?? null,
+            executiveSchemesAgg: (act as any).executiveSchemesAgg ?? null,
+          });
+        }
+      }
+
+      // Remove route-level helper flag before passing to storage
+      const { updateAllTasks: _updateAllTasks, ...patch } = input as any;
+      const updated = await storage.patchScheduleTask(id, patch);
 
       if (!updated) {
         return res.status(404).json({ message: "Schedule task not found" });
@@ -1095,6 +1229,126 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       }
       console.error("Schedule task patch failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Schedule task materials (p.3 AOSR sources)
+  app.get(api.taskMaterials.list.path, async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      if (!Number.isFinite(taskId) || taskId <= 0) {
+        return res.status(400).json({ message: "Invalid schedule task id" });
+      }
+
+      const list = await storage.getTaskMaterials(taskId);
+      const dto = list.map((r: any) => {
+        const pm = r.projectMaterial ?? null;
+        const cat = r.catalogMaterial ?? null;
+        const batch = r.batch ?? null;
+        const qd = r.qualityDocument ?? null;
+
+        const name =
+          String(cat?.name ?? "").trim() ||
+          String(pm?.nameOverride ?? "").trim() ||
+          (pm?.id != null ? `Материал #${String(pm.id)}` : null);
+
+        const batchLabel = batch
+          ? [batch.batchNumber ? `Партия ${String(batch.batchNumber)}` : null, batch.deliveryDate ? `от ${String(batch.deliveryDate)}` : null]
+              .filter(Boolean)
+              .join(" ")
+          : null;
+
+        return {
+          id: Number(r.id),
+          taskId: Number(r.taskId),
+          projectMaterialId: Number(r.projectMaterialId),
+          batchId: r.batchId == null ? null : Number(r.batchId),
+          qualityDocumentId: r.qualityDocumentId == null ? null : Number(r.qualityDocumentId),
+          note: r.note ?? null,
+          orderIndex: Number(r.orderIndex ?? 0),
+          createdAt: (r as any).createdAt,
+          projectMaterialName: name,
+          batchLabel,
+          qualityDocumentTitle: qd?.title ?? null,
+          qualityDocumentNumber: qd?.docNumber ?? null,
+          qualityDocumentFileUrl: qd?.fileUrl ?? null,
+        };
+      });
+
+      return res.status(200).json(dto);
+    } catch (err) {
+      console.error("List task materials failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.put(api.taskMaterials.replace.path, async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      if (!Number.isFinite(taskId) || taskId <= 0) {
+        return res.status(400).json({ message: "Invalid schedule task id" });
+      }
+
+      const input = api.taskMaterials.replace.input.parse(req.body);
+      const items = input.items.map((it, idx) => ({
+        projectMaterialId: Number(it.projectMaterialId),
+        batchId: it.batchId == null ? null : Number(it.batchId),
+        qualityDocumentId: it.qualityDocumentId == null ? null : Number(it.qualityDocumentId),
+        note: it.note ?? null,
+        orderIndex: it.orderIndex ?? idx,
+      }));
+
+      await storage.replaceTaskMaterials(taskId, items as any);
+      const updated = await storage.getTaskMaterials(taskId);
+      return res.status(200).json(updated as any);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("Replace task materials failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post(api.taskMaterials.add.path, async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      if (!Number.isFinite(taskId) || taskId <= 0) {
+        return res.status(400).json({ message: "Invalid schedule task id" });
+      }
+
+      const input = api.taskMaterials.add.input.parse(req.body);
+      const created = await storage.createTaskMaterial(taskId, {
+        projectMaterialId: Number(input.projectMaterialId),
+        batchId: input.batchId == null ? null : Number(input.batchId),
+        qualityDocumentId: input.qualityDocumentId == null ? null : Number(input.qualityDocumentId),
+        note: input.note ?? null,
+        orderIndex: input.orderIndex,
+      } as any);
+
+      return res.status(201).json(created as any);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("Add task material failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete(api.taskMaterials.remove.path, async (req, res) => {
+    try {
+      const materialId = Number(req.params.materialId);
+      if (!Number.isFinite(materialId) || materialId <= 0) {
+        return res.status(400).json({ message: "Invalid material id" });
+      }
+
+      const ok = await storage.deleteTaskMaterial(materialId);
+      if (!ok) return res.status(404).json({ message: "Not found" });
+      return res.status(204).send();
+    } catch (err) {
+      console.error("Delete task material failed:", err);
       return res.status(500).json({ message: "Internal Server Error" });
     }
   });
@@ -1222,9 +1476,17 @@ export async function registerRoutes(
       // Allow exporting without explicit templates (for acts generated from schedule).
       // Strategy:
       // - if templateIds provided -> use them
-      // - else try act_template_selections
+      // - else use act.actTemplateId (single act type)
+      // - else try act_template_selections (legacy)
       // - else generate a single "default" AOSR PDF using worksData aggregated from the act
       let effectiveTemplateIds: string[] = Array.isArray(templateIds) ? templateIds : [];
+      if (effectiveTemplateIds.length === 0) {
+        const actTemplateId = (act as any).actTemplateId as number | null | undefined;
+        if (actTemplateId != null) {
+          const tpl = await storage.getActTemplate(Number(actTemplateId));
+          if (tpl?.templateId) effectiveTemplateIds.push(tpl.templateId);
+        }
+      }
       if (effectiveTemplateIds.length === 0) {
         const selections = await storage.getActTemplateSelections(actId);
         for (const s of selections) {
@@ -1256,6 +1518,21 @@ export async function registerRoutes(
                 .join("\n")
             : "";
 
+        const actProjectDrawingsAgg = String((act as any).projectDrawingsAgg ?? "").trim();
+        const actNormativeRefsAgg = String((act as any).normativeRefsAgg ?? "").trim();
+        const schemesAggRaw = (act as any).executiveSchemesAgg;
+        const schemesAgg = Array.isArray(schemesAggRaw) ? schemesAggRaw : [];
+        const schemesText = schemesAgg
+          .map((s: any) => {
+            const title = String(s?.title ?? "").trim();
+            const fileUrl = String(s?.fileUrl ?? "").trim();
+            if (!title) return "";
+            return fileUrl ? `Исполнительная схема: ${title} — ${fileUrl}` : `Исполнительная схема: ${title}`;
+          })
+          .filter(Boolean)
+          .join("\n");
+        const combinedDbAttachmentsText = [String(dbAttachmentsText || "").trim(), schemesText].filter(Boolean).join("\n");
+
         const actData: ActData = {
           ...objectActData,
           actNumber,
@@ -1283,15 +1560,15 @@ export async function registerRoutes(
           repDesignerOrder: formData?.repDesignerOrder ?? objectActData.repDesignerOrder,
           repWorkPerformerLine: formData?.repWorkPerformerLine ?? objectActData.repWorkPerformerLine,
           repWorkPerformerOrder: formData?.repWorkPerformerOrder ?? objectActData.repWorkPerformerOrder,
-          p2ProjectDocs: formData?.p2ProjectDocs ?? objectActData.p2ProjectDocs,
+          p2ProjectDocs: formData?.p2ProjectDocs ?? actProjectDrawingsAgg,
           p3MaterialsText: formData?.p3MaterialsText ?? (dbP3MaterialsText || objectActData.p3MaterialsText),
           p4AsBuiltDocs: formData?.p4AsBuiltDocs ?? objectActData.p4AsBuiltDocs,
-          p6NormativeRefs: formData?.p6NormativeRefs ?? objectActData.p6NormativeRefs,
+          p6NormativeRefs: formData?.p6NormativeRefs ?? actNormativeRefsAgg,
           p7NextWorks: formData?.p7NextWorks ?? objectActData.p7NextWorks,
           additionalInfo: formData?.additionalInfo ?? objectActData.additionalInfo,
           copiesCount: formData?.copiesCount ?? objectActData.copiesCount,
           attachments: Array.isArray(formData?.attachments) ? formData.attachments : undefined,
-          attachmentsText: formData?.attachmentsText ?? (dbAttachmentsText || objectActData.attachmentsText),
+          attachmentsText: formData?.attachmentsText ?? (combinedDbAttachmentsText || objectActData.attachmentsText),
           sigCustomerControl: formData?.sigCustomerControl ?? objectActData.sigCustomerControl,
           sigBuilder: formData?.sigBuilder ?? objectActData.sigBuilder,
           sigBuilderControl: formData?.sigBuilderControl ?? objectActData.sigBuilderControl,
@@ -1314,6 +1591,21 @@ export async function registerRoutes(
         if (!template) continue;
 
         // Build act data from form and database
+        const actProjectDrawingsAgg = String((act as any).projectDrawingsAgg ?? "").trim();
+        const actNormativeRefsAgg = String((act as any).normativeRefsAgg ?? "").trim();
+        const schemesAggRaw = (act as any).executiveSchemesAgg;
+        const schemesAgg = Array.isArray(schemesAggRaw) ? schemesAggRaw : [];
+        const schemesText = schemesAgg
+          .map((s: any) => {
+            const title = String(s?.title ?? "").trim();
+            const fileUrl = String(s?.fileUrl ?? "").trim();
+            if (!title) return "";
+            return fileUrl ? `Исполнительная схема: ${title} — ${fileUrl}` : `Исполнительная схема: ${title}`;
+          })
+          .filter(Boolean)
+          .join("\n");
+        const combinedDbAttachmentsText = [String(dbAttachmentsText || "").trim(), schemesText].filter(Boolean).join("\n");
+
         const actData: ActData = {
           ...objectActData,
           actNumber: formData?.actNumber || String(act.actNumber ?? act.id),
@@ -1355,16 +1647,16 @@ export async function registerRoutes(
           repWorkPerformerLine: formData?.repWorkPerformerLine ?? objectActData.repWorkPerformerLine,
           repWorkPerformerOrder: formData?.repWorkPerformerOrder ?? objectActData.repWorkPerformerOrder,
 
-          p2ProjectDocs: formData?.p2ProjectDocs ?? objectActData.p2ProjectDocs,
+          p2ProjectDocs: formData?.p2ProjectDocs ?? actProjectDrawingsAgg,
           p3MaterialsText: formData?.p3MaterialsText ?? (dbP3MaterialsText || objectActData.p3MaterialsText),
           p4AsBuiltDocs: formData?.p4AsBuiltDocs ?? objectActData.p4AsBuiltDocs,
-          p6NormativeRefs: formData?.p6NormativeRefs ?? objectActData.p6NormativeRefs,
+          p6NormativeRefs: formData?.p6NormativeRefs ?? actNormativeRefsAgg,
           p7NextWorks: formData?.p7NextWorks ?? objectActData.p7NextWorks,
           additionalInfo: formData?.additionalInfo ?? objectActData.additionalInfo,
           copiesCount: formData?.copiesCount ?? objectActData.copiesCount,
 
           attachments: Array.isArray(formData?.attachments) ? formData.attachments : undefined,
-          attachmentsText: formData?.attachmentsText ?? (dbAttachmentsText || objectActData.attachmentsText),
+          attachmentsText: formData?.attachmentsText ?? (combinedDbAttachmentsText || objectActData.attachmentsText),
 
           sigCustomerControl: formData?.sigCustomerControl ?? objectActData.sigCustomerControl,
           sigBuilder: formData?.sigBuilder ?? objectActData.sigBuilder,
@@ -1414,41 +1706,11 @@ export async function registerRoutes(
     res.sendFile(filePath);
   });
 
-  // Create act with selected templates
-  app.post("/api/acts/create-with-templates", async (req, res) => {
-    try {
-      const { dateStart, dateEnd, location, templateIds, formData } = req.body;
-
-      if (!templateIds || !Array.isArray(templateIds) || templateIds.length === 0) {
-        return res.status(400).json({ message: "No templates selected" });
-      }
-
-      // Create the act
-      const act = await storage.createAct({
-        dateStart,
-        dateEnd,
-        location: location || formData?.objectAddress || "Объект",
-        status: "draft",
-        worksData: [],
-      });
-
-      // Create template selections
-      for (const templateId of templateIds) {
-        const template = await storage.getActTemplateByTemplateId(templateId);
-        if (template) {
-          await storage.createActTemplateSelection({
-            actId: act.id,
-            templateId: template.id,
-            status: "pending",
-          });
-        }
-      }
-
-      res.status(201).json(act);
-    } catch (err) {
-      console.error("Error creating act with templates:", err);
-      res.status(500).json({ message: "Failed to create act" });
-    }
+  // Deprecated: acts can be created only from schedule now.
+  app.post("/api/acts/create-with-templates", async (_req, res) => {
+    return res.status(410).json({
+      message: "Эндпоинт устарел: акты АОСР теперь создаются только из графика работ (/schedule).",
+    });
   });
 
   return httpServer;

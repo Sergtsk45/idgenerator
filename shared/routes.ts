@@ -9,6 +9,7 @@ import {
   actMaterialUsages,
   actDocumentAttachments,
   estimatePositionMaterialLinks,
+  taskMaterials,
   insertWorkSchema,
   insertEstimateSchema,
   insertEstimateSectionSchema,
@@ -678,6 +679,21 @@ export const api = {
           created: z.number(),
           updated: z.number(),
           skippedNoActNumber: z.number(),
+          deletedActNumbers: z.array(z.number().int().positive()),
+          warnings: z.array(
+            z.object({
+              actNumber: z.number().int().positive(),
+              type: z.enum([
+                "no_materials",
+                "no_quality_docs",
+                "no_drawings",
+                "no_normatives",
+                "mixed_template_types",
+                "no_template_type",
+              ]),
+              message: z.string(),
+            }),
+          ),
         }),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
@@ -753,10 +769,96 @@ export const api = {
           durationDays: z.number().int().min(1).optional(),
           orderIndex: z.number().int().min(0).optional(),
           actNumber: z.number().int().positive().nullable().optional(),
+          actTemplateId: z.number().int().positive().nullable().optional(),
+          projectDrawings: z.string().nullable().optional(),
+          normativeRefs: z.string().nullable().optional(),
+          executiveSchemes: z
+            .array(z.object({ title: z.string().min(1), fileUrl: z.string().min(1).optional() }))
+            .nullable()
+            .optional(),
+          updateAllTasks: z.boolean().optional(),
         })
         .refine((v) => Object.keys(v).length > 0, { message: 'Empty patch' }),
       responses: {
         200: z.custom<typeof scheduleTasks.$inferSelect>(),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+        409: z.object({
+          message: z.string(),
+          actNumber: z.number().int().positive().nullable(),
+          currentTemplateId: z.number().int().positive().nullable(),
+          otherTasksCount: z.number().int().min(0),
+        }),
+      },
+    },
+  },
+  taskMaterials: {
+    list: {
+      method: "GET" as const,
+      path: "/api/schedule-tasks/:id/materials",
+      responses: {
+        200: z.array(
+          z.object({
+            id: z.number().int().positive(),
+            taskId: z.number().int().positive(),
+            projectMaterialId: z.number().int().positive(),
+            batchId: z.number().int().positive().nullable(),
+            qualityDocumentId: z.number().int().positive().nullable(),
+            note: z.string().nullable(),
+            orderIndex: z.number().int(),
+            createdAt: z.any(),
+            projectMaterialName: z.string().nullable().optional(),
+            batchLabel: z.string().nullable().optional(),
+            qualityDocumentTitle: z.string().nullable().optional(),
+            qualityDocumentNumber: z.string().nullable().optional(),
+            qualityDocumentFileUrl: z.string().nullable().optional(),
+          }),
+        ),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    replace: {
+      method: "PUT" as const,
+      path: "/api/schedule-tasks/:id/materials",
+      input: z.object({
+        items: z.array(
+          z.object({
+            projectMaterialId: z.number().int().positive(),
+            batchId: z.number().int().positive().nullable().optional(),
+            qualityDocumentId: z.number().int().positive().nullable().optional(),
+            note: z.string().nullable().optional(),
+            orderIndex: z.number().int().min(0).optional(),
+          }),
+        ),
+      }),
+      responses: {
+        200: z.array(z.custom<typeof taskMaterials.$inferSelect>()).or(z.array(z.any())),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    add: {
+      method: "POST" as const,
+      path: "/api/schedule-tasks/:id/materials",
+      input: z.object({
+        projectMaterialId: z.number().int().positive(),
+        batchId: z.number().int().positive().nullable().optional(),
+        qualityDocumentId: z.number().int().positive().nullable().optional(),
+        note: z.string().nullable().optional(),
+        orderIndex: z.number().int().min(0).optional(),
+      }),
+      responses: {
+        201: z.custom<typeof taskMaterials.$inferSelect>(),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    remove: {
+      method: "DELETE" as const,
+      path: "/api/schedule-tasks/:id/materials/:materialId",
+      responses: {
+        204: z.any(),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },

@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguageStore, translations } from "@/lib/i18n";
 import { useWorks } from "@/hooks/use-works";
@@ -31,8 +32,16 @@ import {
   useScheduleSourceInfo,
   useGenerateActsFromSchedule
 } from "@/hooks/use-schedules";
+import { useActTemplates } from "@/hooks/use-act-templates";
+import { useReplaceTaskMaterials, useTaskMaterials } from "@/hooks/use-task-materials";
 import { useCurrentObject } from "@/hooks/use-source-data";
 import { useProjectMaterials } from "@/hooks/use-materials";
+import { ExecutiveSchemesEditor, type ExecutiveSchemeItem } from "@/components/schedule/ExecutiveSchemesEditor";
+import {
+  TaskMaterialsEditor,
+  type ProjectMaterialOption,
+  type TaskMaterialEditorItem,
+} from "@/components/schedule/TaskMaterialsEditor";
 import type { ScheduleTask, Work } from "@shared/schema";
 import { GanttChartSquare, Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Pencil, RotateCcw, AlertTriangle } from "lucide-react";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
@@ -83,6 +92,11 @@ export default function Schedule() {
   const [editStartDate, setEditStartDate] = useState<string>("");
   const [editDurationDays, setEditDurationDays] = useState<number>(1);
   const [editActNumber, setEditActNumber] = useState<string>("");
+  const [editActTemplateId, setEditActTemplateId] = useState<string>("");
+  const [editProjectDrawings, setEditProjectDrawings] = useState<string>("");
+  const [editNormativeRefs, setEditNormativeRefs] = useState<string>("");
+  const [editExecutiveSchemes, setEditExecutiveSchemes] = useState<ExecutiveSchemeItem[]>([]);
+  const [editMaterials, setEditMaterials] = useState<TaskMaterialEditorItem[]>([]);
 
   const { data: estimates = [] } = useEstimates();
   const activeEstimateId = scheduleEstimateId;
@@ -93,6 +107,35 @@ export default function Schedule() {
   const { data: currentObject } = useCurrentObject();
   const objectId = currentObject?.id;
   const { data: projectMaterials = [] } = useProjectMaterials(objectId);
+  const { data: templatesData } = useActTemplates();
+
+  const taskMaterialsQuery = useTaskMaterials(selectedTask?.id);
+  const replaceTaskMaterials = useReplaceTaskMaterials(selectedTask?.id);
+
+  const projectMaterialOptions: ProjectMaterialOption[] = useMemo(() => {
+    return (projectMaterials as any[]).map((m: any) => {
+      const label =
+        String(m?.nameOverride ?? "").trim() ||
+        String(m?.name ?? "").trim() ||
+        (m?.catalogMaterial?.name ? String(m.catalogMaterial.name) : "") ||
+        `Материал #${String(m?.id)}`;
+      return { id: Number(m.id), label };
+    });
+  }, [projectMaterials]);
+
+  // When dialog opens, load current task_materials
+  useEffect(() => {
+    if (!editOpen) return;
+    const list = (taskMaterialsQuery.data ?? []) as any[];
+    setEditMaterials(
+      list.map((r) => ({
+        projectMaterialId: Number(r.projectMaterialId),
+        batchId: r.batchId == null ? null : Number(r.batchId),
+        qualityDocumentId: r.qualityDocumentId == null ? null : Number(r.qualityDocumentId),
+        note: r.note ?? null,
+      })),
+    );
+  }, [editOpen, taskMaterialsQuery.data]);
 
   const upsertLink = useUpsertEstimatePositionLink(scheduleId);
   const deleteLink = useDeleteEstimatePositionLink(scheduleId);
@@ -278,6 +321,10 @@ export default function Schedule() {
     setEditStartDate(String(task.startDate));
     setEditDurationDays(Number(task.durationDays || 1));
     setEditActNumber(task.actNumber == null ? "" : String(task.actNumber));
+    setEditActTemplateId((task as any).actTemplateId == null ? "" : String((task as any).actTemplateId));
+    setEditProjectDrawings(String((task as any).projectDrawings ?? ""));
+    setEditNormativeRefs(String((task as any).normativeRefs ?? ""));
+    setEditExecutiveSchemes(Array.isArray((task as any).executiveSchemes) ? ((task as any).executiveSchemes as any) : []);
     setEditOpen(true);
   };
 
@@ -381,8 +428,8 @@ export default function Schedule() {
       toast({
         title: language === "ru" ? "Акты сформированы" : "Acts generated",
         description: language === "ru"
-          ? `Создано: ${result.created}, обновлено: ${result.updated}`
-          : `Created: ${result.created}, updated: ${result.updated}`,
+          ? `Создано: ${result.created}, обновлено: ${result.updated}, удалено: ${result.deletedActNumbers?.length ?? 0}. Предупреждений: ${result.warnings?.length ?? 0}`
+          : `Created: ${result.created}, updated: ${result.updated}, deleted: ${result.deletedActNumbers?.length ?? 0}. Warnings: ${result.warnings?.length ?? 0}`,
       });
     } catch (err: any) {
       toast({
@@ -435,15 +482,47 @@ export default function Schedule() {
         });
         return;
       }
+
+      const tplTrimmed = editActTemplateId.trim();
+      const nextActTemplateId = tplTrimmed === "" ? null : Number(tplTrimmed);
+      if (tplTrimmed !== "") {
+        const n = Number(tplTrimmed);
+        if (!Number.isFinite(n) || n <= 0 || !Number.isInteger(n)) {
+          toast({
+            title: t.errorTitle,
+            description: language === "ru" ? "Тип акта должен быть целым числом > 0" : "Act type must be an integer > 0",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       await patchTask.mutateAsync({
         id: selectedTask.id,
         patch: {
           startDate: editStartDate,
           durationDays: editDurationDays,
           actNumber: nextActNumber,
+          actTemplateId: nextActTemplateId,
+          projectDrawings: editProjectDrawings.trim() ? editProjectDrawings : null,
+          normativeRefs: editNormativeRefs.trim() ? editNormativeRefs : null,
+          executiveSchemes: (editExecutiveSchemes ?? []).filter((s) => String(s?.title ?? "").trim().length > 0),
+          // change type for all tasks of this actNumber (with backend warning mechanics)
+          updateAllTasks: nextActNumber != null && nextActTemplateId != null ? true : undefined,
         },
         scheduleId: scheduleId ?? undefined,
       });
+
+      await replaceTaskMaterials.mutateAsync({
+        items: (editMaterials ?? []).map((it, idx) => ({
+          projectMaterialId: it.projectMaterialId,
+          batchId: it.batchId ?? null,
+          qualityDocumentId: it.qualityDocumentId ?? null,
+          note: it.note ?? null,
+          orderIndex: idx,
+        })),
+      });
+
       setEditOpen(false);
       setSelectedTask(null);
     } catch (err: any) {
@@ -966,42 +1045,113 @@ export default function Schedule() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open);
+          if (!open) setSelectedTask(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>{t.edit}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">{language === "ru" ? "Номер акта" : "Act number"}</label>
-              <Input
-                type="number"
-                min={1}
-                step={1}
-                value={editActNumber}
-                onChange={(e) => setEditActNumber(e.target.value)}
-                placeholder={language === "ru" ? "Напр.: 5" : "e.g. 5"}
-              />
-            </div>
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+            <div className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">{language === "ru" ? "Номер акта" : "Act number"}</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={editActNumber}
+                    onChange={(e) => setEditActNumber(e.target.value)}
+                    placeholder={language === "ru" ? "Напр.: 5" : "e.g. 5"}
+                  />
+                </div>
 
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">{t.startDate}</label>
-              <Input
-                type="date"
-                value={editStartDate}
-                onChange={(e) => setEditStartDate(e.target.value)}
-              />
-            </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">{t.startDate}</label>
+                  <Input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
+                </div>
 
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">{t.durationDays}</label>
-              <Input
-                type="number"
-                min={1}
-                value={editDurationDays}
-                onChange={(e) => setEditDurationDays(Number(e.target.value || 1))}
-              />
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">{t.durationDays}</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={editDurationDays}
+                    onChange={(e) => setEditDurationDays(Number(e.target.value || 1))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">{language === "ru" ? "Тип акта (шаблон)" : "Act type (template)"}</label>
+                <Select value={editActTemplateId} onValueChange={setEditActTemplateId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={language === "ru" ? "Выбрать тип акта" : "Select act type"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(templatesData?.templates ?? []).map((tpl: any) => (
+                      <SelectItem key={tpl.id} value={String(tpl.id)}>
+                        {String(tpl.code ?? "")} — {language === "ru" ? String(tpl.title ?? "") : String(tpl.titleEn ?? tpl.title ?? "")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">
+                  {language === "ru"
+                    ? "При смене типа акта он будет применён ко всем задачам с тем же номером акта."
+                    : "When changing act type, it will be applied to all tasks with the same act number."}
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">{language === "ru" ? "Материалы задачи (п.3 АОСР)" : "Task materials (AOSR p.3)"}</label>
+                {taskMaterialsQuery.isLoading ? (
+                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {language === "ru" ? "Загрузка материалов..." : "Loading materials..."}
+                  </div>
+                ) : (
+                  <TaskMaterialsEditor
+                    items={editMaterials}
+                    projectMaterials={projectMaterialOptions}
+                    onChange={setEditMaterials}
+                    disabled={replaceTaskMaterials.isPending}
+                  />
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">{language === "ru" ? "Исполнительные схемы" : "Executive schemes"}</label>
+                <ExecutiveSchemesEditor
+                  items={editExecutiveSchemes}
+                  onChange={setEditExecutiveSchemes}
+                  disabled={patchTask.isPending}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">{language === "ru" ? "Номера чертежей проекта" : "Project drawings"}</label>
+                <Textarea
+                  value={editProjectDrawings}
+                  onChange={(e) => setEditProjectDrawings(e.target.value)}
+                  placeholder={language === "ru" ? "например: КЖ-12, КЖ-13, КЖ-14" : "e.g. KZh-12, KZh-13"}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">{language === "ru" ? "СНиП/ГОСТ/РД" : "Normative references"}</label>
+                <Textarea
+                  value={editNormativeRefs}
+                  onChange={(e) => setEditNormativeRefs(e.target.value)}
+                  placeholder={language === "ru" ? "например: СП 70.13330.2012, СП 63.13330" : "e.g. SP 70.13330.2012"}
+                />
+              </div>
             </div>
           </div>
 

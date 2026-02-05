@@ -11,8 +11,18 @@
 - **Импорт ВОР из Excel**: пользователь загружает `.xlsx`, клиент парсит файл и отправляет позиции на сервер одним запросом `POST /api/works/import` в режиме **merge** (без авто-удаления данных).
 - **Импорт Сметы/ЛСР из Excel (ГРАНД‑Смета)**: на экране `/works` пользователь переключается в режим “Смета”, загружает `.xlsx`; клиент парсит выгрузку (поиск строки заголовка `№ п/п / Обоснование / Наименование работ и затрат`, разбор позиций/ресурсов) и отправляет JSON на `POST /api/estimates/import`. Смета хранится отдельными таблицами и отображается на вкладке ВОР.
 - **Журнал работ**: пользователь отправляет сообщение о выполненной работе; сервер сохраняет raw-текст и пытается извлечь структуру через OpenAI (workCode/quantity/date/location и т.д.).
-- **Генерация акта (legacy)**: по диапазону дат выбираются обработанные сообщения, группируются по `workCode`, суммируются количества и создаётся запись акта.
-- **Генерация актов из графика работ (новое)**: на экране `/schedule` каждой задаче задаётся номер принадлежности `actNumber`. По кнопке “Сформировать/обновить акты из графика” сервер группирует задачи по `actNumber`, вычисляет `dateStart/dateEnd` и формирует `worksData` (агрегация по `workId`, quantity — из `works.quantityTotal`).
+- **Генерация актов АОСР (только из графика работ)**: на экране `/schedule` для задачи задаются:
+  - `actNumber` — номер акта (уникальный бизнес‑идентификатор),
+  - `actTemplateId` — тип акта (шаблон из каталога),
+  - документация/схемы (`projectDrawings`, `normativeRefs`, `executiveSchemes`),
+  - материалы задачи (через `task_materials`).
+  По кнопке “Сформировать/обновить акты из графика” сервер:
+  - группирует задачи по `actNumber`,
+  - вычисляет `dateStart/dateEnd`,
+  - формирует `worksData` по источнику графика (ВОР/Смета),
+  - переносит материалы задач в `act_material_usages` (п.3) и `act_document_attachments` (приложения),
+  - агрегирует чертежи/нормативы/схемы в поля акта,
+  - удаляет акты, для которых не осталось задач.
 - **Экспорт PDF АОСР**: `POST /api/acts/:id/export` генерирует один или несколько PDF по выбранным шаблонам. Для АОСР используется pdfmake-шаблон `server/templates/aosr/aosr-template.json` с плейсхолдерами `{{...}}` (в эталонном варианте под `005_АОСР 4.pdf` материалы и приложения формируются **текстом**, а не таблицей; данные приходят через `formData`).
 
 ## Архитектура (высокоуровневая)
@@ -95,10 +105,11 @@ flowchart LR
 - `estimate_positions`: позиции сметы (№ п/п, обоснование/шифр, наименование, ед. изм., количество, суммы/примечания).
 - `position_resources`: ресурсы внутри позиции сметы (код/тип, наименование, ед. изм., количество, суммы).
 - `messages`: исходный текст, нормализованные поля (json), флаги обработки.
-- `acts`: акты (глобальный номер акта `actNumber`, период `dateStart/dateEnd`, локация, статус, агрегированные работы в `worksData` (json)) + `objectId` (FK → `objects.id`, может быть `NULL` для legacy).
+- `acts`: акты АОСР (глобальный номер `actNumber`, **тип акта** `actTemplateId`, период `dateStart/dateEnd`, статус, агрегированные работы `worksData` (json) + агрегированные поля документации из задач (`projectDrawingsAgg`, `normativeRefsAgg`, `executiveSchemesAgg`)).
 - `attachments`: вложения к актам (url/name/type).
 - `schedules`: графики работ (контейнеры диаграммы Ганта; в MVP обычно используется дефолтный).
-- `schedule_tasks`: задачи графика (полосы Ганта), привязанные к `works` и содержащие `startDate`/`durationDays`/`orderIndex` и номер принадлежности к акту `actNumber`.
+- `schedule_tasks`: задачи графика (полосы Ганта), содержащие `startDate`/`durationDays`/`orderIndex`, номер акта `actNumber`, тип акта `actTemplateId` и поля документации/схем (`projectDrawings`, `normativeRefs`, `executiveSchemes`).
+- `task_materials`: материалы, привязанные к задаче графика (источник для `act_material_usages` и `act_document_attachments` при генерации актов).
 - `estimate_position_material_links`: привязка подстроки сметы (`estimate_positions`, вспомогательные строки) к материалу проекта (`project_materials`) для вычисления статуса документов качества в графике работ.
 
 Дополнительно (задел под AI-чат):
@@ -119,7 +130,8 @@ flowchart LR
 - **Works**: `GET /api/works`, `POST /api/works`
 - **Estimates (Смета/ЛСР)**: `GET /api/estimates`, `GET /api/estimates/:id`, `POST /api/estimates/import`, `DELETE /api/estimates/:id` (опц. `?resetSchedule=1` — сбросить график/акты, если смета используется как источник графика)
 - **Messages**: `GET /api/messages`, `POST /api/messages`
-- **Acts**: `GET /api/acts`, `POST /api/acts/generate` (legacy), `GET /api/acts/:id`, `POST /api/acts/create-with-templates` (legacy), `POST /api/acts/:id/export`
+- **Acts**: `GET /api/acts`, `GET /api/acts/:id`, `POST /api/acts/:id/export`
+  - `POST /api/acts/generate` и `POST /api/acts/create-with-templates` — **устарели** (410), создание актов только из графика работ
 - **Act Templates**: `GET /api/act-templates`
 - **Schedules**: 
   - `GET /api/schedules/default`, `POST /api/schedules`, `GET /api/schedules/:id`
@@ -129,7 +141,8 @@ flowchart LR
   - `GET /api/schedules/:id/estimate-subrows/statuses` — статусы документов качества для подстрок сметы (MVP)
   - `GET /api/schedules/:id/source-info` — информация об источнике графика
   - `POST /api/schedules/:id/change-source` — сменить источник графика (ВОР ↔ Смета)
-- **Schedule Tasks**: `PATCH /api/schedule-tasks/:id`
+- **Schedule Tasks**: `PATCH /api/schedule-tasks/:id` (в т.ч. `actNumber`, `actTemplateId`, документация/схемы, `updateAllTasks`)
+- **Task Materials**: `GET/PUT/POST/DELETE /api/schedule-tasks/:id/materials` — материалы задачи графика
 - **Estimate subrow links (MVP)**:
   - `POST /api/estimate-position-links` — создать/обновить привязку подстроки сметы к материалу проекта
   - `DELETE /api/estimate-position-links/:estimatePositionId` — удалить привязку

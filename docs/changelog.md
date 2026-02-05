@@ -1,5 +1,31 @@
 # Changelog
 
+## [2026-02-05] - АОСР: акты только из графика (тип акта, материалы/схемы/документация на задаче)
+### Добавлено
+- БД: миграция `migrations/0010_act_from_schedule_task_data.sql`
+  - `schedule_tasks`: `act_template_id`, `project_drawings`, `normative_refs`, `executive_schemes`
+  - `acts`: `act_template_id`, `project_drawings_agg`, `normative_refs_agg`, `executive_schemes_agg`
+  - новая таблица `task_materials` (материалы, привязанные к задаче графика)
+- API:
+  - `GET/PUT/POST/DELETE /api/schedule-tasks/:id/materials` — материалы задачи (для п.3 АОСР и приложений)
+  - `POST /api/schedules/:id/generate-acts`: ответ расширен `warnings`, `deletedActNumbers`
+
+### Изменено
+- `shared/schema.ts`: добавлены поля актов/задач и таблица `task_materials`
+- `shared/routes.ts`: расширен `PATCH /api/schedule-tasks/:id` (тип акта, документация, схемы, `updateAllTasks` + `409`), добавлены контракты `taskMaterials`, расширен ответ `generate-acts`
+- `server/routes.ts`:
+  - `generate-acts`: теперь собирает тип акта, агрегирует документацию/схемы, переносит материалы задачи в `act_material_usages` и документы в `act_document_attachments`, удаляет акты без задач, формирует `warnings`
+  - `POST /api/acts/:id/export`: при отсутствии `templateIds` использует `acts.act_template_id`, а также берёт `project_drawings_agg`/`normative_refs_agg` и добавляет схемы в `attachmentsText`
+  - `POST /api/acts/generate`, `POST /api/acts/create-with-templates`: помечены устаревшими (410), создание актов только из графика
+- UI:
+  - `client/src/pages/Schedule.tsx`: диалог задачи расширен (номер акта, тип акта, материалы задачи, исполнительные схемы, чертежи, нормативы)
+  - `client/src/pages/Acts.tsx`: добавлено отображение типа акта, экспорт PDF через диалог; создание актов по датам/шаблонам убрано из основного флоу
+
+### Исправлено
+- Нет
+
+---
+
 ## [2026-02-04] - График работ: двухстрочная левая часть (№/Акт/ед.изм + Объём/ТЗ) и перенос наименования
 ### Добавлено
 - Нет

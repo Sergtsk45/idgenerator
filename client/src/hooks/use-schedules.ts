@@ -80,6 +80,11 @@ export function usePatchScheduleTask() {
         durationDays?: number;
         orderIndex?: number;
         actNumber?: number | null;
+        actTemplateId?: number | null;
+        projectDrawings?: string | null;
+        normativeRefs?: string | null;
+        executiveSchemes?: Array<{ title: string; fileUrl?: string }> | null;
+        updateAllTasks?: boolean;
       };
       scheduleId?: number;
     }) => {
@@ -93,7 +98,10 @@ export function usePatchScheduleTask() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to update schedule task");
+        const err: any = new Error(errorData.message || "Failed to update schedule task");
+        err.status = res.status;
+        err.data = errorData;
+        throw err;
       }
 
       return api.scheduleTasks.patch.responses[200].parse(await res.json());
