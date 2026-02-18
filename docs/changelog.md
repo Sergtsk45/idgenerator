@@ -1,5 +1,37 @@
 # Changelog
 
+## [2026-02-18] - График работ: combobox с поиском и сворачиваемыми группами для выбора типа акта
+
+### Изменено
+- `client/src/pages/Schedule.tsx`: выбор типа акта заменён с плоского `Select` на `Popover`+`Command` combobox — категории сворачиваются кликом по заголовку, в заголовке отображается количество актов в категории; при наборе поиска все группы разворачиваются автоматически; выбранный шаблон отображается в кнопке-триггере
+
+---
+
+## [2026-02-18] - График работ: независимые объёмы работ в задачах
+
+### Добавлено
+- `migrations/0011_schedule_task_quantity.sql`: поля `quantity` и `unit` в таблице `schedule_tasks`; существующие задачи заполнены из источника (ВОР/Смета)
+- `shared/schema.ts`: поля `quantity` (numeric) и `unit` (text) в Drizzle-схеме `scheduleTasks`
+- `shared/routes.ts`: поля `quantity` и `unit` в контракте `PATCH /api/schedule-tasks/:id`
+- `client/src/pages/Schedule.tsx` (диалог редактирования): поля «Объём» и «Ед. изм.» с предупреждением при превышении суммарного объёма над справочным значением
+
+### Изменено
+- `server/storage.ts` — `bootstrapScheduleTasksFromWorks` и `bootstrapScheduleTasksFromEstimate`: при создании задач копируют `quantity`/`unit` из ВОР/Сметы
+- `server/storage.ts` — `patchScheduleTask`: добавлена обработка `quantity` и `unit`
+- `server/routes.ts` — `generate-acts`: объём в акт теперь берётся из `schedule_tasks.quantity` (суммируется по всем задачам одного вида работ в акте), а не из справочника напрямую
+- `client/src/pages/Schedule.tsx`: колонка «Объём» в строке графика показывает `task.quantity` для обоих источников (ВОР и Смета)
+- `client/src/hooks/use-schedules.ts`: тип патча `usePatchScheduleTask` расширен полями `quantity` и `unit`
+
+---
+
+## [2026-02-18] - АОСР: шрифт Times New Roman, поле п.1 в форме экспорта
+### Добавлено
+- `server/fonts/`: скопированы TTF-файлы Times New Roman (TimesNewRoman.ttf, Bold, Italic, BoldItalic) из Windows — шрифт теперь подключён локально и не требует наличия `/mnt/c/Windows/Fonts` на сервере
+- Поле **П.1 «Предъявленные работы»** в форму экспорта АОСР на клиенте (`Acts.tsx`): пользователь может вручную переопределить автоматически собранный список работ
+- `aosrForm.p1Works` передаётся в `formData` при `POST /api/acts/:id/export`
+### Изменено
+- `server/routes.ts`: расчёт `p1Works` вынесен до обеих ветвей экспорта (с `templateIds` и без); в обеих ветвях применяется приоритет `formData.p1Works` над авто-значением из `worksData`
+
 ## [2026-02-05] - АОСР: акты только из графика (тип акта, материалы/схемы/документация на задаче)
 ### Добавлено
 - БД: миграция `migrations/0010_act_from_schedule_task_data.sql`

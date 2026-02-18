@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,7 +45,8 @@ import {
   type TaskMaterialEditorItem,
 } from "@/components/schedule/TaskMaterialsEditor";
 import type { ScheduleTask, Work } from "@shared/schema";
-import { GanttChartSquare, Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Pencil, RotateCcw, AlertTriangle } from "lucide-react";
+import { GanttChartSquare, Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, Pencil, RotateCcw, AlertTriangle, ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 
 export default function Schedule() {
@@ -93,6 +96,11 @@ export default function Schedule() {
   const [editDurationDays, setEditDurationDays] = useState<number>(1);
   const [editActNumber, setEditActNumber] = useState<string>("");
   const [editActTemplateId, setEditActTemplateId] = useState<string>("");
+  const [actTemplatePopoverOpen, setActTemplatePopoverOpen] = useState(false);
+  const [actTemplateSearch, setActTemplateSearch] = useState("");
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [editQuantity, setEditQuantity] = useState<string>("");
+  const [editUnit, setEditUnit] = useState<string>("");
   const [editProjectDrawings, setEditProjectDrawings] = useState<string>("");
   const [editNormativeRefs, setEditNormativeRefs] = useState<string>("");
   const [editExecutiveSchemes, setEditExecutiveSchemes] = useState<ExecutiveSchemeItem[]>([]);
@@ -108,6 +116,20 @@ export default function Schedule() {
   const objectId = currentObject?.id;
   const { data: projectMaterials = [] } = useProjectMaterials(objectId);
   const { data: templatesData } = useActTemplates();
+
+  const groupedActTemplates = useMemo(() => {
+    const acc: Record<string, typeof templatesData.templates> = {};
+    for (const tpl of templatesData?.templates ?? []) {
+      if (!acc[tpl.category]) acc[tpl.category] = [];
+      acc[tpl.category].push(tpl);
+    }
+    return acc;
+  }, [templatesData]);
+
+  const selectedActTemplate = useMemo(() => {
+    if (!editActTemplateId) return null;
+    return (templatesData?.templates ?? []).find((t: any) => String(t.id) === editActTemplateId) ?? null;
+  }, [editActTemplateId, templatesData]);
 
   const taskMaterialsQuery = useTaskMaterials(selectedTask?.id);
   const replaceTaskMaterials = useReplaceTaskMaterials(selectedTask?.id);
@@ -316,12 +338,53 @@ export default function Schedule() {
     };
   }, [tasks, sourceType, expandedTaskIds, auxiliaryPositionsByMainId]);
 
+  // Warning: total quantity of all tasks for the same source exceeds the source reference value.
+  const quantityExceedWarning = useMemo(() => {
+    if (!selectedTask || editQuantity.trim() === "") return null;
+    const newQty = Number(editQuantity);
+    if (isNaN(newQty) || newQty < 0) return null;
+
+    const sourceId = selectedTask.workId ?? selectedTask.estimatePositionId ?? null;
+    if (sourceId == null) return null;
+
+    // Sum of all tasks with the same source (excluding current task, adding new value)
+    const totalOthers = tasks
+      .filter((t) => t.id !== selectedTask.id && (t.workId ?? t.estimatePositionId) === sourceId)
+      .reduce((sum, t) => sum + (((t as any).quantity != null) ? Number((t as any).quantity) : 0), 0);
+    const totalNew = totalOthers + newQty;
+
+    // Reference quantity from source
+    let sourceQty: number | null = null;
+    if (selectedTask.workId) {
+      const w = worksById.get(selectedTask.workId);
+      const raw = (w as any)?.quantityTotal;
+      if (raw != null) sourceQty = Number(raw);
+    } else if (selectedTask.estimatePositionId) {
+      const p = estimatePositionsById.get(selectedTask.estimatePositionId);
+      const raw = (p as any)?.quantity;
+      if (raw != null) sourceQty = Number(raw);
+    }
+
+    if (sourceQty == null || !Number.isFinite(sourceQty) || sourceQty <= 0) return null;
+    if (totalNew > sourceQty + 1e-9) {
+      return {
+        totalNew,
+        sourceQty,
+        excess: totalNew - sourceQty,
+      };
+    }
+    return null;
+  }, [selectedTask, editQuantity, tasks, worksById, estimatePositionsById]);
+
   const openEdit = (task: ScheduleTask) => {
     setSelectedTask(task);
     setEditStartDate(String(task.startDate));
     setEditDurationDays(Number(task.durationDays || 1));
     setEditActNumber(task.actNumber == null ? "" : String(task.actNumber));
     setEditActTemplateId((task as any).actTemplateId == null ? "" : String((task as any).actTemplateId));
+    const rawQty = (task as any).quantity;
+    setEditQuantity(rawQty != null ? String(Number(rawQty)) : "");
+    setEditUnit(String((task as any).unit ?? ""));
     setEditProjectDrawings(String((task as any).projectDrawings ?? ""));
     setEditNormativeRefs(String((task as any).normativeRefs ?? ""));
     setEditExecutiveSchemes(Array.isArray((task as any).executiveSchemes) ? ((task as any).executiveSchemes as any) : []);
@@ -497,6 +560,17 @@ export default function Schedule() {
         }
       }
 
+      const nextQuantity = editQuantity.trim() === "" ? null : Number(editQuantity);
+      if (editQuantity.trim() !== "" && (isNaN(nextQuantity!) || nextQuantity! < 0)) {
+        toast({
+          title: t.errorTitle,
+          description: language === "ru" ? "Объём должен быть числом ≥ 0" : "Quantity must be a number ≥ 0",
+          variant: "destructive",
+        });
+        return;
+      }
+      const nextUnit = editUnit.trim() || null;
+
       await patchTask.mutateAsync({
         id: selectedTask.id,
         patch: {
@@ -504,6 +578,8 @@ export default function Schedule() {
           durationDays: editDurationDays,
           actNumber: nextActNumber,
           actTemplateId: nextActTemplateId,
+          quantity: nextQuantity,
+          unit: nextUnit,
           projectDrawings: editProjectDrawings.trim() ? editProjectDrawings : null,
           normativeRefs: editNormativeRefs.trim() ? editNormativeRefs : null,
           executiveSchemes: (editExecutiveSchemes ?? []).filter((s) => String(s?.title ?? "").trim().length > 0),
@@ -778,12 +854,12 @@ export default function Schedule() {
                                 })()}
                               </div>
 
-                              {/* Quantity column (Row 1) */}
+                              {/* Quantity column (Row 1) — independent task quantity */}
                               <div className="row-start-1 col-start-3 w-16 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
-                                {sourceType === "estimate" ? (() => {
-                                  const qty = parseNumeric(p?.quantity);
+                                {(() => {
+                                  const qty = parseNumeric((task as any).quantity);
                                   return qty != null ? qty.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—";
-                                })() : "—"}
+                                })()}
                               </div>
 
                               {/* Labor column (Row 1) */}
@@ -1090,23 +1166,137 @@ export default function Schedule() {
 
               <div className="grid gap-2">
                 <label className="text-sm font-medium">{language === "ru" ? "Тип акта (шаблон)" : "Act type (template)"}</label>
-                <Select value={editActTemplateId} onValueChange={setEditActTemplateId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={language === "ru" ? "Выбрать тип акта" : "Select act type"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(templatesData?.templates ?? []).map((tpl: any) => (
-                      <SelectItem key={tpl.id} value={String(tpl.id)}>
-                        {String(tpl.code ?? "")} — {language === "ru" ? String(tpl.title ?? "") : String(tpl.titleEn ?? tpl.title ?? "")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={actTemplatePopoverOpen} onOpenChange={setActTemplatePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={actTemplatePopoverOpen}
+                      className="w-full justify-between font-normal h-9 px-3 text-sm"
+                    >
+                      <span className={cn("truncate", !selectedActTemplate && "text-muted-foreground")}>
+                        {selectedActTemplate
+                          ? `${String(selectedActTemplate.code ?? "")} — ${language === "ru" ? String(selectedActTemplate.title ?? "") : String((selectedActTemplate as any).titleEn ?? selectedActTemplate.title ?? "")}`
+                          : (language === "ru" ? "Выбрать тип акта" : "Select act type")}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder={language === "ru" ? "Поиск шаблона..." : "Search template..."}
+                        value={actTemplateSearch}
+                        onValueChange={setActTemplateSearch}
+                      />
+                      <CommandList className="max-h-72">
+                        <CommandEmpty>{language === "ru" ? "Шаблон не найден" : "No template found"}</CommandEmpty>
+                        {Object.entries(groupedActTemplates).map(([categoryKey, templates]) => {
+                          const catInfo = (templatesData?.categories as any)?.[categoryKey];
+                          const catLabel = language === "ru"
+                            ? (catInfo?.name ?? categoryKey)
+                            : (catInfo?.nameEn ?? catInfo?.name ?? categoryKey);
+                          const isSearching = actTemplateSearch.trim() !== "";
+                          const filtered = isSearching
+                            ? templates.filter((t: any) => {
+                                const title = language === "ru" ? String(t.title ?? "") : String((t as any).titleEn ?? t.title ?? "");
+                                const search = actTemplateSearch.toLowerCase();
+                                return title.toLowerCase().includes(search) || String(t.code ?? "").toLowerCase().includes(search);
+                              })
+                            : templates;
+                          if (filtered.length === 0) return null;
+                          const isCollapsed = !isSearching && collapsedCategories.has(categoryKey);
+                          return (
+                            <div key={categoryKey}>
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm cursor-pointer"
+                                onClick={() => {
+                                  if (isSearching) return;
+                                  setCollapsedCategories((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(categoryKey)) next.delete(categoryKey);
+                                    else next.add(categoryKey);
+                                    return next;
+                                  });
+                                }}
+                              >
+                                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  {catLabel}
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="secondary" className="text-xs h-4 px-1.5 py-0 leading-none">
+                                    {filtered.length}
+                                  </Badge>
+                                  {!isSearching && (
+                                    <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform duration-150", isCollapsed && "-rotate-90")} />
+                                  )}
+                                </div>
+                              </button>
+                              {!isCollapsed && filtered.map((tpl: any) => (
+                                <CommandItem
+                                  key={tpl.id}
+                                  value={String(tpl.id)}
+                                  onSelect={(val) => {
+                                    setEditActTemplateId(val === editActTemplateId ? "" : val);
+                                    setActTemplatePopoverOpen(false);
+                                    setActTemplateSearch("");
+                                  }}
+                                  className="pl-4"
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4 shrink-0", editActTemplateId === String(tpl.id) ? "opacity-100" : "opacity-0")} />
+                                  <span className="font-mono text-xs text-muted-foreground mr-2 shrink-0">{String(tpl.code ?? "")}</span>
+                                  <span className="truncate">{language === "ru" ? String(tpl.title ?? "") : String((tpl as any).titleEn ?? tpl.title ?? "")}</span>
+                                </CommandItem>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 <div className="text-xs text-muted-foreground">
                   {language === "ru"
                     ? "При смене типа акта он будет применён ко всем задачам с тем же номером акта."
                     : "When changing act type, it will be applied to all tasks with the same act number."}
                 </div>
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">{language === "ru" ? "Объём работ" : "Work quantity"}</label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    step="any"
+                    className="flex-1"
+                    value={editQuantity}
+                    onChange={(e) => setEditQuantity(e.target.value)}
+                    placeholder={language === "ru" ? "Напр.: 120.5" : "e.g. 120.5"}
+                  />
+                  <Input
+                    className="w-28"
+                    value={editUnit}
+                    onChange={(e) => setEditUnit(e.target.value)}
+                    placeholder={language === "ru" ? "Ед. изм." : "Unit"}
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {language === "ru"
+                    ? "Объём независим от справочника ВОР/сметы и попадёт в акт."
+                    : "Quantity is independent from the source and will be included in the act."}
+                </div>
+                {quantityExceedWarning && (
+                  <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 p-2 text-xs text-amber-800 dark:text-amber-200">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
+                    <span>
+                      {language === "ru"
+                        ? `Суммарный объём по задачам (${quantityExceedWarning.totalNew.toLocaleString("ru-RU")}) превышает объём в справочнике (${quantityExceedWarning.sourceQty.toLocaleString("ru-RU")}) на ${quantityExceedWarning.excess.toLocaleString("ru-RU")}.`
+                        : `Total quantity across tasks (${quantityExceedWarning.totalNew.toLocaleString()}) exceeds the source reference (${quantityExceedWarning.sourceQty.toLocaleString()}) by ${quantityExceedWarning.excess.toLocaleString()}.`}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-2">
