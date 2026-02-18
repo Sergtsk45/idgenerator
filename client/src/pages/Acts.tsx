@@ -67,6 +67,7 @@ export default function Acts() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [exportActId, setExportActId] = useState<number | null>(null);
+  const [exportingActId, setExportingActId] = useState<number | null>(null);
 
   // Эталонный АОСР (005_АОСР 4): данные, которые пойдут в formData при экспорте PDF
   const [aosrForm, setAosrForm] = useState({
@@ -92,6 +93,7 @@ export default function Acts() {
     repWorkPerformerLine: "",
     repWorkPerformerOrder: "",
 
+    p1Works: "",
     p2ProjectDocs: "",
     p3MaterialsText: "",
     p4AsBuiltDocs: "",
@@ -211,6 +213,7 @@ export default function Acts() {
           repWorkPerformerLine: aosrForm.repWorkPerformerLine || undefined,
           repWorkPerformerOrder: aosrForm.repWorkPerformerOrder || undefined,
 
+          p1Works: aosrForm.p1Works || undefined,
           p2ProjectDocs: aosrForm.p2ProjectDocs || undefined,
           p3MaterialsText: aosrForm.p3MaterialsText || undefined,
           p4AsBuiltDocs: aosrForm.p4AsBuiltDocs || undefined,
@@ -263,6 +266,34 @@ export default function Acts() {
   const openExportDialog = (actId: number) => {
     setExportActId(actId);
     setIsDialogOpen(true);
+  };
+
+  const handleDownloadAct = async (actId: number) => {
+    setExportingActId(actId);
+    try {
+      const exportResult = await exportAct.mutateAsync({
+        actId,
+        templateIds: [],
+      });
+      if (exportResult.files && exportResult.files.length > 0) {
+        toast({
+          title: language === "ru" ? "Успех" : "Success",
+          description: language === "ru" ? `Создано ${exportResult.files.length} PDF-документов` : `Generated ${exportResult.files.length} PDF documents`,
+        });
+        exportResult.files.forEach((file: { url: string; filename: string }) => {
+          window.open(file.url, "_blank");
+        });
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : undefined;
+      toast({
+        title: language === "ru" ? "Ошибка" : "Error",
+        description: msg || (language === "ru" ? "Не удалось экспортировать акт" : "Failed to export act"),
+        variant: "destructive",
+      });
+    } finally {
+      setExportingActId(null);
+    }
   };
 
   const handleExport = async () => {
@@ -428,10 +459,17 @@ export default function Acts() {
                           variant="ghost"
                           size="sm"
                           className="h-8 text-xs gap-1 group-hover:text-primary"
-                          onClick={() => openExportDialog(act.id)}
+                          onClick={() => handleDownloadAct(act.id)}
+                          disabled={exportingActId !== null}
                           data-testid={`button-download-act-${act.id}`}
                         >
-                          {language === "ru" ? "Скачать" : "Download"} <Download className="h-3 w-3" />
+                          {exportingActId === act.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <>
+                              {language === "ru" ? "Скачать" : "Download"} <Download className="h-3 w-3" />
+                            </>
+                          )}
                         </Button>
                       </div>
                     </CardContent>
@@ -721,6 +759,15 @@ export default function Acts() {
                         </div>
 
                         <div className="grid gap-3">
+                          <div className="grid gap-1.5">
+                            <Label>{language === "ru" ? "П.1 Предъявленные работы (оставьте пустым — авто из графика)" : "P.1 Works performed (leave empty for auto from schedule)"}</Label>
+                            <Textarea
+                              value={aosrForm.p1Works}
+                              onChange={(e) => setAosrForm((s) => ({ ...s, p1Works: e.target.value }))}
+                              className="min-h-[72px]"
+                              placeholder={language === "ru" ? "Автозаполнение из графика работ" : "Auto-filled from work schedule"}
+                            />
+                          </div>
                           <div className="grid gap-1.5">
                             <Label>{language === "ru" ? "П.2 Проектная документация" : "P.2 Project docs"}</Label>
                             <Input
