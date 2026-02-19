@@ -118,8 +118,9 @@ export default function Schedule() {
   const { data: templatesData } = useActTemplates();
 
   const groupedActTemplates = useMemo(() => {
-    const acc: Record<string, typeof templatesData.templates> = {};
-    for (const tpl of templatesData?.templates ?? []) {
+    const templates = templatesData?.templates ?? [];
+    const acc: Record<string, import("@/hooks/use-act-templates").ActTemplateDto[]> = {};
+    for (const tpl of templates) {
       if (!acc[tpl.category]) acc[tpl.category] = [];
       acc[tpl.category].push(tpl);
     }
