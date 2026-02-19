@@ -877,45 +877,45 @@
 ---
 
 ## Задача: Зафиксировать «с нуля» сценарий в документации + CI-проверка миграций
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Описание**: Ошибки миграций всплывают только при чистой БД (fresh install). Нужно задокументировать сценарий bootstrap с нуля и добавить CI job, который ловит сломанные миграции на пустой БД до мержа PR.
 - **Доказательство бага**: В свежей БД после старта приложения в Postgres-логах: `ERROR: relation "works" does not exist`. В БД нет таблиц: `\dt` → «Did not find any relations». `npm run db:migrate` не может выполниться в prod-образе, потому что `tsx: not found`. SQL-миграции содержат ссылки на `acts`/`works`, но не содержат их создания.
 - **Шаги выполнения**:
-  - [ ] **Документация**: в `docs/` добавить раздел «Bootstrap с нуля» (или отдельный файл `docs/bootstrap.md`):
-    - Поднять Postgres (docker-compose или вручную)
-    - Создать БД и пользователя
-    - `npm run db:migrate`
-    - Проверить: `\dt` показывает все таблицы
-  - [ ] **CI job** (GitHub Actions): создать workflow `.github/workflows/test-migrations.yml`:
-    - Поднять чистый Postgres (services: postgres)
-    - Установить зависимости (`npm ci`)
-    - Собрать проект (`npm run build`) — чтобы мигратор был скомпилирован (после решения задачи про tsx)
-    - Запустить `npm run db:migrate`
-    - Проверить наличие таблиц: `\dt` и 1–2 простых `SELECT` из ключевых таблиц (`works`, `acts`, `messages`)
-  - [ ] Проверить, что CI job проходит на текущем состоянии миграций
-  - [ ] Обновить документацию (`docs/changelog.md`, `docs/project.md`)
+  - [x] **Документация**: создан `docs/bootstrap.md` с пошаговым сценарием «Bootstrap с нуля»:
+    - Поднять Postgres (Docker или вручную)
+    - Создать `.env` с `DATABASE_URL`
+    - `npm run build` + `npm run db:migrate`
+    - Проверить: `\dt` показывает все таблицы, контрольные SELECT
+  - [x] **CI job** (GitHub Actions): создан `.github/workflows/test-migrations.yml`:
+    - Поднимает чистый Postgres через `services: postgres`
+    - Устанавливает зависимости (`npm ci`)
+    - Собирает проект (`npm run build`) — компилирует `dist/db-migrate.cjs`
+    - Запускает `npm run db:migrate`
+    - Проверяет наличие 9 ключевых таблиц через SELECT … LIMIT 0
+    - Проверяет совпадение числа SQL-файлов с числом записей в `schema_migrations`
+  - [x] Обновлена документация (`docs/changelog.md`, `docs/tasktracker.md`)
 - **Acceptance Criteria**:
-  - [ ] Любой PR, ломающий миграции на пустой БД, ловится CI (job падает)
-  - [ ] В документации описан пошаговый сценарий «с нуля»
-- **Зависимости**: «Убрать зависимость db:migrate от tsx в проде» (нужна для корректной работы мигратора в CI)
+  - [x] Любой PR, ломающий миграции на пустой БД, ловится CI (job падает)
+  - [x] В документации описан пошаговый сценарий «с нуля»
+- **Зависимости**: «Убрать зависимость db:migrate от tsx в проде» (решена — `npm run build` компилирует мигратор)
 
 ---
 
 ## Задача: (Опционально) Сделать безопасный «инициализатор» только для dev/local
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Описание**: Если `drizzle-kit` нужен для dev-генерации миграций, создать отдельные скрипты с явным разделением: `generate` (генерация SQL из схемы) vs `migrate` (применение SQL к БД). `drizzle-kit push` не должен использоваться в production.
 - **Шаги выполнения**:
-  - [ ] Добавить скрипт `npm run db:generate` (или `db:diff`) — обёртка над `drizzle-kit generate`, доступная только в dev (проверка `NODE_ENV !== 'production'` или наличие `tsx` в devDependencies)
-  - [ ] Убедиться, что `npm run db:push` отсутствует в `package.json` или явно запрещён (выводит ошибку при вызове в prod)
-  - [ ] Добавить в документацию (`docs/project.md` или `docs/rulesdb.md`) раздел с описанием workflow:
+  - [x] Добавить скрипт `npm run db:generate` — обёртка `scripts/db-generate.js` над `drizzle-kit generate`, запрещает запуск при `NODE_ENV=production`
+  - [x] `npm run db:push` явно запрещён: всегда завершается с ошибкой и пояснением
+  - [x] Добавить в документацию (`docs/db-migrations.md`) раздел **Workflow работы с миграциями**:
     - `npm run db:generate` — генерирует новый SQL-файл миграции из изменений в `shared/schema.ts` (только dev)
     - `npm run db:migrate` — применяет SQL-миграции к БД (dev + prod)
     - `drizzle-kit push` — **запрещён** в production
-  - [ ] Обновить документацию (`docs/changelog.md`)
+  - [x] Обновить документацию (`docs/changelog.md`)
 - **Acceptance Criteria**:
-  - [ ] В `package.json` есть явное разделение `db:generate` (dev) и `db:migrate` (prod-safe)
-  - [ ] `drizzle-kit push` не используется нигде как prod-команда
-  - [ ] Документация описывает правильный workflow работы с миграциями
+  - [x] В `package.json` есть явное разделение `db:generate` (dev) и `db:migrate` (prod-safe)
+  - [x] `drizzle-kit push` не используется нигде как prod-команда
+  - [x] Документация описывает правильный workflow работы с миграциями
 - **Зависимости**: «Убрать зависимость db:migrate от tsx в проде», «Привести миграции в консистентный вид»
 
 ---

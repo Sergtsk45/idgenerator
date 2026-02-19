@@ -8,7 +8,8 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "db:push": "drizzle-kit push",
+    "db:generate": "node scripts/db-generate.js",
+    "db:push": "echo 'ОШИБКА: db:push запрещён. Используйте db:generate (dev) + db:migrate вместо push.' && exit 1",
     "db:migrate": "node dist/db-migrate.cjs"
   },
   "dependencies": {

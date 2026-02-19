@@ -1,0 +1,77 @@
+name: Test Migrations (Fresh DB)
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  migration-check:
+    name: Apply migrations on clean Postgres
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: journal
+          POSTGRES_PASSWORD: journal
+          POSTGRES_DB: journal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U journal -d journal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://journal:journal@localhost:5432/journal
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project (compiles db-migrate.cjs)
+        run: npm run build
+
+      - name: Run migrations on clean DB
+        run: npm run db:migrate
+
+      - name: Verify schema — check key tables exist
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+            -- All expected tables must exist; query will fail if any is missing
+            SELECT 'works'                   AS tbl FROM works                   LIMIT 0;
+            SELECT 'acts'                    AS tbl FROM acts                    LIMIT 0;
+            SELECT 'messages'                AS tbl FROM messages                LIMIT 0;
+            SELECT 'act_templates'           AS tbl FROM act_templates           LIMIT 0;
+            SELECT 'act_template_selections' AS tbl FROM act_template_selections LIMIT 0;
+            SELECT 'schedules'               AS tbl FROM schedules               LIMIT 0;
+            SELECT 'schedule_tasks'          AS tbl FROM schedule_tasks          LIMIT 0;
+            SELECT 'attachments'             AS tbl FROM attachments             LIMIT 0;
+            SELECT 'schema_migrations'       AS tbl FROM schema_migrations       LIMIT 0;
+          SQL
+
+      - name: Verify migration log — all files recorded
+        run: |
+          EXPECTED=$(ls migrations/*.sql | xargs -I{} basename {} | sort | wc -l)
+          APPLIED=$(psql "$DATABASE_URL" -t -c "SELECT count(*) FROM schema_migrations;")
+          APPLIED=$(echo "$APPLIED" | tr -d '[:space:]')
+          echo "Expected: $EXPECTED, Applied: $APPLIED"
+          if [ "$EXPECTED" != "$APPLIED" ]; then
+            echo "ERROR: Not all migrations were recorded in schema_migrations!"
+            psql "$DATABASE_URL" -c "SELECT filename, applied_at FROM schema_migrations ORDER BY filename;"
+            exit 1
+          fi
+          echo "All $APPLIED migration(s) applied and recorded."

@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-02-20] - Безопасный workflow генерации миграций (db:generate только dev)
+
+### Добавлено
+- `scripts/db-generate.js`: обёртка над `drizzle-kit generate`, блокирует запуск в `NODE_ENV=production` с явной ошибкой
+- `npm run db:generate` в `package.json` — dev-only скрипт для генерации SQL-миграций из `shared/schema.ts`
+
+### Изменено
+- `npm run db:push` теперь всегда завершается ошибкой с пояснением (`drizzle-kit push` запрещён в проекте)
+- `docs/db-migrations.md`: добавлен раздел **Workflow работы с миграциями** с описанием `db:generate` (dev), `db:migrate` (dev+prod), `db:push` (запрещён)
+
+---
+
+## [2026-02-20] - Bootstrap-документация и CI-проверка миграций на чистой БД
+
+### Добавлено
+- `docs/bootstrap.md`: пошаговая инструкция «с нуля» — Postgres (Docker или вручную), `.env`, `npm run build`, `npm run db:migrate`, проверка через `\dt` и SELECT
+- `.github/workflows/test-migrations.yml`: CI job, который при каждом пуше и PR поднимает чистый Postgres, применяет все миграции и проверяет наличие ключевых таблиц (`works`, `acts`, `messages`, `schedules`, `schedule_tasks`, `act_templates`, `act_template_selections`, `attachments`, `schema_migrations`)
+
+---
+
 ## [2026-02-20] - Устранены ложные комментарии про drizzle-kit push в миграциях
 
 ### Изменено
