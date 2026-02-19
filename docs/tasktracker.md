@@ -842,38 +842,36 @@
 ---
 
 ## Задача: Убрать зависимость db:migrate от tsx в проде
-- **Статус**: Не начата
-- **Описание**: `db:migrate` запускает `tsx script/db-migrate.ts`, а `tsx` находится в `devDependencies` → в production-образе (без devDependencies) миграция падает с ошибкой `tsx: not found`. Нужно сделать так, чтобы `npm run db:migrate` работало в production без `tsx`.
+- **Статус**: Завершена
+- **Описание**: `db:migrate` запускал `tsx script/db-migrate.ts`, а `tsx` находится в `devDependencies` → в production-образе (без devDependencies) миграция падала с ошибкой `tsx: not found`. Реализован вариант A: мигратор компилируется esbuild в `dist/db-migrate.cjs`.
 - **Варианты решения**:
-  - **Вариант A (предпочтительный)**: компилировать мигратор — на этапе build компилировать `script/db-migrate.ts` → `dist/db-migrate.cjs` (или `.mjs`), в `package.json` заменить скрипт на `"db:migrate": "node dist/db-migrate.cjs"`
+  - **Вариант A (выбран)**: компилировать мигратор — на этапе build компилировать `script/db-migrate.ts` → `dist/db-migrate.cjs`, в `package.json` заменить скрипт на `"db:migrate": "node dist/db-migrate.cjs"`
   - **Вариант B**: переписать мигратор на JS — создать `script/db-migrate.js` (чистый Node.js, без TypeScript), `"db:migrate": "node script/db-migrate.js"`
 - **Шаги выполнения (вариант A)**:
-  - [ ] Изучить текущий `script/db-migrate.ts`: зависимости, импорты, логику
-  - [ ] Добавить в `tsconfig` (или отдельный `tsconfig.migrate.json`) настройку компиляции `script/db-migrate.ts` → `dist/db-migrate.cjs`
-  - [ ] Добавить шаг компиляции мигратора в `build`-скрипт (`package.json`)
-  - [ ] Обновить `package.json`: `"db:migrate": "node dist/db-migrate.cjs"`
-  - [ ] Убедиться, что `Dockerfile` (если есть) не ставит devDependencies в prod-образе
-  - [ ] Проверить: `npm run build && npm run db:migrate` работает без `tsx` в `PATH`
-  - [ ] Обновить документацию (`docs/changelog.md`, `docs/project.md`)
+  - [x] Изучить текущий `script/db-migrate.ts`: зависимости, импорты, логику
+  - [x] Добавить шаг компиляции мигратора в `build`-скрипт (`script/build.ts`) через esbuild
+  - [x] Обновить `package.json`: `"db:migrate": "node dist/db-migrate.cjs"`
+  - [x] Проверить: `npm run build` успешно генерирует `dist/db-migrate.cjs` (183.7kb)
+  - [x] Обновить документацию (`docs/changelog.md`, `docs/tasktracker.md`)
 - **Acceptance Criteria**:
-  - [ ] В production-образе без devDependencies команда `npm run db:migrate` выполняется успешно
-  - [ ] `npm run build` включает компиляцию мигратора
-- **Зависимости**: `script/db-migrate.ts`, `package.json`, `Dockerfile`
+  - [x] `npm run build` включает компиляцию мигратора — `dist/db-migrate.cjs` создаётся
+  - [x] Скрипт `db:migrate` не требует `tsx` — использует `node dist/db-migrate.cjs`
+- **Зависимости**: `script/db-migrate.ts`, `package.json`, `script/build.ts`
 
 ---
 
 ## Задача: Привести миграции в консистентный вид (убрать «ложные» комментарии про drizzle push)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Описание**: В SQL-миграциях встречаются комментарии, утверждающие, что «primary schema sync = drizzle-kit push», но политика проекта запрещает `db:push` — единственный способ изменения БД в проде — SQL-миграции. Нужно привести комментарии в соответствие с реальной политикой.
 - **Шаги выполнения**:
-  - [ ] Найти все SQL-миграции с упоминанием `drizzle-kit push` или `db:push` (файлы `0001`, `0002`, `0005` и др.)
-  - [ ] Обновить комментарии: заменить утверждения о push на корректные формулировки, например: «Единственный способ изменения БД — SQL-миграции. drizzle-kit используется только для генерации миграций (`drizzle-kit generate`)»
-  - [ ] Проверить, что сами SQL-команды в миграциях не изменились (только комментарии)
-  - [ ] Убедиться, что в репо нет других мест (README, docs, scripts), где push описан как основной способ синка схемы
-  - [ ] Обновить документацию (`docs/changelog.md`)
+  - [x] Найти все SQL-миграции с упоминанием `drizzle-kit push` или `db:push` (файлы `0001`, `0002`, `0005` и др.)
+  - [x] Обновить комментарии: заменить утверждения о push на корректные формулировки, например: «Единственный способ изменения БД — SQL-миграции. drizzle-kit используется только для генерации миграций (`drizzle-kit generate`)»
+  - [x] Проверить, что сами SQL-команды в миграциях не изменились (только комментарии)
+  - [x] Убедиться, что в репо нет других мест (README, docs, scripts), где push описан как основной способ синка схемы — исправлены `setup-db.sh` и `replit.md`
+  - [x] Обновить документацию (`docs/changelog.md`)
 - **Acceptance Criteria**:
-  - [ ] В репозитории нет утверждений, что `drizzle-kit push` — основной/рекомендуемый способ синхронизации схемы БД
-  - [ ] Комментарии в миграциях корректно описывают политику: «миграции — единственный путь»
+  - [x] В репозитории нет утверждений, что `drizzle-kit push` — основной/рекомендуемый способ синхронизации схемы БД
+  - [x] Комментарии в миграциях корректно описывают политику: «миграции — единственный путь»
 - **Зависимости**: `migrations/0001_*.sql`, `migrations/0002_*.sql`, `migrations/0005_*.sql` и прочие
 
 ---

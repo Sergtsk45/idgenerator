@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-02-20] - Устранены ложные комментарии про drizzle-kit push в миграциях
+
+### Изменено
+- `migrations/0001_objects_source_data.sql`, `0002_estimates.sql`, `0005_materials_documents.sql`: заменены NOTE-комментарии «Project currently uses drizzle-kit push as the primary schema sync mechanism» на корректные — «Единственный способ изменения БД — SQL-миграции; drizzle-kit push в проекте не применяется»
+- `migrations/0000_initial_schema.sql`: уточнена историческая ремарка — явно указано, что bootstrapped через push относится к прошлому, а текущая политика — только SQL-миграции
+- `setup-db.sh`: подсказка `npm run db:push` заменена на `npm run db:migrate`
+- `replit.md`: описание управления схемой БД исправлено — «Schema managed via SQL migrations (`npm run db:migrate`)»
+
+---
+
+## [2026-02-20] - Убрана зависимость db:migrate от tsx в production
+
+### Изменено
+- `script/build.ts`: добавлен шаг компиляции `script/db-migrate.ts` → `dist/db-migrate.cjs` через esbuild (bundle: true, format: cjs)
+- `package.json`: скрипт `db:migrate` изменён с `tsx script/db-migrate.ts` на `node dist/db-migrate.cjs` — теперь работает в production без devDependencies
+
+---
+
 ## [2026-02-20] - Bootstrap-миграция для пустой БД
 
 ### Добавлено

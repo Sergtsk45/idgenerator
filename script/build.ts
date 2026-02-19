@@ -59,6 +59,16 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  console.log("building db-migrate...");
+  await esbuild({
+    entryPoints: ["script/db-migrate.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "dist/db-migrate.cjs",
+    logLevel: "info",
+  });
 }
 
 buildAll().catch((err) => {

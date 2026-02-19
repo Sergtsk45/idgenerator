@@ -1,7 +1,8 @@
 -- @file: 0000_initial_schema.sql
 -- @description: Bootstrap migration — creates all base tables that subsequent migrations depend on.
---   Must run first. All tables here were previously created via drizzle-kit push and are
---   referenced (but never created) by migrations 0001–0011.
+--   Must run first. All tables here were historically bootstrapped outside of migrations
+--   (via drizzle-kit push) and are referenced (but never created) by migrations 0001–0011.
+--   Current policy: only SQL migrations are used; drizzle-kit push is not applied.
 -- @created: 2026-02-20
 --
 -- Columns intentionally omitted (added by later migrations):

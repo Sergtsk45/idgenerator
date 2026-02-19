@@ -72,7 +72,7 @@ The `shared/` directory contains code used by both frontend and backend:
 - **OpenAI API**: Used for natural language processing of work log messages. Configured via Replit AI Integrations with environment variables `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL`.
 
 ### Database
-- **PostgreSQL**: Primary data store. Connection via `DATABASE_URL` environment variable. Schema managed with Drizzle Kit (`db:push` command).
+- **PostgreSQL**: Primary data store. Connection via `DATABASE_URL` environment variable. Schema managed via SQL migrations (`npm run db:migrate`); `drizzle-kit push` is not used in this project.
 
 ### PDF Generation
 - **Library**: pdfmake for server-side PDF generation

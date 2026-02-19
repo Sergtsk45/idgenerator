@@ -2,8 +2,9 @@
 -- @description: Create estimates (ЛСР/Смета) tables: estimates, sections, positions, resources
 -- @created: 2026-01-29
 
--- NOTE: Project currently uses `drizzle-kit push` as the primary schema sync mechanism.
--- This migration is kept as an explicit SQL reference and for future migration-based flows.
+-- NOTE: Единственный способ изменения БД — SQL-миграции (этот файл).
+-- drizzle-kit используется только для генерации миграций (`drizzle-kit generate`).
+-- `drizzle-kit push` в проекте не применяется.
 
 CREATE TABLE IF NOT EXISTS "estimates" (
   "id" SERIAL PRIMARY KEY,

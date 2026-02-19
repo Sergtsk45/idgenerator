@@ -40,5 +40,5 @@ fi
 
 echo ""
 echo "После настройки DATABASE_URL выполните:"
-echo "  npm run db:push  # для применения схемы базы данных"
-echo "  npm run dev      # для запуска приложения"
+echo "  npm run db:migrate  # для применения SQL-миграций к базе данных"
+echo "  npm run dev         # для запуска приложения"
