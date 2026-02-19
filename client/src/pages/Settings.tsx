@@ -1,12 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { useLanguageStore, translations } from "@/lib/i18n";
+import { useAppSettings } from "@/lib/app-settings";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 
 export default function Settings() {
   const { language, setLanguage } = useLanguageStore();
+  const { showWorkVolumes, setShowWorkVolumes } = useAppSettings();
   const t = translations[language].settings;
 
   return (
@@ -37,6 +40,29 @@ export default function Settings() {
                 </Label>
               </div>
             </RadioGroup>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">{t.worklog}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <Label htmlFor="show-work-volumes" className="text-base cursor-pointer leading-snug">
+                  {t.showWorkVolumes}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                  {t.showWorkVolumesHint}
+                </p>
+              </div>
+              <Switch
+                id="show-work-volumes"
+                checked={showWorkVolumes}
+                onCheckedChange={setShowWorkVolumes}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>

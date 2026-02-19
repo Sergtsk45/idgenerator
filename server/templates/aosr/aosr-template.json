@@ -1,19 +1,19 @@
 {
   "pageSize": "A4",
   "pageOrientation": "portrait",
-  "pageMargins": [40, 40, 40, 40],
+  "pageMargins": [30, 30, 30, 30],
   "defaultStyle": {
     "font": "TimesNewRoman",
     "fontSize": 10,
-    "lineHeight": 1.1
+    "lineHeight": 1.0
   },
   "styles": {
-    "titleAct": { "fontSize": 14, "bold": true, "alignment": "center", "margin": [0, 10, 0, 2] },
-    "subtitleAct": { "fontSize": 12, "bold": true, "alignment": "center", "margin": [0, 0, 0, 4] },
-    "sectionLabel": { "bold": true, "margin": [0, 3, 0, 0] },
-    "pLabel": { "bold": true, "margin": [0, 6, 0, 0] },
-    "hint": { "fontSize": 7, "italics": true, "color": "#444444", "margin": [0, 0, 0, 1], "alignment": "center" },
-    "signatureRole": { "bold": true, "margin": [0, 8, 0, 0] },
+    "titleAct": { "fontSize": 14, "bold": true, "alignment": "center", "margin": [0, 6, 0, 1] },
+    "subtitleAct": { "fontSize": 12, "bold": true, "alignment": "center", "margin": [0, 0, 0, 2] },
+    "sectionLabel": { "bold": true, "margin": [0, 2, 0, 0] },
+    "pLabel": { "bold": true, "margin": [0, 3, 0, 0] },
+    "hint": { "fontSize": 7, "italics": true, "color": "#444444", "margin": [0, 0, 0, 0], "alignment": "center" },
+    "signatureRole": { "bold": true, "margin": [0, 4, 0, 0] },
     "signatureName": { "margin": [0, 0, 0, 0] },
     "signatureHint": { "fontSize": 8, "italics": true, "color": "#444444", "margin": [0, 0, 0, 0] }
   },
@@ -114,12 +114,11 @@
     { "text": "освидетельствования скрытых работ", "style": "subtitleAct" },
     {
       "table": {
-        "widths": ["auto", 40, "auto", "*"],
+        "widths": ["auto", 40, "*"],
         "body": [
           [
             { "text": "№" },
             { "text": "{{actNumber}}", "alignment": "center" },
-            { "text": "«" },
             { "text": "{{actDate}}", "alignment": "center" }
           ]
         ]
@@ -140,20 +139,6 @@
           [
             {
               "text": "{{repCustomerControlLine}}",
-              "italics": true
-            }
-          ]
-        ]
-      },
-      "layout": "thinUnderline"
-    },
-    {
-      "table": {
-        "widths": ["*"],
-        "body": [
-          [
-            {
-              "text": "{{repCustomerControlOrder}}",
               "italics": true
             }
           ]
@@ -183,20 +168,6 @@
           ]
         ]
       },
-      "layout": "thinUnderline"
-    },
-    {
-      "table": {
-        "widths": ["*"],
-        "body": [
-          [
-            {
-              "text": "{{repBuilderOrder}}",
-              "italics": true
-            }
-          ]
-        ]
-      },
       "layout": "thinUnderline",
       "margin": [0, 0, 0, 2]
     },
@@ -216,20 +187,6 @@
           [
             {
               "text": "{{repBuilderControlLine}}",
-              "italics": true
-            }
-          ]
-        ]
-      },
-      "layout": "thinUnderline"
-    },
-    {
-      "table": {
-        "widths": ["*"],
-        "body": [
-          [
-            {
-              "text": "{{repBuilderControlOrder}}",
               "italics": true
             }
           ]
@@ -259,20 +216,6 @@
           ]
         ]
       },
-      "layout": "thinUnderline"
-    },
-    {
-      "table": {
-        "widths": ["*"],
-        "body": [
-          [
-            {
-              "text": "{{repDesignerOrder}}",
-              "italics": true
-            }
-          ]
-        ]
-      },
       "layout": "thinUnderline",
       "margin": [0, 0, 0, 2]
     },
@@ -292,20 +235,6 @@
           [
             {
               "text": "{{repWorkPerformerLine}}",
-              "italics": true
-            }
-          ]
-        ]
-      },
-      "layout": "thinUnderline"
-    },
-    {
-      "table": {
-        "widths": ["*"],
-        "body": [
-          [
-            {
-              "text": "{{repWorkPerformerOrder}}",
               "italics": true
             }
           ]
@@ -494,90 +423,110 @@
       "text": "Представитель застройщика, технического заказчика, лица, ответственного за эксплуатацию здания, сооружения, или регионального оператора по вопросам строительного контроля",
       "style": "signatureRole"
     },
-    { "text": "{{sigCustomerControl}}", "style": "signatureName" },
     {
       "table": {
-        "widths": ["auto", "*"],
+        "widths": ["*", "*"],
         "body": [
           [
+            { "text": "{{sigCustomerControl}}", "style": "signatureName" },
+            { "text": "", "style": "signatureName" }
+          ],
+          [
             { "text": "(фамилия, инициалы)", "style": "signatureHint" },
-            { "text": "(подпись)", "style": "signatureHint", "alignment": "right" }
+            { "text": "(подпись)", "style": "signatureHint", "alignment": "center" }
           ]
         ]
       },
-      "layout": "noBorders"
+      "layout": "thinUnderline",
+      "margin": [0, 2, 0, 0]
     },
 
     {
       "text": "Представитель лица, осуществляющего строительство, реконструкцию, капитальный ремонт",
       "style": "signatureRole"
     },
-    { "text": "{{sigBuilder}}", "style": "signatureName" },
     {
       "table": {
-        "widths": ["auto", "*"],
+        "widths": ["*", "*"],
         "body": [
           [
+            { "text": "{{sigBuilder}}", "style": "signatureName" },
+            { "text": "", "style": "signatureName" }
+          ],
+          [
             { "text": "(фамилия, инициалы)", "style": "signatureHint" },
-            { "text": "(подпись)", "style": "signatureHint", "alignment": "right" }
+            { "text": "(подпись)", "style": "signatureHint", "alignment": "center" }
           ]
         ]
       },
-      "layout": "noBorders"
+      "layout": "thinUnderline",
+      "margin": [0, 2, 0, 0]
     },
 
     {
       "text": "Представитель лица, осуществляющего строительство, реконструкцию, капитальный ремонт, по вопросам строительного контроля",
       "style": "signatureRole"
     },
-    { "text": "{{sigBuilderControl}}", "style": "signatureName" },
     {
       "table": {
-        "widths": ["auto", "*"],
+        "widths": ["*", "*"],
         "body": [
           [
+            { "text": "{{sigBuilderControl}}", "style": "signatureName" },
+            { "text": "", "style": "signatureName" }
+          ],
+          [
             { "text": "(фамилия, инициалы)", "style": "signatureHint" },
-            { "text": "(подпись)", "style": "signatureHint", "alignment": "right" }
+            { "text": "(подпись)", "style": "signatureHint", "alignment": "center" }
           ]
         ]
       },
-      "layout": "noBorders"
+      "layout": "thinUnderline",
+      "margin": [0, 2, 0, 0]
     },
 
     {
       "text": "Представитель лица, осуществляющего подготовку проектной документации (в случае привлечения застройщиком лица, осуществляющего подготовку проектной документации, для проверки соответствия выполняемых работ проектной документации согласно части 2 статьи 53 Градостроительного кодекса Российской Федерации):",
       "style": "signatureRole"
     },
-    { "text": "{{sigDesigner}}", "style": "signatureName" },
     {
       "table": {
-        "widths": ["auto", "*"],
+        "widths": ["*", "*"],
         "body": [
           [
+            { "text": "{{sigDesigner}}", "style": "signatureName" },
+            { "text": "", "style": "signatureName" }
+          ],
+          [
             { "text": "(фамилия, инициалы)", "style": "signatureHint" },
-            { "text": "(подпись)", "style": "signatureHint", "alignment": "right" }
+            { "text": "(подпись)", "style": "signatureHint", "alignment": "center" }
           ]
         ]
       },
-      "layout": "noBorders"
+      "layout": "thinUnderline",
+      "margin": [0, 2, 0, 0]
     },
 
     {
       "text": "Представитель лица, выполнившего строительные конструкции, подлежащие освидетельствованию (в случае выполнения работ по договорам о строительстве, реконструкции, капитальном ремонте объектов капитального строительства, заключенным с иными лицами):",
       "style": "signatureRole"
     },
-    { "text": "{{sigWorkPerformer}}", "style": "signatureName" },
     {
       "table": {
-        "widths": ["auto", "*"],
+        "widths": ["*", "*"],
         "body": [
           [
+            { "text": "{{sigWorkPerformer}}", "style": "signatureName" },
+            { "text": "", "style": "signatureName" }
+          ],
+          [
             { "text": "(фамилия, инициалы)", "style": "signatureHint" },
-            { "text": "(подпись)", "style": "signatureHint", "alignment": "right" }
+            { "text": "(подпись)", "style": "signatureHint", "alignment": "center" }
           ]
         ]
       },
-      "layout": "noBorders"
+      "layout": "thinUnderline",
+      "margin": [0, 2, 0, 0]
     }
   ],
   "placeholders": {

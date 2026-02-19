@@ -745,15 +745,24 @@ export default function Schedule() {
               <CardContent className="p-0">
                 {/* Header */}
                 <div className="flex border-b bg-muted/20">
-                  <div className="w-[420px] shrink-0 flex">
-                    <div className="flex-1 px-3 py-2 text-xs font-medium text-muted-foreground">
-                      {t.taskColumn}
-                    </div>
-                    <div className="w-16 px-1 py-2 text-xs font-medium text-muted-foreground text-center border-l border-border/40">
-                      {language === "ru" ? "Объём" : "Qty"}
-                    </div>
-                    <div className="w-16 px-1 py-2 text-xs font-medium text-muted-foreground text-center border-l border-border/40">
-                      {language === "ru" ? "ТЗ" : "Labor"}
+                  <div className="w-[500px] shrink-0 px-3 py-2">
+                    <div className="grid grid-cols-[24px_minmax(0,1fr)_4rem_4rem_4rem_auto] gap-x-2">
+                      <div />
+                      <div className="text-xs font-medium text-muted-foreground">{t.taskColumn}</div>
+                      <div className="text-xs font-medium text-muted-foreground text-right border-l border-border/40 px-1">
+                        {language === "ru" ? "Объём" : "Qty"}
+                      </div>
+                      <div className="text-xs font-medium text-muted-foreground text-right border-l border-border/40 px-1">
+                        {language === "ru" ? "ТЗ" : "Labor"}
+                      </div>
+                      <div className="text-xs font-medium text-muted-foreground text-right border-l border-border/40 px-1">
+                        {language === "ru" ? "Брг" : "Team"}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <div className="h-8 w-8" />
+                        <div className="h-8 w-8" />
+                        <div className="h-8 w-8" />
+                      </div>
                     </div>
                   </div>
                   <div className="flex-1 overflow-x-auto">
@@ -777,7 +786,7 @@ export default function Schedule() {
 
                 {/* Body */}
                 <div className="flex">
-                  <div className="w-[420px] shrink-0 border-r">
+                  <div className="w-[500px] shrink-0 border-r">
                     {tasks.map((task) => {
                       const w = task.workId ? worksById.get(task.workId) : null;
                       const p = task.estimatePositionId ? estimatePositionsById.get(task.estimatePositionId) : null;
@@ -798,9 +807,9 @@ export default function Schedule() {
                             className="px-3 py-2 border-b border-border/60"
                             style={{ height: rowHeight }}
                           >
-                            <div className="grid h-full grid-cols-[24px_minmax(0,1fr)_4rem_4rem_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1">
+                            <div className="grid h-full grid-cols-[24px_minmax(0,1fr)_4rem_4rem_4rem_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1">
                               {/* Expand/collapse button (only for estimate with auxiliaries) */}
-                              <div className="row-start-1 col-start-1 flex items-start justify-start">
+                              <div className="row-start-1 row-end-3 col-start-1 flex items-start justify-start">
                                 {sourceType === "estimate" && hasAuxiliaries ? (
                                   <Button
                                     variant="ghost"
@@ -815,18 +824,15 @@ export default function Schedule() {
                                 )}
                               </div>
 
-                              {/* Row 1: № позиции | Акт № | ед. изм. */}
-                              <div className="row-start-1 col-start-2 min-w-0">
+                              {/* Row 2: № строки | № акта | ед. изм. */}
+                              <div className="row-start-2 col-start-2 min-w-0">
                                 {(() => {
                                   const codeLabel =
                                     sourceType === "estimate"
                                       ? (p?.lineNo || p?.code || `ID:${task.estimatePositionId ?? task.id}`)
                                       : (w?.code || `ID:${task.workId ?? task.id}`);
-                                  const actLabel =
-                                    task.actNumber != null
-                                      ? `${language === "ru" ? "Акт №" : "Act #"}${task.actNumber}`
-                                      : null;
                                   const unit = sourceType === "estimate" ? String(p?.unit ?? "").trim() : "";
+                                  const actLabel = task.actNumber != null ? String(task.actNumber) : "—";
 
                                   const sep = (
                                     <span className="px-1 text-muted-foreground/60" aria-hidden="true">
@@ -836,13 +842,9 @@ export default function Schedule() {
 
                                   return (
                                     <div className="flex items-center text-xs text-muted-foreground min-w-0">
-                                      <span className="font-mono truncate">{String(codeLabel)}</span>
-                                      {actLabel ? (
-                                        <>
-                                          {sep}
-                                          <span className="truncate">{actLabel}</span>
-                                        </>
-                                      ) : null}
+                                      <span className="font-mono shrink-0">{String(codeLabel)}</span>
+                                      {sep}
+                                      <span className="font-mono shrink-0">{actLabel}</span>
                                       {unit ? (
                                         <>
                                           {sep}
@@ -854,24 +856,29 @@ export default function Schedule() {
                                 })()}
                               </div>
 
-                              {/* Quantity column (Row 1) — independent task quantity */}
-                              <div className="row-start-1 col-start-3 w-16 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
+                              {/* Quantity column (Row 2) — independent task quantity */}
+                              <div className="row-start-2 col-start-3 w-16 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
                                 {(() => {
                                   const qty = parseNumeric((task as any).quantity);
                                   return qty != null ? qty.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—";
                                 })()}
                               </div>
 
-                              {/* Labor column (Row 1) */}
-                              <div className="row-start-1 col-start-4 w-16 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
+                              {/* Labor column (Row 2) */}
+                              <div className="row-start-2 col-start-4 w-16 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
                                 {sourceType === "estimate" ? (() => {
                                   const labor = getLaborManHours(p);
                                   return labor != null ? labor.toLocaleString(language === "ru" ? "ru-RU" : "en-US") : "—";
                                 })() : "—"}
                               </div>
 
-                              {/* Buttons (Row 1) */}
-                              <div className="row-start-1 col-start-5 flex items-center gap-1 shrink-0">
+                              {/* Brigade column (Row 2) — placeholder, not used yet */}
+                              <div className="row-start-2 col-start-5 w-16 text-xs text-muted-foreground text-right px-1 border-l border-border/40">
+                                —
+                              </div>
+
+                              {/* Buttons (Row 2) */}
+                              <div className="row-start-2 col-start-6 flex items-center gap-1 shrink-0">
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -903,8 +910,8 @@ export default function Schedule() {
                                 </Button>
                               </div>
 
-                              {/* Row 2: Title spans under Qty + Labor */}
-                              <div className="row-start-2 col-start-2 col-end-5 min-w-0 text-sm font-medium leading-snug whitespace-normal break-words line-clamp-2">
+                              {/* Row 1: Title */}
+                              <div className="row-start-1 col-start-2 col-end-5 min-w-0 text-sm font-medium leading-snug whitespace-normal break-words line-clamp-2">
                                 {title}
                               </div>
                             </div>
@@ -1005,15 +1012,13 @@ export default function Schedule() {
                             className="absolute h-6 rounded-md bg-primary/80 hover:bg-primary text-primary-foreground text-[10px] px-2 truncate"
                             style={{ left, top, width }}
                             onClick={() => openEdit(task)}
-                            title={`${task.startDate} / ${task.durationDays}d`}
+                            title={[
+                              task.actNumber != null ? `Акт №${task.actNumber}` : null,
+                              format(parseISO(String(task.startDate)), "dd.MM.yy"),
+                              `${task.durationDays ?? 1} д`,
+                            ].filter(Boolean).join(" / ")}
                           >
-                            {sourceType === "estimate"
-                              ? (task.estimatePositionId
-                                  ? (estimatePositionsById.get(task.estimatePositionId)?.lineNo ||
-                                      estimatePositionsById.get(task.estimatePositionId)?.code ||
-                                      `#${task.estimatePositionId}`)
-                                  : `#${task.id}`)
-                              : (task.workId ? worksById.get(task.workId)?.code || `#${task.workId}` : `#${task.id}`)}
+                            {task.actNumber != null ? task.actNumber : "—"}
                           </button>
                         );
                       })}

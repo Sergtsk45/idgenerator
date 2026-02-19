@@ -83,6 +83,22 @@ const estimateSubrowStatusSchema = z.object({
   batchId: z.number().int().positive().nullable().optional(),
 });
 
+export const workSegmentSchema = z.object({
+  text: z.string(),
+  sourceType: z.enum(['message', 'act']),
+  sourceId: z.number(),
+  isPending: z.boolean(),
+});
+export type WorkSegment = z.infer<typeof workSegmentSchema>;
+
+export const section3RowSchema = z.object({
+  date: z.string(),
+  workConditions: z.string(),
+  segments: z.array(workSegmentSchema),
+  representative: z.string(),
+});
+export type Section3Row = z.infer<typeof section3RowSchema>;
+
 export const api = {
   object: {
     current: {
@@ -594,6 +610,37 @@ export const api = {
         404: z.object({ message: z.string() }),
       },
     },
+    patch: {
+      method: 'PATCH' as const,
+      path: '/api/messages/:id',
+      input: z.object({
+        messageRaw: z.string().optional(),
+        normalizedData: z.object({
+          workCode: z.string().optional(),
+          workDescription: z.string().optional(),
+          quantity: z.number().optional(),
+          unit: z.string().optional(),
+          date: z.string().optional(),
+          location: z.string().optional(),
+          workConditions: z.string().optional(),
+          materials: z.array(z.string()).optional(),
+          representative: z.string().optional(),
+        }).optional(),
+      }),
+      responses: {
+        200: z.custom<typeof messages.$inferSelect>(),
+        404: z.object({ message: z.string() }),
+      },
+    },
+  },
+  worklog: {
+    section3: {
+      method: 'GET' as const,
+      path: '/api/worklog/section3',
+      responses: {
+        200: z.array(section3RowSchema),
+      },
+    },
   },
   acts: {
     list: {
@@ -776,6 +823,9 @@ export const api = {
             .array(z.object({ title: z.string().min(1), fileUrl: z.string().min(1).optional() }))
             .nullable()
             .optional(),
+          // Independent quantity/unit for this task (detached from source after bootstrap)
+          quantity: z.number().nonnegative().nullable().optional(),
+          unit: z.string().nullable().optional(),
           updateAllTasks: z.boolean().optional(),
         })
         .refine((v) => Object.keys(v).length > 0, { message: 'Empty patch' }),

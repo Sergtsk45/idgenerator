@@ -25,6 +25,16 @@ function addDaysISO(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function eachDayInRange(start: string, end: string): string[] {
+  const days: string[] = [];
+  let current = start;
+  while (current <= end) {
+    days.push(current);
+    current = addDaysISO(current, 1);
+  }
+  return days;
+}
+
 // OpenAI is optional for local/dev runs. Only initialize when credentials exist.
 let openaiClient: OpenAI | null = null;
 function getOpenAIClient(): OpenAI | null {
@@ -652,6 +662,146 @@ export async function registerRoutes(
     }
   });
 
+  // Messages: patch endpoint for inline editing
+  app.patch(api.messages.patch.path, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ message: "Invalid message id" });
+      }
+
+      const input = api.messages.patch.input.parse(req.body);
+      const updated = await storage.patchMessage(id, input);
+
+      if (!updated) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+
+      return res.status(200).json(updated);
+    } catch (err) {
+      console.error("Message patch failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Worklog Section 3: combined view of messages and acts, grouped by date
+  app.get(api.worklog.section3.path, async (req, res) => {
+    try {
+      const showVolumes = req.query.showVolumes === "1";
+
+      // Load messages and acts in parallel
+      const [allMessages, allActs] = await Promise.all([
+        storage.getMessages(),
+        storage.getActs(),
+      ]);
+
+      type Segment = {
+        text: string;
+        sourceType: 'message' | 'act';
+        sourceId: number;
+        isPending: boolean;
+      };
+
+      type DateRow = {
+        date: string;
+        workConditions: string;
+        segments: Segment[];
+        representative: string;
+      };
+
+      // Group rows by date using a Map (insertion order preserved = sort later)
+      const byDate = new Map<string, DateRow>();
+
+      const getOrCreateRow = (date: string): DateRow => {
+        if (!byDate.has(date)) {
+          byDate.set(date, { date, workConditions: "", segments: [], representative: "" });
+        }
+        return byDate.get(date)!;
+      };
+
+      // First pass: acts (appear first in each date's segments list)
+      for (const act of allActs) {
+        if (!act.dateStart || !act.dateEnd || !act.worksData) continue;
+
+        const dateStart = String(act.dateStart);
+        const dateEnd = String(act.dateEnd);
+        const worksData = act.worksData as Array<{
+          description: string;
+          code?: string;
+          quantity?: number;
+          unit?: string;
+        }>;
+
+        if (!Array.isArray(worksData) || worksData.length === 0) continue;
+
+        const dates = eachDayInRange(dateStart, dateEnd);
+
+        for (const date of dates) {
+          const row = getOrCreateRow(date);
+
+          for (const workItem of worksData) {
+            let text = workItem.description || "";
+            if (showVolumes && workItem.quantity != null && workItem.unit) {
+              text += ` (${workItem.quantity} ${workItem.unit})`;
+            }
+
+            row.segments.push({ text, sourceType: 'act', sourceId: act.id, isPending: false });
+          }
+        }
+      }
+
+      // Second pass: messages (appear after acts in each date's segments list)
+      for (const msg of allMessages) {
+        const data = msg.normalizedData;
+
+        // Determine date
+        let dateStr = "";
+        if (data?.date) {
+          dateStr = data.date;
+        } else if (msg.createdAt) {
+          dateStr = new Date(msg.createdAt).toISOString().slice(0, 10);
+        }
+        if (!dateStr) continue;
+
+        // Build work description
+        let text = "";
+        if (msg.isProcessed && data) {
+          text = data.workDescription || msg.messageRaw || "";
+          const materials = Array.isArray(data.materials) ? data.materials : [];
+          if (materials.length > 0) text += ` — ${materials.join("; ")}`;
+        } else {
+          text = msg.messageRaw || "";
+        }
+
+        const row = getOrCreateRow(dateStr);
+
+        // Merge workConditions from message (if any)
+        if (data?.workConditions && !row.workConditions) {
+          row.workConditions = data.workConditions;
+        }
+        // Merge representative from message (if any)
+        if (data?.representative && !row.representative) {
+          row.representative = data.representative;
+        }
+
+        row.segments.push({
+          text,
+          sourceType: 'message',
+          sourceId: msg.id,
+          isPending: !msg.isProcessed,
+        });
+      }
+
+      // Sort rows by date and return
+      const rows = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+      res.json(rows);
+    } catch (err) {
+      console.error("Worklog section3 fetch failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // Acts
   app.get(api.acts.list.path, async (req, res) => {
     const acts = await storage.getActs();
@@ -834,7 +984,8 @@ export async function registerRoutes(
         for (const t of tasks) {
           const start = String(t.startDate);
           const durationDays = Number(t.durationDays ?? 0);
-          const end = addDaysISO(start, durationDays);
+          // dateEnd is inclusive: if duration is 1 day, end = start
+          const end = addDaysISO(start, Math.max(0, durationDays - 1));
 
           if (!minStart || start < minStart) minStart = start;
           if (!maxEnd || end > maxEnd) maxEnd = end;
@@ -859,7 +1010,8 @@ export async function registerRoutes(
           }
         }
 
-        // Generate worksData based on schedule source type
+        // Generate worksData from task-level quantity (independent from source).
+        // Multiple tasks with the same sourceId have their quantities summed.
         let worksData: Array<{
           sourceType: 'works' | 'estimate';
           sourceId: number;
@@ -870,50 +1022,72 @@ export async function registerRoutes(
         }>;
 
         if (schedule.sourceType === 'estimate') {
-          // Source: Estimate positions
-          const positionIdsSet = new Set<number>();
+          // Group tasks by estimatePositionId and sum their independent quantities
+          const positionIdToTasks = new Map<number, typeof tasks>();
           for (const t of tasks) {
             if (t.estimatePositionId) {
-              positionIdsSet.add(Number(t.estimatePositionId));
+              const key = Number(t.estimatePositionId);
+              const list = positionIdToTasks.get(key) ?? [];
+              list.push(t);
+              positionIdToTasks.set(key, list);
             }
           }
-          const positionIds = Array.from(positionIdsSet);
+          const positionIds = Array.from(positionIdToTasks.keys());
           const positions = await storage.getEstimatePositionsByIds(positionIds);
           positions.sort((a, b) => String(a.code ?? '').localeCompare(String(b.code ?? '')));
 
           worksData = positions.map((p) => {
-            const rawQty: any = (p as any).quantity;
-            const qty = rawQty == null ? 0 : Number(rawQty);
+            const taskGroup = positionIdToTasks.get(p.id) ?? [];
+            // Sum independent task quantities; fall back to source quantity if task has none
+            const qty = taskGroup.reduce((sum, t) => {
+              const tQty = (t as any).quantity;
+              if (tQty != null) return sum + Number(tQty);
+              const rawQty: any = (p as any).quantity;
+              return sum + (rawQty != null ? Number(rawQty) : 0);
+            }, 0);
+            // Use task unit if set, else fall back to source
+            const unit = ((taskGroup[0] as any)?.unit ?? (p as any).unit) ?? undefined;
             return {
               sourceType: 'estimate' as const,
               sourceId: p.id,
               description: p.name,
               quantity: Number.isFinite(qty) ? qty : 0,
-              unit: p.unit ?? undefined,
+              unit,
               code: p.code ?? undefined,
             };
           });
         } else {
-          // Source: Works (BoQ)
-          const workIdsSet = new Set<number>();
+          // Source: Works (BoQ) — group by workId and sum independent task quantities
+          const workIdToTasks = new Map<number, typeof tasks>();
           for (const t of tasks) {
             if (t.workId) {
-              workIdsSet.add(Number(t.workId));
+              const key = Number(t.workId);
+              const list = workIdToTasks.get(key) ?? [];
+              list.push(t);
+              workIdToTasks.set(key, list);
             }
           }
-          const workIds = Array.from(workIdsSet);
+          const workIds = Array.from(workIdToTasks.keys());
           const works = await storage.getWorksByIds(workIds);
           works.sort((a, b) => String(a.code).localeCompare(String(b.code)));
 
           worksData = works.map((w) => {
-            const rawQty: any = (w as any).quantityTotal;
-            const qty = rawQty == null ? 0 : Number(rawQty);
+            const taskGroup = workIdToTasks.get(w.id) ?? [];
+            // Sum independent task quantities; fall back to source quantityTotal if task has none
+            const qty = taskGroup.reduce((sum, t) => {
+              const tQty = (t as any).quantity;
+              if (tQty != null) return sum + Number(tQty);
+              const rawQty: any = (w as any).quantityTotal;
+              return sum + (rawQty != null ? Number(rawQty) : 0);
+            }, 0);
+            // Use task unit if set, else fall back to source
+            const unit = ((taskGroup[0] as any)?.unit ?? w.unit) ?? undefined;
             return {
               sourceType: 'works' as const,
               sourceId: w.id,
               description: w.description,
               quantity: Number.isFinite(qty) ? qty : 0,
-              unit: w.unit,
+              unit,
               code: w.code,
             };
           });
@@ -1491,20 +1665,23 @@ export async function registerRoutes(
 
       const generatedFiles: { templateId: string; filename: string; url: string }[] = [];
 
+      // Вычисляем p1Works один раз (авто из worksData + переопределение через formData)
+      const p1WorksAuto =
+        Array.isArray(act.worksData) && act.worksData.length > 0
+          ? act.worksData
+              .map((w, idx) => {
+                const qty = typeof (w as any).quantity === "number" ? (w as any).quantity : 0;
+                const desc = String((w as any).description ?? "").trim();
+                const line = desc || `workId ${(w as any).workId ?? ""}`.trim();
+                return `${idx + 1}. ${line}${qty ? ` — ${qty}` : ""}`;
+              })
+              .join("\n")
+          : "";
+      const p1Works = formData?.p1Works || p1WorksAuto;
+
       if (effectiveTemplateIds.length === 0) {
         const actNumber = formData?.actNumber || String(act.actNumber ?? act.id);
         const actDate = formData?.actDate || String(act.dateEnd ?? new Date().toISOString().split("T")[0]);
-        const p1Works =
-          Array.isArray(act.worksData) && act.worksData.length > 0
-            ? act.worksData
-                .map((w, idx) => {
-                  const qty = typeof (w as any).quantity === "number" ? (w as any).quantity : 0;
-                  const desc = String((w as any).description ?? "").trim();
-                  const line = desc || `workId ${(w as any).workId ?? ""}`.trim();
-                  return `${idx + 1}. ${line}${qty ? ` — ${qty}` : ""}`;
-                })
-                .join("\n")
-            : "";
 
         const actProjectDrawingsAgg = String((act as any).projectDrawingsAgg ?? "").trim();
         const actNormativeRefsAgg = String((act as any).normativeRefsAgg ?? "").trim();
@@ -1617,6 +1794,7 @@ export async function registerRoutes(
           dateEnd: act.dateEnd || new Date().toISOString().split("T")[0],
           qualityDocuments: formData?.qualityDocuments || "Сертификаты, паспорта качества",
           materials: formData?.materials,
+          p1Works,
 
           // эталонные поля (005_АОСР 4)
           objectFullName: formData?.objectFullName ?? objectActData.objectFullName,

@@ -217,6 +217,7 @@ export interface IStorage {
   getMessage(id: number): Promise<Message | undefined>;
   createMessage(message: InsertMessage): Promise<Message>;
   updateMessageNormalized(id: number, normalizedData: any): Promise<Message>;
+  patchMessage(id: number, data: { messageRaw?: string; normalizedData?: any }): Promise<Message | undefined>;
 
   // Acts
   getActs(): Promise<Act[]>;
@@ -1475,6 +1476,36 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async patchMessage(id: number, data: { messageRaw?: string; normalizedData?: any }): Promise<Message | undefined> {
+    const existing = await this.getMessage(id);
+    if (!existing) return undefined;
+
+    const updates: any = {};
+    
+    if (data.messageRaw !== undefined) {
+      updates.messageRaw = data.messageRaw;
+    }
+    
+    if (data.normalizedData !== undefined) {
+      // Merge with existing normalizedData
+      updates.normalizedData = {
+        ...(existing.normalizedData || {}),
+        ...data.normalizedData,
+      };
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return existing;
+    }
+
+    const [updated] = await db.update(messages)
+      .set(updates)
+      .where(eq(messages.id, id))
+      .returning();
+    
+    return updated;
+  }
+
   async getActs(): Promise<Act[]> {
     return await db.select().from(acts).orderBy(desc(acts.createdAt));
   }
@@ -1684,7 +1715,7 @@ export class DatabaseStorage implements IStorage {
           : await tx.select().from(works).orderBy(works.code);
 
       const existingTasks = await tx
-        .select({ workId: scheduleTasks.workId, orderIndex: scheduleTasks.orderIndex })
+        .select({ id: scheduleTasks.id, workId: scheduleTasks.workId, orderIndex: scheduleTasks.orderIndex, quantity: scheduleTasks.quantity })
         .from(scheduleTasks)
         .where(eq(scheduleTasks.scheduleId, scheduleId));
 
@@ -1694,12 +1725,27 @@ export class DatabaseStorage implements IStorage {
           ? -1
           : Math.max(...existingTasks.map((t) => Number(t.orderIndex ?? 0)));
 
+      // Build lookup: workId → task id (for backfill of existing tasks with quantity=NULL)
+      const existingTaskByWorkId = new Map(existingTasks.map((t) => [t.workId, t]));
+
       let nextOrderIndex = maxOrderIndex + 1;
       let created = 0;
       let skipped = 0;
 
       for (const w of worksList) {
+        const rawQty = (w as any).quantityTotal;
+        const qty = rawQty == null ? null : Number(rawQty);
+        const qtyStr = qty != null && Number.isFinite(qty) ? String(qty) : null;
+
         if (existingWorkIds.has(w.id)) {
+          // Backfill quantity/unit for existing tasks that were created without them
+          const existing = existingTaskByWorkId.get(w.id);
+          if (existing && existing.quantity == null && qtyStr != null) {
+            await tx
+              .update(scheduleTasks)
+              .set({ quantity: qtyStr as any, unit: w.unit ?? null })
+              .where(eq(scheduleTasks.id, existing.id));
+          }
           skipped++;
           continue;
         }
@@ -1708,6 +1754,8 @@ export class DatabaseStorage implements IStorage {
           scheduleId,
           workId: w.id,
           titleOverride: null,
+          quantity: qtyStr as any,
+          unit: w.unit ?? null,
           startDate: defaultStartDate,
           durationDays: defaultDurationDays,
           orderIndex: nextOrderIndex++,
@@ -1734,6 +1782,8 @@ export class DatabaseStorage implements IStorage {
         | "projectDrawings"
         | "normativeRefs"
         | "executiveSchemes"
+        | "quantity"
+        | "unit"
       >
     >
   ): Promise<ScheduleTask | undefined> {
@@ -1748,6 +1798,8 @@ export class DatabaseStorage implements IStorage {
     if ("projectDrawings" in patch) updateData.projectDrawings = patch.projectDrawings ?? null;
     if ("normativeRefs" in patch) updateData.normativeRefs = patch.normativeRefs ?? null;
     if ("executiveSchemes" in patch) updateData.executiveSchemes = (patch.executiveSchemes ?? null) as any;
+    if ("quantity" in patch) updateData.quantity = (patch.quantity != null ? String(patch.quantity) : null) as any;
+    if ("unit" in patch) updateData.unit = patch.unit ?? null;
 
     if (Object.keys(updateData).length === 0) return undefined;
 
@@ -1897,7 +1949,7 @@ export class DatabaseStorage implements IStorage {
 
       // Get existing tasks (idempotency)
       const existingTasks = await tx
-        .select({ estimatePositionId: scheduleTasks.estimatePositionId, orderIndex: scheduleTasks.orderIndex })
+        .select({ id: scheduleTasks.id, estimatePositionId: scheduleTasks.estimatePositionId, orderIndex: scheduleTasks.orderIndex, quantity: scheduleTasks.quantity })
         .from(scheduleTasks)
         .where(eq(scheduleTasks.scheduleId, scheduleId));
 
@@ -1909,12 +1961,32 @@ export class DatabaseStorage implements IStorage {
           ? -1
           : Math.max(...existingTasks.map(t => Number(t.orderIndex ?? 0)));
 
+      // Build lookup: estimatePositionId → task (for backfill of tasks with quantity=NULL)
+      const existingTaskByPositionId = new Map(
+        existingTasks
+          .filter(t => t.estimatePositionId != null)
+          .map(t => [t.estimatePositionId!, t])
+      );
+
       let nextOrderIndex = maxOrderIndex + 1;
       let created = 0;
       let skipped = 0;
 
       for (const pos of mainPositions) {
+        const rawQty = (pos as any).quantity;
+        const qty = rawQty == null ? null : Number(rawQty);
+        const qtyStr = qty != null && Number.isFinite(qty) ? String(qty) : null;
+        const unit = (pos as any).unit ?? null;
+
         if (existingPositionIds.has(pos.id)) {
+          // Backfill quantity/unit for existing tasks that were created without them
+          const existing = existingTaskByPositionId.get(pos.id);
+          if (existing && existing.quantity == null && qtyStr != null) {
+            await tx
+              .update(scheduleTasks)
+              .set({ quantity: qtyStr as any, unit })
+              .where(eq(scheduleTasks.id, existing.id));
+          }
           skipped++;
           continue;
         }
@@ -1924,6 +1996,8 @@ export class DatabaseStorage implements IStorage {
           workId: null,
           estimatePositionId: pos.id,
           titleOverride: null,
+          quantity: qtyStr as any,
+          unit,
           startDate: defaultStartDate,
           durationDays: defaultDurationDays,
           orderIndex: nextOrderIndex++,

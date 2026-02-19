@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Header } from "@/components/Header";
-import { useMessages } from "@/hooks/use-messages";
+import { useSection3 } from "@/hooks/use-section3";
+import { usePatchMessage } from "@/hooks/use-messages";
 import { useLanguageStore, translations } from "@/lib/i18n";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, FileText, RefreshCw, Construction, Pencil, Save, Search } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, FileText, RefreshCw, Construction, Pencil, Save, Search, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { queryClient } from "@/lib/queryClient";
+import { api } from "@shared/routes";
 
 function PlaceholderSection({ title, comingSoon }: { title: string; comingSoon: string }) {
   return (
@@ -47,13 +50,9 @@ export default function WorkLog() {
   const { language } = useLanguageStore();
   const t = translations[language].worklog;
   const [activeTab, setActiveTab] = useState("section3");
-  const { data: messages = [], isLoading, refetch } = useMessages();
-
-  const sortedMessages = [...messages].sort((a, b) => {
-    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return dateA - dateB;
-  });
+  const [editingSegment, setEditingSegment] = useState<{ sourceId: number; text: string; isProcessed: boolean } | null>(null);
+  const { data: rows = [], isLoading, refetch } = useSection3({ enablePolling: !editingSegment });
+  const patchMessage = usePatchMessage();
 
   const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return "";
@@ -67,28 +66,32 @@ export default function WorkLog() {
   };
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/messages'] });
+    queryClient.invalidateQueries({ queryKey: [api.worklog.section3.path] });
     refetch();
   };
 
-  const buildWorkDescription = (msg: typeof messages[0]) => {
-    const data = msg.normalizedData;
-    if (!msg.isProcessed || !data) {
-      return msg.messageRaw || "";
+  const handleSegmentClick = (sourceId: number, text: string, isProcessed: boolean, sourceType: string) => {
+    if (sourceType !== 'message') return; // Only allow editing messages
+    setEditingSegment({ sourceId, text, isProcessed });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSegment) return;
+
+    try {
+      const data = editingSegment.isProcessed
+        ? { normalizedData: { workDescription: editingSegment.text } }
+        : { messageRaw: editingSegment.text };
+
+      await patchMessage.mutateAsync({ id: editingSegment.sourceId, data });
+      setEditingSegment(null);
+    } catch (error) {
+      console.error("Failed to save edit:", error);
     }
-    
-    let description = data.workDescription || msg.messageRaw || "";
-    
-    const materials: string[] = [];
-    if (data.materials && Array.isArray(data.materials)) {
-      materials.push(...data.materials);
-    }
-    
-    if (materials.length > 0) {
-      description += ` — ${materials.join("; ")}`;
-    }
-    
-    return description;
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSegment(null);
   };
 
   return (
@@ -313,7 +316,7 @@ export default function WorkLog() {
                   <div className="flex justify-center items-center py-20">
                     <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
                   </div>
-                ) : sortedMessages.length === 0 ? (
+                ) : rows.length === 0 ? (
                   <div className="text-center py-16 opacity-60">
                     <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                       <FileText className="h-8 w-8 text-muted-foreground" />
@@ -322,77 +325,109 @@ export default function WorkLog() {
                     <p className="text-sm text-muted-foreground">{t.noRecordsHint}</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto border border-blue-400 rounded-sm">
+                  <div className="overflow-x-auto border-2 border-foreground">
                     <table className="w-full border-collapse text-sm" data-testid="worklog-table">
                       <thead>
-                        <tr className="bg-blue-50 dark:bg-blue-950/30">
-                          <th className="border border-blue-300 dark:border-blue-700 px-2 py-2 text-xs font-normal text-center align-top w-12">
+                        <tr>
+                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
                             {t.section3.rowNumber}
                           </th>
-                          <th className="border border-blue-300 dark:border-blue-700 px-2 py-2 text-xs font-normal text-center align-top w-24">
+                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-24 italic">
                             {t.section3.date}
                           </th>
-                          <th className="border border-blue-300 dark:border-blue-700 px-2 py-2 text-xs font-normal text-center align-top w-20">
+                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-20 italic">
                             {t.section3.workConditions}
                           </th>
-                          <th className="border border-blue-300 dark:border-blue-700 px-2 py-2 text-xs font-normal text-center italic">
+                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
                             {t.section3.workDescription}
                           </th>
-                          <th className="border border-blue-300 dark:border-blue-700 px-2 py-2 text-xs font-normal text-center italic w-36">
+                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic w-36">
                             {t.section3.representative}
                           </th>
                         </tr>
-                        <tr className="bg-blue-50 dark:bg-blue-950/30">
-                          <th className="border border-blue-300 dark:border-blue-700 px-1 py-1 text-xs font-normal text-center">
-                            1
-                          </th>
-                          <th className="border border-blue-300 dark:border-blue-700 px-1 py-1 text-xs font-normal text-center">
-                            2
-                          </th>
-                          <th className="border border-blue-300 dark:border-blue-700 px-1 py-1 text-xs font-normal text-center">
-                            3
-                          </th>
-                          <th className="border border-blue-300 dark:border-blue-700 px-1 py-1 text-xs font-normal text-center">
-                            4
-                          </th>
-                          <th className="border border-blue-300 dark:border-blue-700 px-1 py-1 text-xs font-normal text-center">
-                            5
-                          </th>
+                        <tr>
+                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">1</th>
+                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">2</th>
+                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">3</th>
+                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">4</th>
+                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">5</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedMessages.map((msg, idx) => {
-                          const isPending = !msg.isProcessed;
-                          const data = msg.normalizedData;
-                          return (
-                            <tr 
-                              key={msg.id} 
-                              className={cn(
-                                "hover:bg-muted/30 transition-colors",
-                                isPending && "opacity-70 bg-yellow-50/30 dark:bg-yellow-900/10"
-                              )}
-                              data-testid={`worklog-row-${msg.id}`}
-                            >
-                              <td className="border border-blue-300 dark:border-blue-700 px-2 py-3 text-center align-top">
-                                {idx + 1}
-                              </td>
-                              <td className="border border-blue-300 dark:border-blue-700 px-2 py-3 text-center align-top whitespace-nowrap">
-                                {formatDate(data?.date || msg.createdAt?.toString())}
-                              </td>
-                              <td className="border border-blue-300 dark:border-blue-700 px-2 py-3 text-center align-top">
-                                {data?.workConditions || ""}
-                              </td>
-                              <td className="border border-blue-300 dark:border-blue-700 px-3 py-3 align-top">
-                                <div className={cn(isPending && "italic text-muted-foreground")}>
-                                  {buildWorkDescription(msg)}
-                                </div>
-                              </td>
-                              <td className="border border-blue-300 dark:border-blue-700 px-2 py-3 text-center align-top">
-                                {data?.representative || ""}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {rows.map((row, idx) => (
+                          <tr
+                            key={row.date}
+                            className="hover:bg-muted/30 transition-colors"
+                            data-testid={`worklog-row-${row.date}`}
+                          >
+                            <td className="border border-foreground px-2 py-3 text-center align-top">
+                              {idx + 1}
+                            </td>
+                            <td className="border border-foreground px-2 py-3 text-center align-top whitespace-nowrap">
+                              {formatDate(row.date)}
+                            </td>
+                            <td className="border border-foreground px-2 py-3 text-center align-top">
+                              {row.workConditions}
+                            </td>
+                            <td className="border border-foreground px-3 py-3 align-top">
+                              {row.segments.map((seg, segIdx) => {
+                                const isEditing = editingSegment?.sourceId === seg.sourceId;
+                                
+                                if (isEditing) {
+                                  return (
+                                    <div key={`${seg.sourceType}-${seg.sourceId}-${segIdx}`} className="space-y-2 mb-2">
+                                      <Textarea
+                                        value={editingSegment.text}
+                                        onChange={(e) => setEditingSegment({ ...editingSegment, text: e.target.value })}
+                                        className="min-h-[60px] text-sm"
+                                        autoFocus
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button
+                                          size="sm"
+                                          onClick={handleSaveEdit}
+                                          disabled={patchMessage.isPending}
+                                          className="h-7"
+                                        >
+                                          <Check className="h-3 w-3 mr-1" />
+                                          Сохранить
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={handleCancelEdit}
+                                          disabled={patchMessage.isPending}
+                                          className="h-7"
+                                        >
+                                          <X className="h-3 w-3 mr-1" />
+                                          Отмена
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                
+                                return (
+                                  <div
+                                    key={`${seg.sourceType}-${seg.sourceId}-${segIdx}`}
+                                    className={cn(
+                                      "mb-1 last:mb-0",
+                                      seg.sourceType === 'message' &&
+                                        "text-primary/70 cursor-pointer hover:bg-primary/5 rounded px-1 py-0.5 transition-colors",
+                                      seg.isPending && "italic text-muted-foreground"
+                                    )}
+                                    onClick={() => handleSegmentClick(seg.sourceId, seg.text, !seg.isPending, seg.sourceType)}
+                                  >
+                                    {seg.text}
+                                  </div>
+                                );
+                              })}
+                            </td>
+                            <td className="border border-foreground px-2 py-3 text-center align-top">
+                              {row.representative}
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>

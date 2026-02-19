@@ -490,6 +490,10 @@ export const scheduleTasks = pgTable(
     normativeRefs: text("normative_refs"),
     executiveSchemes: jsonb("executive_schemes").$type<ExecutiveSchemeLink[]>(),
     titleOverride: text("title_override"),
+    // Independent quantity and unit — copied from source during bootstrap, editable per-task.
+    // Allows splitting a work into sub-sections (захватки) with partial volumes in the future.
+    quantity: numeric("quantity", { precision: 20, scale: 4 }),
+    unit: text("unit"),
     startDate: date("start_date").notNull(),
     durationDays: integer("duration_days").notNull(),
     orderIndex: integer("order_index").notNull(),

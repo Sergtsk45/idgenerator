@@ -184,7 +184,16 @@ export interface ActData {
 function buildRepLine(person: PersonDto | undefined): string | undefined {
   const lineText = person?.lineText?.trim();
   if (lineText) return lineText;
-  const parts = [person?.position?.trim(), person?.personName?.trim()].filter(Boolean) as string[];
+  
+  const position = person?.position?.trim();
+  const name = person?.personName?.trim();
+  const basis = person?.basisText?.trim();
+  
+  const parts: string[] = [];
+  if (position) parts.push(position);
+  if (name) parts.push(name);
+  if (basis) parts.push(basis);
+  
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
@@ -215,26 +224,21 @@ function buildOrg(party: PartyDto | undefined): string | undefined {
 
   // “Бланковый” формат (удобен для PDF): одна сущность = несколько строк.
   // Пустые поля не выводим.
-  const lines: string[] = [fullName];
+  // Компактный формат (как в образце): одна строка с запятыми-разделителями
+  const parts: string[] = [fullName];
 
-  if (ogrn) lines.push(`ОГРН: ${ogrn}`);
+  if (ogrn) parts.push(`ОГРН ${ogrn}`);
+  
+  if (inn && kpp) parts.push(`ИНН ${inn}/${kpp}`);
+  else if (inn) parts.push(`ИНН ${inn}`);
 
-  if (inn && kpp) lines.push(`ИНН/КПП: ${inn}/${kpp}`);
-  else if (inn) lines.push(`ИНН: ${inn}`);
-  else if (kpp) lines.push(`КПП: ${kpp}`);
+  if (addressLegal) parts.push(`адрес: ${addressLegal}`);
 
-  if (addressLegal) lines.push(`Адрес (место нахождения): ${addressLegal}`);
-  if (phone) lines.push(`Тел./факс: ${phone}`);
+  return parts.join(", ");
+}
 
-  if (sroFullName || sroOgrn || sroInn) {
-    const sroParts: string[] = [];
-    if (sroFullName) sroParts.push(sroFullName);
-    if (sroOgrn) sroParts.push(`ОГРН ${sroOgrn}`);
-    if (sroInn) sroParts.push(`ИНН ${sroInn}`);
-    lines.push(`СРО: ${sroParts.join(", ")}`.trim());
-  }
-
-  return lines.join("\n");
+function buildOrgShortName(party: PartyDto | undefined): string | undefined {
+  return party?.fullName?.trim() || undefined;
 }
 
 export function buildActDataFromSourceData(sourceData: SourceDataDto): Partial<ActData> {
@@ -294,7 +298,7 @@ export function buildActDataFromSourceData(sourceData: SourceDataDto): Partial<A
     repWorkPerformerOrder: buildOrder(repWorkPerformer),
     sigWorkPerformer: buildSig(repWorkPerformer),
 
-    worksPerformedByOrg: builderOrgFull,
+    worksPerformedByOrg: buildOrgShortName(sourceData.parties.builder),
   };
 }
 
@@ -302,11 +306,13 @@ function formatDate(dateStr: string): string {
   if (!dateStr) return "";
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString("ru-RU", {
+    const formatted = date.toLocaleDateString("ru-RU", {
       day: "2-digit",
-      month: "long",
+      month: "long", 
       year: "numeric",
     });
+    // Добавляем кавычки-ёлочки вокруг дня, как в образце
+    return formatted.replace(/^(\d+)/, "« $1 »");
   } catch {
     return dateStr;
   }
@@ -341,10 +347,10 @@ export async function generateAosrPdf(data: ActData): Promise<Buffer> {
         return 0;
       },
       paddingTop: function () {
-        return 2;
+        return 1;
       },
       paddingBottom: function () {
-        return 2;
+        return 1;
       },
     },
     // Подчёркивание каждой строки таблицы (линия под каждой строкой),
@@ -369,10 +375,10 @@ export async function generateAosrPdf(data: ActData): Promise<Buffer> {
         return 0;
       },
       paddingTop: function () {
-        return 2;
+        return 1;
       },
       paddingBottom: function () {
-        return 2;
+        return 1;
       },
     },
   };

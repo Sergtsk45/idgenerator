@@ -1,5 +1,49 @@
 # Changelog
 
+## [2026-02-19] - Раздел 3: inline-редактирование сегментов сообщений
+
+### Добавлено
+- `PATCH /api/messages/:id` — API для редактирования сообщений (обновление `messageRaw` и/или `normalizedData`)
+- `server/storage.ts`: метод `patchMessage(id, data)` — частичное обновление сообщения с merge `normalizedData`
+- `client/src/hooks/use-messages.ts`: хук `usePatchMessage()` для редактирования сообщений
+- `client/src/pages/WorkLog.tsx`: inline-редактирование сегментов с `sourceType: 'message'` — клик по сегменту открывает textarea с кнопками «Сохранить»/«Отмена»
+- `client/src/hooks/use-section3.ts`: параметр `enablePolling` для управления автообновлением (отключается на время редактирования)
+
+### Изменено
+- Сегменты из сообщений теперь кликабельны и редактируемые (hover-эффект, курсор pointer)
+- При редактировании polling отключается автоматически, возобновляется после сохранения/отмены
+- Для обработанных сообщений (`isProcessed: true`) редактируется `normalizedData.workDescription`, для pending — `messageRaw`
+- `client/src/pages/WorkLog.tsx`: оформление таблицы **раздела 3** приведено к единому стилю “печатных” разделов (как в разделе 2) — убраны синие границы/заливки, унифицированы рамки и курсивные заголовки
+
+---
+
+## [2026-02-19] - Раздел 3: группировка по датам (segments)
+
+### Изменено
+- Раздел 3 теперь показывает **одну строку на дату**: все работы из актов и сообщений за дату объединяются в одну ячейку списком сегментов
+- `shared/routes.ts`: `section3RowSchema` переработан — вместо `workDescription` (строка) добавлен `segments[]` с типом `WorkSegment` (`text`, `sourceType`, `sourceId`, `isPending`)
+- `server/routes.ts`: эндпоинт `/api/worklog/section3` теперь группирует записи по дате в `Map`; акты добавляются первыми, messages — следом
+- `client/src/pages/WorkLog.tsx`: ячейка «Наименование работ» рендерит каждый сегмент отдельным `<div>`, сегменты из messages — приглушённый голубой цвет, pending — курсив
+
+---
+
+## [2026-02-19] - Раздел 3: два источника данных
+
+### Добавлено
+- Эндпоинт `GET /api/worklog/section3` — объединяет messages и acts (АОСР)
+- Акты разворачиваются в строки: **одна строка на дату**, все работы акта объединяются через точку с запятой
+- Строки из messages визуально светлее (редактируемые, `bg-blue-50/20`)
+- Строки из актов — стандартный фон (readonly, редактируются через график)
+- `shared/routes.ts`: схема `section3RowSchema` и тип `Section3Row`
+- `server/routes.ts`: утилита `eachDayInRange(start, end)` для генерации дат
+- `client/src/hooks/use-section3.ts`: хук для загрузки данных раздела 3
+
+### Изменено
+- `client/src/pages/WorkLog.tsx`: переключён с `useMessages()` на `useSection3()`, обновлена стилизация строк таблицы
+- `server/routes.ts` (generate-acts): `dateEnd` теперь включительная — при продолжительности 1 день `dateEnd = dateStart`
+
+---
+
 ## [2026-02-18] - Вкладка «Акты»: скачивание без модального окна
 
 ### Изменено

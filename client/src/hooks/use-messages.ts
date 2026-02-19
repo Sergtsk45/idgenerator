@@ -58,3 +58,29 @@ export function useProcessMessage() {
     },
   });
 }
+
+export function usePatchMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { messageRaw?: string; normalizedData?: any } }) => {
+      const url = buildUrl(api.messages.patch.path, { id });
+      const res = await fetch(url, {
+        method: api.messages.patch.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to patch message");
+      }
+      
+      return api.messages.patch.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.messages.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.worklog.section3.path] });
+    },
+  });
+}

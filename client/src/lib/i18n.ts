@@ -141,7 +141,10 @@ export const translations = {
       title: 'Settings',
       language: 'Language',
       en: 'English',
-      ru: 'Russian'
+      ru: 'Russian',
+      worklog: 'Work Log',
+      showWorkVolumes: 'Show work volumes in journal and acts',
+      showWorkVolumesHint: 'Quantity and unit (e.g. "12.5 m²") will be shown next to each work item in section 3'
     },
     schedule: {
       title: 'Work Schedule',
@@ -334,7 +337,10 @@ export const translations = {
       title: 'Настройки',
       language: 'Язык',
       en: 'English (En)',
-      ru: 'Русский (Ru)'
+      ru: 'Русский (Ru)',
+      worklog: 'Журнал работ',
+      showWorkVolumes: 'Показывать объёмы работ в журнале и актах',
+      showWorkVolumesHint: 'Количество и единица измерения (напр. «12,5 м²») будут отображаться рядом с каждой позицией в разделе 3'
     },
     schedule: {
       title: 'График работ',

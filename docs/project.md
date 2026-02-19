@@ -129,7 +129,7 @@ flowchart LR
 - **Act document attachments**: `GET /api/acts/:id/document-attachments`, `PUT /api/acts/:id/document-attachments`
 - **Works**: `GET /api/works`, `POST /api/works`
 - **Estimates (Смета/ЛСР)**: `GET /api/estimates`, `GET /api/estimates/:id`, `POST /api/estimates/import`, `DELETE /api/estimates/:id` (опц. `?resetSchedule=1` — сбросить график/акты, если смета используется как источник графика)
-- **Messages**: `GET /api/messages`, `POST /api/messages`
+- **Messages**: `GET /api/messages`, `POST /api/messages`, `PATCH /api/messages/:id`, `POST /api/messages/:id/process`
 - **Acts**: `GET /api/acts`, `GET /api/acts/:id`, `POST /api/acts/:id/export`
   - `POST /api/acts/generate` и `POST /api/acts/create-with-templates` — **устарели** (410), создание актов только из графика работ
 - **Act Templates**: `GET /api/act-templates`

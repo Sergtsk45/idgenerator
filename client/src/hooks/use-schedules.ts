@@ -84,6 +84,8 @@ export function usePatchScheduleTask() {
         projectDrawings?: string | null;
         normativeRefs?: string | null;
         executiveSchemes?: Array<{ title: string; fileUrl?: string }> | null;
+        quantity?: number | null;
+        unit?: string | null;
         updateAllTasks?: boolean;
       };
       scheduleId?: number;
