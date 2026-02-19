@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-02-20] - Bootstrap-миграция для пустой БД
+
+### Добавлено
+- `migrations/0000_initial_schema.sql` — начальная миграция, создающая все базовые таблицы, которые ранее существовали только через `drizzle-kit push`: `works`, `act_templates`, `messages`, `acts`, `attachments`, `act_template_selections`, `schedules`, `schedule_tasks`. Теперь `npm run db:migrate` на чистой БД проходит полностью без ошибок.
+
+---
+
 ## [2026-02-19] - Исправление парсинга позиций со звёздочкой в ГРАНД-Смете
 
 ### Исправлено
