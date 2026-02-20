@@ -98,7 +98,7 @@ function isMainEstimatePosition(position: { code?: string | null }): boolean {
 
 export interface IStorage {
   // Objects / Source data (MVP: single default object)
-  getOrCreateDefaultObject(): Promise<DbObject>;
+  getOrCreateDefaultObject(telegramUserId?: number): Promise<DbObject>;
   getObject(id: number): Promise<DbObject | undefined>;
   updateObject(id: number, patch: Partial<Pick<InsertObject, "title" | "address" | "city">>): Promise<DbObject>;
   getObjectSourceData(objectId: number): Promise<SourceDataDto>;
@@ -342,11 +342,27 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  async getOrCreateDefaultObject(): Promise<DbObject> {
-    // MVP: single "current" object.
+  async getOrCreateDefaultObject(telegramUserId?: number): Promise<DbObject> {
+    // MVP: single "current" object per user (if telegramUserId provided).
     // IMPORTANT: do NOT rely on title to find the current object,
     // because title is user-editable via source-data and would lead to duplicates.
-    const all = await db.select().from(objects);
+    
+    // Если передан telegramUserId, ищем объект для этого пользователя
+    let all: DbObject[];
+    if (telegramUserId !== undefined) {
+      all = await db
+        .select()
+        .from(objects)
+        .where(eq(objects.telegramUserId, telegramUserId));
+    } else {
+      // Для обратной совместимости: если telegramUserId не передан,
+      // ищем объекты без привязки к пользователю (legacy)
+      all = await db
+        .select()
+        .from(objects)
+        .where(sql`${objects.telegramUserId} IS NULL`);
+    }
+    
     if (all.length === 1) return all[0];
     if (all.length > 1) {
       // If duplicates exist (legacy bug), pick the object that was most recently
@@ -394,7 +410,12 @@ export class DatabaseStorage implements IStorage {
     const defaultTitle = "Объект по умолчанию";
     const [created] = await db
       .insert(objects)
-      .values({ title: defaultTitle, address: null, city: null })
+      .values({ 
+        title: defaultTitle, 
+        address: null, 
+        city: null,
+        telegramUserId: telegramUserId ?? null
+      })
       .returning();
     return created;
   }

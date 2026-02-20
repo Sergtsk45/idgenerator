@@ -25,6 +25,7 @@ export const objects = pgTable("objects", {
   title: text("title").notNull(), // e.g. "ЖК Северный, корпус 2"
   address: text("address"),
   city: text("city"),
+  telegramUserId: bigint("telegram_user_id", { mode: "number" }), // Telegram user ID (owner)
   createdAt: timestamp("created_at").defaultNow(),
 });
 

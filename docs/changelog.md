@@ -1,5 +1,68 @@
 # Changelog
 
+## [2026-02-20] - Telegram MiniApp: Серверная валидация и привязка к userId
+
+### Добавлено
+- **Middleware для валидации Telegram initData**: `server/middleware/telegramAuth.ts`
+  - Проверка подписи HMAC-SHA-256 с использованием Bot Token
+  - Извлечение данных пользователя из initData
+  - Добавление `req.telegramUser` и `req.telegramInitData` в Express Request
+  - Поддержка опциональной аутентификации в dev-режиме
+  - Утилита `createMockInitData()` для генерации тестовых данных
+- **Поле `telegramUserId` в таблице `objects`**: миграция `0012_add_telegram_user_id.sql`
+  - Привязка объектов строительства к пользователям Telegram
+  - Индекс для быстрого поиска по `telegram_user_id`
+- **Клиентская интеграция для передачи initData**:
+  - `client/src/lib/telegram.ts` — утилиты для работы с Telegram WebApp
+  - Обновлён `client/src/lib/queryClient.ts` — автоматическое добавление заголовка `X-Telegram-Init-Data` ко всем API-запросам
+- **Документация и инструменты для тестирования**:
+  - `docs/telegram-auth-testing.md` — руководство по тестированию аутентификации
+  - `scripts/generate-mock-initdata.js` — скрипт для генерации mock initData с валидной подписью
+- **Обновлён storage layer**: метод `getOrCreateDefaultObject()` поддерживает фильтрацию по `telegramUserId`
+
+### Изменено
+- `server/routes.ts` — добавлен middleware `telegramAuth` к защищённым эндпоинтам
+- `shared/schema.ts` — добавлено поле `telegramUserId` в таблицу `objects`
+- Задача «Интеграция Telegram MiniApp» в `docs/tasktracker.md` — шаги 6-7 завершены
+
+### Безопасность
+- Серверная валидация initData защищает от подделки данных пользователя
+- В production режиме все защищённые эндпоинты требуют валидный initData
+- В dev-режиме аутентификация опциональна для удобства разработки
+
+---
+
+## [2026-02-20] - Telegram MiniApp: Бот, нативные кнопки и Haptic Feedback
+
+### Добавлено
+- **Документация по созданию Telegram-бота**: `docs/telegram-bot-setup.md` — пошаговая инструкция по созданию бота через @BotFather, настройке Web App URL и получению Bot Token
+- **Переменная окружения `TELEGRAM_BOT_TOKEN`**: добавлена в `.env` с подробными комментариями для серверной валидации initData
+- **Хуки для нативных кнопок Telegram**:
+  - `client/src/hooks/use-telegram-main-button.ts` — управление MainButton (главная кнопка действия)
+  - `client/src/hooks/use-telegram-back-button.ts` — управление BackButton (кнопка "Назад")
+  - Документация: `docs/telegram-buttons-guide.md` с примерами использования и best practices
+- **Хук для тактильной обратной связи**: `client/src/hooks/use-telegram-haptic.ts` — интеграция HapticFeedback API для улучшения UX
+  - Поддержка impact (light/medium/heavy/rigid/soft)
+  - Поддержка notification (success/error/warning)
+  - Поддержка selectionChanged для навигации
+  - Утилита `haptic` для использования вне React компонентов
+  - Документация: `docs/telegram-haptic-guide.md` с матрицей использования и примерами
+- **Обновлена документация проекта**: `docs/project.md` — добавлена информация о новых возможностях Telegram MiniApp
+
+### Изменено
+- Задача «Интеграция Telegram MiniApp» в `docs/tasktracker.md` — шаги 8-10 завершены, задача помечена как "Завершена"
+
+---
+
+## [2026-02-20] - Подключение Telegram WebApp SDK
+
+### Добавлено
+- Telegram WebApp SDK (`telegram-web-app.js`) подключён в `client/index.html`
+- Инициализация `WebApp.ready()` и `WebApp.expand()` в `client/src/main.tsx` — приложение сообщает Telegram о готовности и разворачивается на полный экран
+- Задача «Интеграция Telegram MiniApp» с 10 этапами добавлена в `docs/tasktracker.md`
+
+---
+
 ## [2026-02-20] - Безопасный workflow генерации миграций (db:generate только dev)
 
 ### Добавлено
@@ -902,6 +965,41 @@
 
 ### Исправлено
 - Убрано безусловное сидирование при старте сервера
+
+---
+
+## [2026-02-20] - Интеграция Telegram MiniApp: Применение темы Telegram к UI
+### Добавлено
+- `client/src/components/TelegramThemeProvider.tsx` — провайдер для автоматического применения темы Telegram к приложению
+  - Автоматически устанавливает CSS-переменные Telegram (`--tg-theme-bg-color`, `--tg-theme-text-color`, `--tg-theme-button-color` и др.)
+  - Автоматически переключает класс `dark`/`light` на основе `colorScheme` из Telegram
+  - Реагирует на изменения темы в реальном времени
+- Утилитарные CSS-классы для работы с темой Telegram: `.tg-bg`, `.tg-text`, `.tg-hint`, `.tg-link`, `.tg-button`, `.tg-secondary-bg`, `.tg-accent`, `.tg-destructive`
+
+### Изменено
+- `client/src/index.css` — добавлены CSS-переменные Telegram с дефолтными значениями
+- `client/src/index.css` — обновлены базовые стили для использования переменных Telegram (`body`, `h1-h6`, `a`, `button`)
+- `client/src/App.tsx` — интегрирован `TelegramThemeProvider` в дерево компонентов
+
+### Исправлено
+- Нет
+
+---
+
+## [2026-02-20] - Интеграция Telegram MiniApp: TypeScript типы и хук useTelegram
+### Добавлено
+- `client/src/types/telegram.d.ts` — полные TypeScript типы для Telegram WebApp API (TelegramWebApp, TelegramWebAppUser, TelegramWebAppThemeParams, MainButton, BackButton, HapticFeedback и др.)
+- `client/src/hooks/useTelegram.ts` — React хук для работы с Telegram WebApp API
+  - Предоставляет доступ к WebApp, user, initData, themeParams, colorScheme
+  - Обрабатывает случай запуска вне Telegram (mock данные для разработки)
+  - Дополнительные хелперы: `useTelegramUser()`, `useTelegramTheme()`
+  - Автоматическая подписка на события изменения темы и viewport
+
+### Изменено
+- Нет
+
+### Исправлено
+- Нет
 
 ---
 

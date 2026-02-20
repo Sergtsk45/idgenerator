@@ -927,3 +927,30 @@ server/fonts/TimesNewRoman.ttf
 server/fonts/TimesNewRomanBold.ttf
 server/fonts/TimesNewRomanItalic.ttf
 server/fonts/TimesNewRomanBoldItalic.ttf
+
+---
+
+## Задача: Интеграция Telegram MiniApp (WebApp)
+- **Статус**: Завершена
+- **Описание**: Довести проект до состояния полноценного Telegram MiniApp — от подключения SDK до серверной валидации и создания бота. Без этого приложение работает как обычный SPA без привязки к Telegram.
+- **Шаги выполнения**:
+  - [x] **Шаг 1. Подключить Telegram WebApp SDK** — добавить `<script src="https://telegram.org/js/telegram-web-app.js">` в `client/index.html` перед `main.tsx`
+  - [x] **Шаг 2. Инициализация WebApp в main.tsx** — вызвать `Telegram.WebApp.ready()` и `expand()` при старте приложения
+  - [x] **Шаг 3. TypeScript-типы для Telegram WebApp** — создан файл `client/src/types/telegram.d.ts` с полными типами для Telegram WebApp API (TelegramWebApp, TelegramWebAppUser, TelegramWebAppThemeParams, MainButton, BackButton, HapticFeedback, InitData и др.)
+  - [x] **Шаг 4. Хук useTelegram()** — создан React-хук `client/src/hooks/useTelegram.ts` с доступом к WebApp, user, initData, themeParams, colorScheme. Включает обработку запуска вне Telegram (mock данные для разработки) и дополнительные хелперы `useTelegramUser()`, `useTelegramTheme()`
+  - [x] **Шаг 5. Применить тему Telegram к UI** — создан компонент `TelegramThemeProvider` для автоматического применения темы Telegram. Добавлены CSS-переменные Telegram (`--tg-theme-bg-color`, `--tg-theme-text-color`, `--tg-theme-button-color` и др.) в `index.css`. Реализована поддержка автоматического переключения между светлой и темной темой на основе `colorScheme`. Добавлены утилитарные классы (`.tg-bg`, `.tg-text`, `.tg-button` и др.) для удобного использования темы Telegram в компонентах
+  - [x] **Шаг 6. Серверная валидация initData** — создан middleware `server/middleware/telegramAuth.ts` для проверки подписи HMAC-SHA-256 с Bot Token; добавлена поддержка `req.telegramUser` и `req.telegramInitData`; утилита `createMockInitData()` для тестирования; документация `docs/telegram-auth-testing.md`; скрипт `scripts/generate-mock-initdata.js` для генерации mock данных
+  - [x] **Шаг 7. Привязка данных к Telegram userId** — добавлено поле `telegramUserId` в таблицу `objects` (миграция `0012_add_telegram_user_id.sql`); обновлён `storage.getOrCreateDefaultObject()` для фильтрации по userId; клиент передаёт `initData` через заголовок `X-Telegram-Init-Data` (обновлён `client/src/lib/queryClient.ts`); создана утилита `client/src/lib/telegram.ts` для работы с Telegram WebApp
+  - [x] **Шаг 8. Создать Telegram-бота** — создана подробная инструкция `docs/telegram-bot-setup.md` по созданию бота через @BotFather, настройке Web App URL (`/setmenubutton`), добавлен `TELEGRAM_BOT_TOKEN` в `.env` с комментариями. Инструкция включает примеры настройки menu button, inline button, дополнительные настройки бота (описание, команды, аватар) и раздел по безопасности
+  - [x] **Шаг 9. (Опционально) Telegram MainButton / BackButton** — созданы React-хуки для работы с нативными кнопками Telegram:
+    - `client/src/hooks/use-telegram-main-button.ts` — управление MainButton (текст, цвет, состояние, прогресс)
+    - `client/src/hooks/use-telegram-back-button.ts` — управление BackButton (показать/скрыть)
+    - Документация `docs/telegram-buttons-guide.md` с API хуков, примерами использования (формы, навигация, модальные окна) и best practices
+  - [x] **Шаг 10. (Опционально) HapticFeedback** — создан хук `client/src/hooks/use-telegram-haptic.ts` для тактильной обратной связи:
+    - Поддержка `impact` (light/medium/heavy/rigid/soft) для физических действий
+    - Поддержка `notification` (success/error/warning) для результатов операций
+    - Поддержка `selectionChanged` для навигации и выбора
+    - Утилита `haptic` для использования вне React компонентов
+    - Документация `docs/telegram-haptic-guide.md` с матрицей использования, примерами по сценариям и best practices
+- **Зависимости**: нет (шаги 6–8 зависят от наличия Bot Token)
+- **Примечание**: Шаги 6-7 (серверная валидация и привязка к userId) остаются для будущей реализации при необходимости многопользовательского режима

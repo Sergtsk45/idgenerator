@@ -1,10 +1,30 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getTelegramInitData } from "./telegram";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
+}
+
+/**
+ * Создаёт заголовки для API-запросов, включая Telegram initData
+ */
+function createHeaders(includeContentType: boolean): HeadersInit {
+  const headers: HeadersInit = {};
+  
+  if (includeContentType) {
+    headers["Content-Type"] = "application/json";
+  }
+  
+  // Добавляем Telegram initData, если доступен
+  const initData = getTelegramInitData();
+  if (initData) {
+    headers["X-Telegram-Init-Data"] = initData;
+  }
+  
+  return headers;
 }
 
 export async function apiRequest(
@@ -14,7 +34,7 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: createHeaders(!!data),
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -30,6 +50,7 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
+      headers: createHeaders(false),
       credentials: "include",
     });
 

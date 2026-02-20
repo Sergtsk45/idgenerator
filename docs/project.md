@@ -29,6 +29,21 @@
 
 ### Компоненты
 - **Frontend**: React + TypeScript, маршрутизация через Wouter, server-state через TanStack Query, локальное состояние (язык) через Zustand, UI на Tailwind + shadcn/ui, анимации Framer Motion.
+- **Telegram MiniApp**: Полная интеграция с Telegram WebApp API:
+  - **SDK**: `telegram-web-app.js` подключен в `index.html`, инициализация через `WebApp.ready()` и `WebApp.expand()`
+  - **TypeScript типы**: `client/src/types/telegram.d.ts` — полные типы для Telegram WebApp API
+  - **Аутентификация**: 
+    - Серверная валидация `initData` через middleware `server/middleware/telegramAuth.ts` (HMAC-SHA-256 с Bot Token)
+    - Клиент автоматически передаёт `initData` в заголовке `X-Telegram-Init-Data` (см. `client/src/lib/queryClient.ts`)
+    - Данные пользователя привязываются к `telegramUserId` в таблице `objects`
+    - Документация: `docs/telegram-auth-testing.md`, скрипт для тестирования: `scripts/generate-mock-initdata.js`
+  - **Хуки**: 
+    - `useTelegram()` — доступ к WebApp, user, initData, themeParams, colorScheme
+    - `useTelegramMainButton()` — управление главной кнопкой действия (см. `docs/telegram-buttons-guide.md`)
+    - `useTelegramBackButton()` — управление кнопкой "Назад"
+    - `useTelegramHaptic()` — тактильная обратная связь (impact/notification/selectionChanged, см. `docs/telegram-haptic-guide.md`)
+  - **Тема**: `TelegramThemeProvider` автоматически применяет тему Telegram, CSS-переменные (`--tg-theme-*`)
+  - **Бот**: Инструкция по созданию и настройке бота в `docs/telegram-bot-setup.md`
 - **Backend**: Express + TypeScript. REST API с типами/валидацией на базе `shared/routes.ts` (Zod).
 - **База данных**: PostgreSQL + Drizzle ORM. Схема описана в `shared/schema.ts`.
 - **AI**: OpenAI API (через переменные окружения интеграции), используется для нормализации сообщений.
@@ -89,7 +104,7 @@ flowchart LR
 
 ## Модель данных (текущее состояние)
 Основные таблицы:
-- `objects`: объект строительства (MVP: один «текущий объект»), используется как якорь для исходных данных плейсхолдеров.
+- `objects`: объект строительства (MVP: один «текущий объект» на пользователя), используется как якорь для исходных данных плейсхолдеров. Содержит поле `telegramUserId` для привязки к пользователю Telegram.
 - `object_parties`: стороны объекта (заказчик/подрядчик/проектировщик) с реквизитами (минимум — `fullName`, дополнительно — ИНН/КПП/ОГРН, юр.адрес, телефон, email, реквизиты СРО). Эти данные используются при экспорте АОСР в PDF (если не переопределены через `formData`).
 - `object_responsible_persons`: ответственные лица/подписанты по ролям (ФИО/должность/основание + опционально line/sign).
 - `materials_catalog`: глобальный справочник материалов (наименование, ГОСТ/ТУ, ед. изм., параметры).
@@ -161,6 +176,8 @@ flowchart LR
 - **AI**
   - `AI_INTEGRATIONS_OPENAI_API_KEY`
   - `AI_INTEGRATIONS_OPENAI_BASE_URL`
+- **Telegram**
+  - `TELEGRAM_BOT_TOKEN` — токен бота для валидации initData (обязателен в production, опционален в dev).
 - **Server**
   - `PORT` — порт HTTP (по умолчанию 5000).
   - `ENABLE_DEMO_SEED=true` — (только dev) включить сидирование демо-работ в пустую БД. В production игнорируется.
@@ -186,5 +203,8 @@ flowchart LR
 - AI-нормализация сообщений выполняется синхронно в обработчике `POST /api/messages` (с попыткой вернуть уже обновлённую запись).
 - Контракт API и реализация должны оставаться синхронизированными (пример: `messages/:id/process`, `works/import`).
 
-## Связанный документ
+## Связанные документы
 - `/docs/improvements.md` — перечень улучшений и расширений (приоритеты и идеи).
+- `/docs/telegram-bot-setup.md` — пошаговая инструкция по созданию и настройке Telegram-бота.
+- `/docs/telegram-buttons-guide.md` — руководство по использованию нативных кнопок Telegram (MainButton, BackButton).
+- `/docs/telegram-haptic-guide.md` — руководство по использованию тактильной обратной связи (HapticFeedback).

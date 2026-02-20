@@ -14,6 +14,7 @@ import {
 } from "./pdfGenerator";
 import * as fs from "fs";
 import * as path from "path";
+import { telegramAuthMiddleware } from "./middleware/telegramAuth";
 
 function addDaysISO(dateStr: string, days: number): string {
   // Expect YYYY-MM-DD. Work in UTC to avoid timezone shifts.
@@ -89,9 +90,14 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // Telegram Auth Middleware (опционально в dev, обязательно в prod)
+  const telegramAuth = telegramAuthMiddleware({ 
+    required: process.env.NODE_ENV === 'production' 
+  });
+  
   // Object (MVP: single current object)
-  app.get(api.object.current.path, async (_req, res) => {
-    const obj = await storage.getOrCreateDefaultObject();
+  app.get(api.object.current.path, telegramAuth, async (req, res) => {
+    const obj = await storage.getOrCreateDefaultObject(req.telegramUser?.id);
     return res.status(200).json(obj);
   });
 
