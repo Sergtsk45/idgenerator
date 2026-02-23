@@ -1,8 +1,15 @@
 # Changelog
 
+## [2026-02-23] - WorkLog: удалён плавающий FAB «+»
+### Удалено
+- `client/src/pages/WorkLog.tsx`: убрана круглая плавающая кнопка «+» (FAB) на вкладке «Разд. 3», чтобы не дублировать CTA «Добавить новую запись»
+
 ## [2026-02-23] - UI: белый текст на primary/filled кнопках
 ### Исправлено
 - `client/src/components/ui/button.tsx`: для `variant="default"` закреплён `text-white`, чтобы текст на залитых primary-кнопках не сливался с фоном в темах Telegram
+- `client/src/index.css`: убрана глобальная стилизация всех `<button>` под Telegram-тему (она ломала pill/табы и делала текст на некоторых кнопках нечитабельным)
+- `client/src/pages/Works.tsx`, `client/src/pages/Schedule.tsx`: проблемные pill/табы переведены на общий `Button` (filled/active состояния теперь с белым текстом)
+- `client/src/pages/Works.tsx`: вкладки «Ведомость (ВОР) / Смета (ЛС)» оформлены в стиле outline с синей рамкой
 
 ## [2026-02-23] - Admin Panel — Панель администратора
 

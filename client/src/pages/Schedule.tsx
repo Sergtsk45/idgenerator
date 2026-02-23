@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -754,18 +754,20 @@ export default function Schedule() {
                       "without-act": { ru: "Без акта", en: "No act" },
                     };
                     return (
-                      <button
+                      <Button
                         key={f}
+                        type="button"
+                        variant={taskFilter === f ? "default" : "ghost"}
                         onClick={() => setTaskFilter(f)}
                         className={cn(
-                          "px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all",
+                          "h-6 min-h-0 px-2.5 py-0 rounded-full text-[11px] font-medium transition-all",
                           taskFilter === f
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
+                            ? "shadow-sm border-0"
+                            : "bg-transparent text-muted-foreground hover:bg-background/60 hover:text-foreground"
                         )}
                       >
                         {language === "ru" ? labels[f].ru : labels[f].en}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -1003,7 +1005,10 @@ export default function Schedule() {
                           <button
                             key={task.id}
                             type="button"
-                            className="absolute h-6 rounded-md bg-primary/80 hover:bg-primary text-primary-foreground text-[10px] px-2 truncate"
+                            className={cn(
+                              buttonVariants({ variant: "default", size: "sm" }),
+                              "absolute h-6 min-h-0 px-2 py-0 rounded-md border-0 bg-primary/80 hover:bg-primary text-[10px] leading-none truncate"
+                            )}
                             style={{ left, top, width }}
                             onClick={() => openEdit(task)}
                             title={[

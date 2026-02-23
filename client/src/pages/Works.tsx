@@ -305,29 +305,33 @@ export default function Works() {
       {/* Sticky toolbar */}
       <div className="sticky top-14 z-30 bg-background/95 backdrop-blur border-b border-border/40 px-4 py-3 space-y-3">
         {/* Segmented control */}
-        <div className="flex bg-muted rounded-xl p-1 gap-1">
-          <button
+        <div className="flex rounded-xl gap-2">
+          <Button
+            type="button"
+            variant="outline"
             className={cn(
-              "flex-1 py-2 text-[13px] font-medium rounded-lg transition-colors",
+              "flex-1 h-10 px-3 text-[13px] font-medium rounded-xl transition-colors",
               tab === "works"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground"
+                ? "bg-primary/10 text-primary border-primary/60 hover:bg-primary/15"
+                : "bg-transparent text-primary/80 border-primary/30 hover:bg-primary/5 hover:border-primary/50 hover:text-primary"
             )}
             onClick={() => setTab("works")}
           >
             {language === "ru" ? "Ведомость (ВОР)" : "BoQ"}
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             className={cn(
-              "flex-1 py-2 text-[13px] font-medium rounded-lg transition-colors",
+              "flex-1 h-10 px-3 text-[13px] font-medium rounded-xl transition-colors",
               tab === "estimate"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground"
+                ? "bg-primary/10 text-primary border-primary/60 hover:bg-primary/15"
+                : "bg-transparent text-primary/80 border-primary/30 hover:bg-primary/5 hover:border-primary/50 hover:text-primary"
             )}
             onClick={() => setTab("estimate")}
           >
             {language === "ru" ? "Смета (ЛС)" : "Estimate"}
-          </button>
+          </Button>
         </div>
 
         {tab === "works" ? (

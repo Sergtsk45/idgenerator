@@ -642,21 +642,6 @@ export default function WorkLog() {
         )}
       </div>
 
-      {/* FAB (только для Раздела 3) */}
-      {activeTab === "section3" && (
-        <div className="fixed bottom-20 right-4 z-40">
-          <button
-            type="button"
-            className="w-14 h-14 rounded-full bg-primary shadow-xl flex items-center justify-center"
-            onClick={() => {
-              /* TODO: открыть диалог добавления записи */
-            }}
-          >
-            <Plus className="h-6 w-6 text-white" />
-          </button>
-        </div>
-      )}
-
       <BottomNav />
     </div>
   );
