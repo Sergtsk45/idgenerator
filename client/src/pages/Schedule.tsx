@@ -32,7 +32,6 @@ import {
   usePatchScheduleTask, 
   useSchedule,
   useScheduleSourceInfo,
-  useGenerateActsFromSchedule
 } from "@/hooks/use-schedules";
 import { useActTemplates } from "@/hooks/use-act-templates";
 import { useReplaceTaskMaterials, useTaskMaterials } from "@/hooks/use-task-materials";
@@ -45,7 +44,7 @@ import {
   type TaskMaterialEditorItem,
 } from "@/components/schedule/TaskMaterialsEditor";
 import type { ScheduleTask, Work } from "@shared/schema";
-import { Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, RotateCcw, AlertTriangle, ChevronsUpDown, Check, SlidersHorizontal, Filter, MoreVertical } from "lucide-react";
+import { Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, RotateCcw, AlertTriangle, ChevronsUpDown, Check, Filter, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
@@ -70,7 +69,6 @@ export default function Schedule() {
   const bootstrapFromWorks = useBootstrapScheduleFromWorks(scheduleId);
   const bootstrapFromEstimate = useBootstrapScheduleFromEstimate(scheduleId);
   const changeSource = useChangeScheduleSource(scheduleId);
-  const generateActs = useGenerateActsFromSchedule(scheduleId);
   const { data: sourceInfo } = useScheduleSourceInfo(scheduleId);
   const patchTask = usePatchScheduleTask();
 
@@ -487,24 +485,6 @@ export default function Schedule() {
     );
   };
 
-  const handleGenerateActs = async () => {
-    try {
-      const result = await generateActs.mutateAsync();
-      toast({
-        title: language === "ru" ? "Акты сформированы" : "Acts generated",
-        description: language === "ru"
-          ? `Создано: ${result.created}, обновлено: ${result.updated}, удалено: ${result.deletedActNumbers?.length ?? 0}. Предупреждений: ${result.warnings?.length ?? 0}`
-          : `Created: ${result.created}, updated: ${result.updated}, deleted: ${result.deletedActNumbers?.length ?? 0}. Warnings: ${result.warnings?.length ?? 0}`,
-      });
-    } catch (err: any) {
-      toast({
-        title: t.errorTitle,
-        description: err?.message || "Failed to generate acts",
-        variant: "destructive",
-      });
-    }
-  };
-
   const shiftTask = async (task: ScheduleTask, deltaDays: number) => {
     try {
       const current = parseISO(String(task.startDate));
@@ -686,25 +666,6 @@ export default function Schedule() {
                   <span className="text-[13px]">{language === "ru" ? "Обновить" : "Refresh"}</span>
                 </Button>
               </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                className="flex-1 h-12 rounded-xl text-[15px] font-medium"
-                onClick={handleGenerateActs}
-                disabled={generateActs.isPending || tasks.length === 0}
-              >
-                {generateActs.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {language === "ru" ? "Сформировать акты" : "Generate acts"}
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-11 w-11 rounded-xl border-border/60 shrink-0"
-                disabled
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
