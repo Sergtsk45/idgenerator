@@ -1144,11 +1144,15 @@ export default function Schedule() {
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">{language === "ru" ? "Номер акта" : "Act number"}</label>
                   <Input
-                    type="number"
-                    min={1}
-                    step={1}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={editActNumber}
-                    onChange={(e) => setEditActNumber(e.target.value)}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const digitsOnly = raw.replace(/[^\d]/g, "");
+                      setEditActNumber(digitsOnly);
+                    }}
                     placeholder={language === "ru" ? "Напр.: 5" : "e.g. 5"}
                   />
                 </div>
