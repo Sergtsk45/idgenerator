@@ -59,6 +59,25 @@ export function useProcessMessage() {
   });
 }
 
+export function useClearMessages() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch(api.messages.list.path, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok && res.status !== 204) {
+        throw new Error("Failed to clear messages");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.messages.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.worklog.section3.path] });
+    },
+  });
+}
+
 export function usePatchMessage() {
   const queryClient = useQueryClient();
   return useMutation({

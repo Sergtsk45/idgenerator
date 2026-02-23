@@ -213,11 +213,12 @@ export interface IStorage {
   deleteEstimate(id: number, options?: { resetScheduleIfInUse?: boolean }): Promise<boolean>;
 
   // Messages
-  getMessages(): Promise<Message[]>;
+  getMessages(userId?: string): Promise<Message[]>;
   getMessage(id: number): Promise<Message | undefined>;
   createMessage(message: InsertMessage): Promise<Message>;
   updateMessageNormalized(id: number, normalizedData: any): Promise<Message>;
   patchMessage(id: number, data: { messageRaw?: string; normalizedData?: any }): Promise<Message | undefined>;
+  clearMessages(userId?: string): Promise<void>;
 
   // Acts
   getActs(): Promise<Act[]>;
@@ -1472,7 +1473,12 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getMessages(): Promise<Message[]> {
+  async getMessages(userId?: string): Promise<Message[]> {
+    if (userId) {
+      return await db.select().from(messages)
+        .where(eq(messages.userId, userId))
+        .orderBy(desc(messages.createdAt));
+    }
     return await db.select().from(messages).orderBy(desc(messages.createdAt));
   }
 
@@ -1525,6 +1531,14 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updated;
+  }
+
+  async clearMessages(userId?: string): Promise<void> {
+    if (userId) {
+      await db.delete(messages).where(eq(messages.userId, userId));
+    } else {
+      await db.delete(messages);
+    }
   }
 
   async getActs(): Promise<Act[]> {

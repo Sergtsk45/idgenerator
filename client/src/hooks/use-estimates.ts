@@ -85,10 +85,9 @@ export function useDeleteEstimate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.estimates.list.path] });
-      // If the deleted estimate was used as a schedule source and we reset it,
-      // the schedule state (source/tasks) should be refetched.
       queryClient.invalidateQueries({ queryKey: [api.schedules.default.path] });
       queryClient.invalidateQueries({ queryKey: [api.schedules.get.path] });
+      queryClient.invalidateQueries({ queryKey: [api.messages.list.path] });
     },
   });
 }

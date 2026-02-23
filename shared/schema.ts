@@ -188,7 +188,8 @@ export const positionResources = pgTable(
 // Messages (Raw and Normalized)
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(), // Telegram User ID
+  userId: text("user_id").notNull(), // Telegram User ID (string)
+  objectId: integer("object_id").references(() => objects.id, { onDelete: "set null" }), // Construction object
   messageRaw: text("message_raw").notNull(), // Original text
   // Normalized data extracted from LLM
   normalizedData: jsonb("normalized_data").$type<{

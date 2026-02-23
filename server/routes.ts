@@ -522,6 +522,8 @@ export async function registerRoutes(
     try {
       const ok = await storage.deleteEstimate(id, { resetScheduleIfInUse: resetSchedule });
       if (!ok) return res.status(404).json({ message: "Not found" });
+      const userId = req.telegramUser?.id ? String(req.telegramUser.id) : undefined;
+      await storage.clearMessages(userId);
       return res.status(204).send();
     } catch (err) {
       if (err instanceof Error && err.message === "ESTIMATE_IN_USE_BY_SCHEDULE") {
@@ -578,8 +580,10 @@ export async function registerRoutes(
 
     try {
       console.log("Clearing all works from database...");
+      const userId = req.telegramUser?.id ? String(req.telegramUser.id) : undefined;
       await storage.clearWorks({ resetScheduleIfInUse: resetSchedule });
-      console.log("Works cleared successfully");
+      await storage.clearMessages(userId);
+      console.log("Works and messages cleared successfully");
       return res.status(204).send();
     } catch (err) {
       if (err instanceof Error && err.message === "WORKS_IN_USE_BY_SCHEDULE") {
@@ -607,16 +611,36 @@ export async function registerRoutes(
   });
 
   // Messages
-  app.get(api.messages.list.path, async (req, res) => {
-    const messages = await storage.getMessages();
+  app.delete(api.messages.list.path, telegramAuth, async (req, res) => {
+    const userId = req.telegramUser?.id
+      ? String(req.telegramUser.id)
+      : undefined;
+    await storage.clearMessages(userId);
+    return res.status(204).send();
+  });
+
+  app.get(api.messages.list.path, telegramAuth, async (req, res) => {
+    const userId = req.telegramUser?.id
+      ? String(req.telegramUser.id)
+      : undefined;
+    const messages = await storage.getMessages(userId);
     res.json(messages);
   });
 
-  app.post(api.messages.create.path, async (req, res) => {
+  app.post(api.messages.create.path, telegramAuth, async (req, res) => {
     try {
       const input = api.messages.create.input.parse(req.body);
+      // В prod — берём userId из валидированного telegramUser, в dev — из тела запроса
+      const userId = req.telegramUser?.id
+        ? String(req.telegramUser.id)
+        : input.userId;
+
+      // Резолвим текущий объект пользователя для привязки сообщения
+      const currentObj = await storage.getOrCreateDefaultObject(req.telegramUser?.id);
+
       const message = await storage.createMessage({
-        userId: input.userId,
+        userId,
+        objectId: currentObj.id,
         messageRaw: input.messageRaw,
       });
 
@@ -644,7 +668,7 @@ export async function registerRoutes(
   });
 
   // Messages: explicit processing endpoint (sync with shared/routes.ts)
-  app.post(api.messages.process.path, async (req, res) => {
+  app.post(api.messages.process.path, telegramAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isFinite(id)) {
@@ -654,6 +678,11 @@ export async function registerRoutes(
       const message = await storage.getMessage(id);
       if (!message) {
         return res.status(404).json({ message: "Message not found" });
+      }
+
+      // Проверка владельца (только в prod с валидированным пользователем)
+      if (req.telegramUser?.id && message.userId !== String(req.telegramUser.id)) {
+        return res.status(403).json({ message: "Forbidden" });
       }
 
       // Re-run normalization on demand (useful if initial processing failed)
@@ -669,11 +698,22 @@ export async function registerRoutes(
   });
 
   // Messages: patch endpoint for inline editing
-  app.patch(api.messages.patch.path, async (req, res) => {
+  app.patch(api.messages.patch.path, telegramAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isFinite(id)) {
         return res.status(400).json({ message: "Invalid message id" });
+      }
+
+      // Проверка владельца (только в prod с валидированным пользователем)
+      if (req.telegramUser?.id) {
+        const existing = await storage.getMessage(id);
+        if (!existing) {
+          return res.status(404).json({ message: "Message not found" });
+        }
+        if (existing.userId !== String(req.telegramUser.id)) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
       }
 
       const input = api.messages.patch.input.parse(req.body);
@@ -691,13 +731,16 @@ export async function registerRoutes(
   });
 
   // Worklog Section 3: combined view of messages and acts, grouped by date
-  app.get(api.worklog.section3.path, async (req, res) => {
+  app.get(api.worklog.section3.path, telegramAuth, async (req, res) => {
     try {
       const showVolumes = req.query.showVolumes === "1";
+      const userId = req.telegramUser?.id
+        ? String(req.telegramUser.id)
+        : undefined;
 
       // Load messages and acts in parallel
       const [allMessages, allActs] = await Promise.all([
-        storage.getMessages(),
+        storage.getMessages(userId),
         storage.getActs(),
       ]);
 

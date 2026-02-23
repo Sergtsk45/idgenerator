@@ -44,7 +44,7 @@ import {
   type TaskMaterialEditorItem,
 } from "@/components/schedule/TaskMaterialsEditor";
 import type { ScheduleTask, Work } from "@shared/schema";
-import { Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, RotateCcw, AlertTriangle, ChevronsUpDown, Check, Filter, MoreVertical } from "lucide-react";
+import { Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, RotateCcw, AlertTriangle, ChevronsUpDown, Check, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
@@ -75,7 +75,16 @@ export default function Schedule() {
   const tasks: ScheduleTask[] = schedule?.tasks ?? [];
   const sourceType = schedule?.sourceType ?? 'works';
   const scheduleEstimateId = sourceType === "estimate" ? (schedule?.estimateId ?? null) : null;
-  
+
+  type TaskFilter = 'all' | 'with-act' | 'without-act';
+  const [taskFilter, setTaskFilter] = useState<TaskFilter>('all');
+
+  const filteredTasks = useMemo(() => {
+    if (taskFilter === 'with-act') return tasks.filter((t) => t.actNumber != null);
+    if (taskFilter === 'without-act') return tasks.filter((t) => !t.actNumber);
+    return tasks;
+  }, [tasks, taskFilter]);
+
   const [changeSourceDialogOpen, setChangeSourceDialogOpen] = useState(false);
   const [confirmationInput, setConfirmationInput] = useState("");
   const [pendingSourceType, setPendingSourceType] = useState<'works' | 'estimate' | null>(null);
@@ -737,10 +746,29 @@ export default function Schedule() {
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-                <Button variant="ghost" className="h-8 gap-1.5 text-[13px] text-primary">
-                  <Filter className="h-3.5 w-3.5" />
-                  {language === "ru" ? "Фильтры" : "Filters"}
-                </Button>
+                <div className="flex items-center gap-1 bg-muted/40 rounded-full p-0.5">
+                  {(["all", "with-act", "without-act"] as TaskFilter[]).map((f) => {
+                    const labels: Record<TaskFilter, { ru: string; en: string }> = {
+                      all: { ru: "Все", en: "All" },
+                      "with-act": { ru: "С актом", en: "W/ act" },
+                      "without-act": { ru: "Без акта", en: "No act" },
+                    };
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => setTaskFilter(f)}
+                        className={cn(
+                          "px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all",
+                          taskFilter === f
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {language === "ru" ? labels[f].ru : labels[f].en}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Таблица Ганта */}
@@ -774,7 +802,7 @@ export default function Schedule() {
                 {/* Body */}
                 <div className="flex">
                   <div className="w-[160px] md:w-[400px] shrink-0 border-r">
-                    {tasks.map((task) => {
+                    {filteredTasks.map((task) => {
                       const w = task.workId ? worksById.get(task.workId) : null;
                       const p = task.estimatePositionId ? estimatePositionsById.get(task.estimatePositionId) : null;
                       const title =
@@ -964,7 +992,7 @@ export default function Schedule() {
                         `repeating-linear-gradient(to bottom, rgba(0,0,0,0.04) 0, rgba(0,0,0,0.04) 1px, transparent 1px, transparent ${rowHeight}px)`,
                     }}
                   >
-                    {tasks.map((task) => {
+                    {filteredTasks.map((task) => {
                         const start = differenceInCalendarDays(parseISO(String(task.startDate)), parseISO(viewCalendarStart));
                         const left = Math.max(0, start) * dayWidth;
                         const width = Math.max(1, Number(task.durationDays || 1)) * dayWidth;

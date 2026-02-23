@@ -1,5 +1,34 @@
 # Changelog
 
+## [2026-02-23] - Ручная очистка журнала чата + эндпоинт DELETE /api/messages
+
+### Добавлено
+- `DELETE /api/messages` — новый серверный маршрут для очистки всех сообщений текущего пользователя (защищён `telegramAuthMiddleware`)
+- `useClearMessages()` — React Query хук для вызова нового маршрута
+- Кнопка «Очистить историю» на главной странице (`/`): появляется когда есть хотя бы одно сообщение; требует подтверждения через AlertDialog; сообщает что акты и график остаются нетронутыми
+
+## [2026-02-23] - Очистка сообщений ЖР при удалении ВОР/Сметы
+
+### Изменено
+- `server/storage.ts`: добавлен метод `clearMessages(userId?: string)` — удаляет все сообщения пользователя (или все, если userId не передан)
+- `server/routes.ts`: `DELETE /api/works` и `DELETE /api/estimates/:id` теперь также очищают сообщения текущего пользователя после основной операции
+- `client/src/hooks/use-works.ts`: `useClearWorks.onSuccess` инвалидирует кеш сообщений (`api.messages.list.path`)
+- `client/src/hooks/use-estimates.ts`: `useDeleteEstimate.onSuccess` инвалидирует кеш сообщений
+
+## [2026-02-23] - MVP: изоляция данных пользователя и UX-доработки
+
+### Добавлено
+- **Серверная фильтрация сообщений по `userId`**: маршруты `GET/POST/PATCH /api/messages` и `GET /api/worklog/section3` теперь применяют `telegramAuthMiddleware` и фильтруют данные по идентифицированному пользователю Telegram
+- **SQL-миграция `0013_messages_object_id`**: поле `object_id` (nullable FK → `objects`) добавлено в таблицу `messages` для привязки сообщений к объекту строительства; созданы индексы `messages_object_id_idx` и `messages_user_id_idx`
+- **Onboarding-баннер** на главной странице (`/`): пошаговая карточка «С чего начать?» для новых пользователей (скрывается кнопкой ×, состояние сохраняется в localStorage)
+- **Pill-фильтры на `/schedule`**: кнопка-заглушка «Фильтры» заменена на переключатель «Все / С актом / Без акта» для фильтрации задач Ганта на клиенте
+
+### Изменено
+- `client/src/pages/Home.tsx`: `currentUser` теперь берётся из `useTelegram().user.id` (в dev-режиме — `"dev_user"`)
+- `server/storage.ts`: `getMessages()` принимает необязательный параметр `userId?: string` для WHERE-фильтрации
+- `server/routes.ts`: при `POST /api/messages` `objectId` текущего объекта пользователя сохраняется вместе с сообщением
+- `shared/schema.ts`: поле `objectId` добавлено в таблицу `messages`
+
 ## [2026-02-23] - Восстановлен Гант на мобильных в вкладке График работ
 
 ### Изменено

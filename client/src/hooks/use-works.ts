@@ -96,6 +96,7 @@ export function useClearWorks() {
       queryClient.invalidateQueries({ queryKey: [api.schedules.default.path] });
       queryClient.invalidateQueries({ queryKey: [api.schedules.get.path] });
       queryClient.invalidateQueries({ queryKey: [api.acts.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.messages.list.path] });
     },
   });
 }
