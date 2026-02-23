@@ -254,6 +254,12 @@ interface TelegramWebApp {
   enableClosingConfirmation(): void;
   /** A method that disables the confirmation dialog while the user is trying to close the Web App */
   disableClosingConfirmation(): void;
+  /** A method that disables vertical swipes to close or minimize the Mini App (Bot API 7.7+) */
+  disableVerticalSwipes(): void;
+  /** A method that enables vertical swipes to close or minimize the Mini App (Bot API 7.7+) */
+  enableVerticalSwipes(): void;
+  /** True if vertical swipes to close or minimize the Mini App are enabled (Bot API 7.7+) */
+  isVerticalSwipesEnabled: boolean;
   /** A method that sets the app event handler */
   onEvent(eventType: string, eventHandler: () => void): void;
   /** A method that deletes a previously set event handler */
