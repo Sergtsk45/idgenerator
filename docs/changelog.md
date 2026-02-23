@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026-02-23] - UI: белый текст на primary/filled кнопках
+### Исправлено
+- `client/src/components/ui/button.tsx`: для `variant="default"` закреплён `text-white`, чтобы текст на залитых primary-кнопках не сливался с фоном в темах Telegram
+
 ## [2026-02-23] - Admin Panel — Панель администратора
 
 ### Добавлено
