@@ -366,7 +366,14 @@ export default function Acts() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background bg-grain">
-      <Header title={t.title} />
+      <Header
+        title={t.title}
+        subtitle={
+          currentObject.data?.title
+            ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.data.title}`
+            : undefined
+        }
+      />
 
       <div className="flex-1 px-4 py-6 pb-24 max-w-md mx-auto w-full">
         <div className="mb-3">

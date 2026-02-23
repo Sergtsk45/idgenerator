@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguageStore, translations } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, FileText, Loader2, Package, Plus, Save, Sparkles, Users, Wrench } from "lucide-react";
 import { useCreateDocument, useDocuments } from "@/hooks/use-documents";
 import { MaterialWizard } from "@/components/materials/MaterialWizard";
@@ -287,7 +288,14 @@ export default function SourceData() {
 
   return (
     <div className="flex flex-col min-h-screen h-[100dvh] bg-background bg-grain">
-      <Header title={t?.title ?? (language === "ru" ? "Исходные" : "Source")} />
+      <Header
+        title={t?.title ?? (language === "ru" ? "Исходные" : "Source")}
+        subtitle={
+          currentObjectQuery.data?.title
+            ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObjectQuery.data.title}`
+            : undefined
+        }
+      />
 
       <div className="flex-1 overflow-hidden px-4 py-6 pb-24">
         {isLoading ? (
@@ -353,6 +361,7 @@ export default function SourceData() {
                           onClick={() => setPartyDialogRole(role.key)}
                         >
                           <CardContent className="p-4">
+                            <div className={cn("h-1 rounded-t-xl -mt-4 -mx-4 mb-3", filled ? "bg-emerald-500" : "bg-muted")} />
                             <div className="flex items-start justify-between gap-2">
                               <div className="text-sm font-medium">{role.title}</div>
                               <div className={`h-2 w-2 rounded-full mt-1 ${filled ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
@@ -390,7 +399,7 @@ export default function SourceData() {
                 <div className="mb-6">
                   <div className="text-sm font-medium mb-2">{language === "ru" ? "Разделы" : "Sections"}</div>
                   <div className="grid gap-3">
-                    <Card className="rounded-xl cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation("/source/materials")}>
+                    <Card className="rounded-xl cursor-pointer hover:border-primary/50 hover:bg-muted/20 transition-colors" onClick={() => setLocation("/source/materials")}>
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3 min-w-0">
@@ -445,7 +454,7 @@ export default function SourceData() {
                       </CardContent>
                     </Card>
 
-                    <Card className="rounded-xl cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setLocation("/source/documents")}>
+                    <Card className="rounded-xl cursor-pointer hover:border-primary/50 hover:bg-muted/20 transition-colors" onClick={() => setLocation("/source/documents")}>
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3 min-w-0">
@@ -561,6 +570,20 @@ export default function SourceData() {
       {Number.isFinite(objectId) ? (
         <MaterialWizard objectId={objectId as number} open={wizardOpen} onOpenChange={setWizardOpen} />
       ) : null}
+
+      {/* Плавающая кнопка сохранения */}
+      {isDirty && (
+        <div className="fixed bottom-20 left-0 right-0 flex justify-center z-40 pointer-events-none">
+          <Button
+            className="pointer-events-auto rounded-full px-6 shadow-lg"
+            onClick={save}
+            disabled={isSaving}
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            {language === "ru" ? "Сохранить изменения" : "Save changes"}
+          </Button>
+        </div>
+      )}
 
       <Dialog open={objectDialogOpen} onOpenChange={setObjectDialogOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">

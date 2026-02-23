@@ -1,3 +1,10 @@
+/**
+ * @file: Home.tsx
+ * @description: Главная страница — журнал работ в формате чата с AI-распознаванием записей
+ * @dependencies: use-messages, MessageBubble, BottomNav, Header, @/lib/i18n, framer-motion
+ * @created: 2026-02-23
+ */
+
 import { useState, useRef, useEffect } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Header } from "@/components/Header";
@@ -10,10 +17,15 @@ import { Send, Mic, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguageStore, translations } from "@/lib/i18n";
+import { useCurrentObject } from "@/hooks/use-source-data";
 
 export default function Home() {
   const { language } = useLanguageStore();
   const t = translations[language].home;
+  const { data: currentObject } = useCurrentObject();
+  const objectSubtitle = currentObject?.title
+    ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.title}`
+    : undefined;
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const { data: messages = [], isLoading } = useMessages();
@@ -21,7 +33,7 @@ export default function Home() {
   const processMessage = useProcessMessage();
   const { toast } = useToast();
 
-  const currentUser = "user_123"; // Mock user ID
+  const currentUser = "user_123";
 
   const sortedMessages = [...messages].sort((a, b) => {
     const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -29,10 +41,17 @@ export default function Home() {
     return dateA - dateB;
   });
 
-  // Auto-scroll to bottom on new messages
+  // Индекс последнего обработанного сообщения с данными
+  const lastProcessedIdx = sortedMessages.reduce<number>(
+    (acc, msg, idx) => (msg.isProcessed && msg.normalizedData ? idx : acc),
+    -1
+  );
+
   useEffect(() => {
     if (scrollRef.current) {
-      const scrollElement = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      const scrollElement = scrollRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      );
       if (scrollElement) {
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
@@ -48,18 +67,19 @@ export default function Home() {
         userId: currentUser,
         messageRaw: inputValue,
       });
-      
+
       setInputValue("");
-      
-      // Simulate processing delay for effect
+
       setTimeout(() => {
         processMessage.mutate(newMessage.id);
       }, 1000);
-      
-    } catch (error) {
+    } catch {
       toast({
-        title: language === 'ru' ? "Ошибка" : "Error",
-        description: language === 'ru' ? "Не удалось отправить сообщение" : "Failed to send message",
+        title: language === "ru" ? "Ошибка" : "Error",
+        description:
+          language === "ru"
+            ? "Не удалось отправить сообщение"
+            : "Failed to send message",
         variant: "destructive",
       });
     }
@@ -67,9 +87,9 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background bg-grain">
-      <Header title={t.title} />
-      
-      <ScrollArea ref={scrollRef} className="flex-1 px-4 py-6 mb-20">
+      <Header title={t.title} subtitle={objectSubtitle} showAvatar />
+
+      <ScrollArea ref={scrollRef} className="flex-1 px-4 py-6 mb-36">
         <div className="max-w-md mx-auto min-h-[calc(100vh-12rem)] flex flex-col justify-end">
           {isLoading ? (
             <div className="flex justify-center items-center py-10">
@@ -84,14 +104,18 @@ export default function Home() {
             </div>
           ) : (
             <AnimatePresence initial={false}>
-              {sortedMessages.map((msg) => (
+              {sortedMessages.map((msg, idx) => (
                 <motion.div
                   key={msg.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <MessageBubble message={msg} isProcessing={createMessage.isPending && !msg.isProcessed} />
+                  <MessageBubble
+                    message={msg}
+                    isProcessing={createMessage.isPending && !msg.isProcessed}
+                    showActions={idx === lastProcessedIdx}
+                  />
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -99,42 +123,60 @@ export default function Home() {
         </div>
       </ScrollArea>
 
-      <div className="fixed bottom-[4.5rem] left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t border-border/50">
-        <form onSubmit={handleSubmit} className="max-w-md mx-auto flex gap-2 items-end">
-          <div className="relative flex-1">
-            <Textarea 
-              placeholder={t.placeholder} 
-              className="resize-none min-h-[52px] max-h-[120px] pr-10 rounded-2xl border-border/50 shadow-sm focus-visible:ring-primary/20 bg-background"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
+      {/* Панель ввода */}
+      <div className="fixed bottom-16 left-0 right-0 bg-background border-t border-border/40 px-4 pt-3 pb-3">
+        <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-2">
+          <div className="flex items-end gap-2">
+            {/* Поле ввода с микрофоном внутри */}
+            <div className="relative flex-1">
+              <Textarea
+                placeholder={
+                  language === "ru"
+                    ? "Опишите выполненные работы..."
+                    : "Describe completed works..."
                 }
-              }}
-            />
-            <Button 
-              type="button" 
-              variant="ghost" 
-              size="icon" 
-              className="absolute right-1 bottom-1 text-muted-foreground hover:text-primary"
+                className="resize-none min-h-[48px] max-h-[120px] rounded-2xl border-border/60 pr-10 py-3 text-[15px] bg-secondary/30 focus-visible:ring-primary/20"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+                rows={1}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 bottom-1 h-8 w-8 text-muted-foreground/60"
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Кнопка отправки — синяя круглая */}
+            <Button
+              type="submit"
+              size="icon"
+              className="h-11 w-11 rounded-full bg-primary hover:bg-primary/90 shadow-md shadow-primary/20 shrink-0"
+              disabled={!inputValue.trim() || createMessage.isPending}
             >
-              <Mic className="h-5 w-5" />
+              {createMessage.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </div>
-          <Button 
-            type="submit" 
-            size="icon" 
-            className="h-[52px] w-[52px] rounded-2xl shadow-lg shadow-primary/20"
-            disabled={!inputValue.trim() || createMessage.isPending}
-          >
-            {createMessage.isPending ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Send className="h-5 w-5" />
-            )}
-          </Button>
+
+          {/* Подпись */}
+          <p className="text-[10px] text-muted-foreground/60 text-center leading-snug px-2">
+            {language === "ru"
+              ? "ИИ автоматически распознаёт строительные термины и сопоставляет с ВОР"
+              : "AI automatically recognizes construction terms and matches to BoQ"}
+          </p>
         </form>
       </div>
 

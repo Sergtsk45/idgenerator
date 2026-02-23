@@ -1,19 +1,41 @@
+/**
+ * @file: WorkLog.tsx
+ * @description: Страница «Общий журнал работ» — pill-табы + список раздела 3 (как в референсе) + таблицы разделов 1, 2, 4, 5
+ * @dependencies: useSection3, usePatchMessage, useCurrentObject, useLanguageStore, BottomNav, Header
+ * @created: 2026-02-23
+ */
+
 import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { Header } from "@/components/Header";
 import { useSection3 } from "@/hooks/use-section3";
 import { usePatchMessage } from "@/hooks/use-messages";
 import { useLanguageStore, translations } from "@/lib/i18n";
+import { useCurrentObject } from "@/hooks/use-source-data";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, FileText, RefreshCw, Construction, Pencil, Save, Search, Check, X } from "lucide-react";
+import {
+  Loader2,
+  FileText,
+  RefreshCw,
+  Construction,
+  Pencil,
+  Save,
+  Search,
+  Check,
+  X,
+  MoreVertical,
+  Plus,
+  Zap,
+} from "lucide-react";
 import { format } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
+
+/* ─── вспомогательные компоненты ──────────────────────────────────── */
 
 function PlaceholderSection({ title, comingSoon }: { title: string; comingSoon: string }) {
   return (
@@ -27,7 +49,13 @@ function PlaceholderSection({ title, comingSoon }: { title: string; comingSoon: 
   );
 }
 
-function SectionActionBar({ actions, sectionId }: { actions: { edit: string; save: string; search: string }; sectionId: string }) {
+function SectionActionBar({
+  actions,
+  sectionId,
+}: {
+  actions: { edit: string; save: string; search: string };
+  sectionId: string;
+}) {
   return (
     <div className="flex gap-2 justify-center mb-4" data-testid={`action-bar-${sectionId}`}>
       <Button variant="outline" size="sm" data-testid={`button-edit-${sectionId}`}>
@@ -46,20 +74,57 @@ function SectionActionBar({ actions, sectionId }: { actions: { edit: string; sav
   );
 }
 
+/* ─── константы табов ──────────────────────────────────────────────── */
+
+const TABS = [
+  { value: "title" },
+  { value: "section1" },
+  { value: "section2" },
+  { value: "section3" },
+  { value: "section4" },
+  { value: "section5" },
+  { value: "section6" },
+] as const;
+
+type TabValue = (typeof TABS)[number]["value"];
+
+/* ─── аббревиатуры табов (как в референсе: «Разд. 1») ─────────────── */
+const TAB_SHORT: Record<TabValue, string> = {
+  title: "Титул",
+  section1: "Разд. 1",
+  section2: "Разд. 2",
+  section3: "Разд. 3",
+  section4: "Разд. 4",
+  section5: "Разд. 5",
+  section6: "Разд. 6",
+};
+
+/* ─── основной компонент ───────────────────────────────────────────── */
+
 export default function WorkLog() {
   const { language } = useLanguageStore();
   const t = translations[language].worklog;
-  const [activeTab, setActiveTab] = useState("section3");
-  const [editingSegment, setEditingSegment] = useState<{ sourceId: number; text: string; isProcessed: boolean } | null>(null);
+  const locale = language === "ru" ? ru : enUS;
+
+  const { data: currentObject } = useCurrentObject();
+  const objectSubtitle = currentObject?.title
+    ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.title}`
+    : undefined;
+
+  const [activeTab, setActiveTab] = useState<TabValue>("section3");
+  const [editingSegment, setEditingSegment] = useState<{
+    sourceId: number;
+    text: string;
+    isProcessed: boolean;
+  } | null>(null);
+
   const { data: rows = [], isLoading, refetch } = useSection3({ enablePolling: !editingSegment });
   const patchMessage = usePatchMessage();
 
   const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return "";
     try {
-      return format(new Date(dateStr), "dd.MM.yyyy", { 
-        locale: language === 'ru' ? ru : enUS 
-      });
+      return format(new Date(dateStr), "dd.MM.yyyy", { locale });
     } catch {
       return dateStr;
     }
@@ -70,19 +135,22 @@ export default function WorkLog() {
     refetch();
   };
 
-  const handleSegmentClick = (sourceId: number, text: string, isProcessed: boolean, sourceType: string) => {
-    if (sourceType !== 'message') return; // Only allow editing messages
+  const handleSegmentClick = (
+    sourceId: number,
+    text: string,
+    isProcessed: boolean,
+    sourceType: string,
+  ) => {
+    if (sourceType !== "message") return;
     setEditingSegment({ sourceId, text, isProcessed });
   };
 
   const handleSaveEdit = async () => {
     if (!editingSegment) return;
-
     try {
       const data = editingSegment.isProcessed
         ? { normalizedData: { workDescription: editingSegment.text } }
         : { messageRaw: editingSegment.text };
-
       await patchMessage.mutateAsync({ id: editingSegment.sourceId, data });
       setEditingSegment(null);
     } catch (error) {
@@ -90,512 +158,504 @@ export default function WorkLog() {
     }
   };
 
-  const handleCancelEdit = () => {
-    setEditingSegment(null);
-  };
+  const handleCancelEdit = () => setEditingSegment(null);
+
+  /* прогресс */
+  const totalSegs = rows.reduce((acc, r) => acc + r.segments.length, 0);
+  const processedSegs = rows.reduce(
+    (acc, r) => acc + r.segments.filter((s) => !s.isPending).length,
+    0,
+  );
+  const progress = totalSegs > 0 ? Math.round((processedSegs / totalSegs) * 100) : 0;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background bg-grain">
-      <Header title={t.title} />
-      
-      <div className="flex-1 flex flex-col pb-20 overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <div className="py-3 border-b">
-            <div 
-              className="flex gap-2 overflow-x-auto px-3 pb-1 scrollbar-hide"
-              style={{ scrollSnapType: 'x mandatory' }}
-              data-testid="worklog-tabs"
-            >
-              {[
-                { value: 'title', label: t.tabs.title },
-                { value: 'section1', label: t.tabs.section1 },
-                { value: 'section2', label: t.tabs.section2 },
-                { value: 'section3', label: t.tabs.section3 },
-                { value: 'section4', label: t.tabs.section4 },
-                { value: 'section5', label: t.tabs.section5 },
-                { value: 'section6', label: t.tabs.section6 },
-              ].map((tab) => (
-                <button
-                  key={tab.value}
-                  onClick={() => setActiveTab(tab.value)}
-                  className={cn(
-                    "flex-shrink-0 w-20 h-20 rounded-md border-2 flex items-center justify-center text-center text-xs font-medium transition-all",
-                    "hover-elevate active-elevate-2",
-                    activeTab === tab.value
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/50"
-                  )}
-                  style={{ scrollSnapAlign: 'start' }}
-                  data-testid={`tab-${tab.value}`}
-                >
-                  <span className="px-1 leading-tight">{tab.label}</span>
-                </button>
-              ))}
-              <div className="flex-shrink-0 w-4" aria-hidden="true" />
+    <div className="flex flex-col min-h-screen bg-background">
+      <Header title={t.title} subtitle={objectSubtitle} showAvatar />
+
+      {/* Pill-табы (как в референсе) */}
+      <div
+        className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-border/40 scrollbar-hide bg-background sticky top-14 z-20"
+        data-testid="worklog-tabs"
+      >
+        {TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setActiveTab(tab.value)}
+            className={cn(
+              "shrink-0 px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors whitespace-nowrap",
+              activeTab === tab.value
+                ? "bg-primary text-white"
+                : "bg-muted/60 text-muted-foreground hover:text-foreground",
+            )}
+            data-testid={`tab-${tab.value}`}
+          >
+            {TAB_SHORT[tab.value]}
+          </button>
+        ))}
+      </div>
+
+      {/* Контент */}
+      <div className="flex-1 pb-28 overflow-y-auto">
+
+        {/* ── РАЗДЕЛ 3 (список как в референсе) ──────────────────────── */}
+        {activeTab === "section3" && (
+          <>
+            {/* Info-badge */}
+            <div className="flex items-center justify-between px-4 py-2 bg-primary/5 border-b border-primary/10">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                  <span className="text-[10px] text-primary font-bold">i</span>
+                </div>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                  {t.section3.title}
+                </span>
+              </div>
+              {rows.length > 0 && (
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                  {format(
+                    new Date(rows[rows.length - 1].date),
+                    language === "ru" ? "LLLL yyyy" : "MMM yyyy",
+                    { locale },
+                  ).toUpperCase()}
+                </span>
+              )}
             </div>
-          </div>
 
-          <TabsContent value="title" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full px-2 py-4">
-              <SectionActionBar actions={t.actions} sectionId="title" />
-              <PlaceholderSection title={t.tabs.title} comingSoon={t.comingSoon} />
-            </ScrollArea>
-          </TabsContent>
+            {/* Кнопка обновить */}
+            <div className="flex justify-end px-4 py-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                className="shrink-0"
+                data-testid="button-refresh-log"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                {t.refreshLog}
+              </Button>
+            </div>
 
-          <TabsContent value="section1" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full px-2 py-2">
-              <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-4">
-                  <h2 className="text-lg font-bold mb-2">{t.section1.title}</h2>
-                  <p className="text-sm text-muted-foreground leading-tight px-2">
-                    {t.section1.subtitle}
-                  </p>
-                </div>
-
-                <SectionActionBar actions={t.actions} sectionId="section1" />
-
-                <div className="overflow-x-auto border-2 border-foreground">
-                  <table className="w-full border-collapse text-sm" data-testid="section1-table">
-                    <thead>
-                      <tr>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
-                          {t.section1.rowNumber}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section1.orgName}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section1.personInfo}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section1.startDate}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section1.endDate}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section1.representative}
-                        </th>
-                      </tr>
-                      <tr>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">1</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">2</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">3</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">4</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">5</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">6</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+            {/* Загрузка */}
+            {isLoading && (
+              <div className="flex justify-center items-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
               </div>
-            </ScrollArea>
-          </TabsContent>
+            )}
 
-          <TabsContent value="section2" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full px-2 py-2">
-              <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-4">
-                  <h2 className="text-lg font-bold mb-2">{t.section2.title}</h2>
-                  <p className="text-sm text-muted-foreground leading-tight px-2">
-                    {t.section2.subtitle}
-                  </p>
+            {/* Пусто */}
+            {!isLoading && rows.length === 0 && (
+              <div className="text-center py-16 opacity-60 px-6">
+                <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileText className="h-8 w-8 text-muted-foreground" />
                 </div>
-
-                <SectionActionBar actions={t.actions} sectionId="section2" />
-
-                <div className="overflow-x-auto border-2 border-foreground">
-                  <table className="w-full border-collapse text-sm" data-testid="section2-table">
-                    <thead>
-                      <tr>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
-                          {t.section2.rowNumber}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section2.journalName}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section2.personInfo}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section2.transferDate}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section2.signature}
-                        </th>
-                      </tr>
-                      <tr>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">1</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">2</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">3</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">4</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">5</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <h3 className="font-semibold text-lg mb-1">{t.noRecords}</h3>
+                <p className="text-sm text-muted-foreground">{t.noRecordsHint}</p>
               </div>
-            </ScrollArea>
-          </TabsContent>
+            )}
 
-          <TabsContent value="section3" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full px-2 py-2">
-              <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-2">
-                  <h2 className="text-lg font-bold mb-2">{t.section3.title}</h2>
-                  <p className="text-sm text-muted-foreground leading-tight px-2">
-                    {t.section3.subtitle}
-                  </p>
-                </div>
+            {/* Список записей */}
+            {!isLoading && rows.length > 0 && (
+              <div>
+                {rows.map((row) => {
+                  const rowDate = new Date(row.date);
+                  const allProcessed = row.segments.every((s) => !s.isPending);
+                  const statusLabel = allProcessed
+                    ? language === "ru" ? "ПРИНЯТО" : "ACCEPTED"
+                    : language === "ru" ? "В РАБОТЕ" : "IN PROGRESS";
+                  const statusClass = allProcessed
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : "border-border text-muted-foreground bg-muted/40";
 
-                <SectionActionBar actions={t.actions} sectionId="section3" />
+                  return (
+                    <div
+                      key={row.date}
+                      className="border-b border-border/40 last:border-b-0 px-4 py-3"
+                      data-testid={`worklog-row-${row.date}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Дата */}
+                        <div className="w-10 shrink-0 text-center">
+                          <div className="text-[15px] font-bold leading-tight">
+                            {format(rowDate, "d", { locale })}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground uppercase">
+                            {format(rowDate, "EEE", { locale })}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {format(rowDate, "LLL", { locale })}
+                          </div>
+                        </div>
 
-                <div className="flex justify-end mb-3">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleRefresh}
-                    className="shrink-0"
-                    data-testid="button-refresh-log"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    {t.refreshLog}
-                  </Button>
-                </div>
+                        {/* Основной контент */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span
+                              className={cn(
+                                "text-[10px] font-medium uppercase px-2 py-0.5 rounded border",
+                                statusClass,
+                              )}
+                            >
+                              {statusLabel}
+                            </span>
+                            <button type="button" className="text-muted-foreground/60 p-0.5">
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </div>
 
-                {isLoading ? (
-                  <div className="flex justify-center items-center py-20">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
-                  </div>
-                ) : rows.length === 0 ? (
-                  <div className="text-center py-16 opacity-60">
-                    <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FileText className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="font-semibold text-lg mb-1">{t.noRecords}</h3>
-                    <p className="text-sm text-muted-foreground">{t.noRecordsHint}</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto border-2 border-foreground">
-                    <table className="w-full border-collapse text-sm" data-testid="worklog-table">
-                      <thead>
-                        <tr>
-                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
-                            {t.section3.rowNumber}
-                          </th>
-                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-24 italic">
-                            {t.section3.date}
-                          </th>
-                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-20 italic">
-                            {t.section3.workConditions}
-                          </th>
-                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                            {t.section3.workDescription}
-                          </th>
-                          <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic w-36">
-                            {t.section3.representative}
-                          </th>
-                        </tr>
-                        <tr>
-                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">1</th>
-                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">2</th>
-                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">3</th>
-                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">4</th>
-                          <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">5</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((row, idx) => (
-                          <tr
-                            key={row.date}
-                            className="hover:bg-muted/30 transition-colors"
-                            data-testid={`worklog-row-${row.date}`}
-                          >
-                            <td className="border border-foreground px-2 py-3 text-center align-top">
-                              {idx + 1}
-                            </td>
-                            <td className="border border-foreground px-2 py-3 text-center align-top whitespace-nowrap">
-                              {formatDate(row.date)}
-                            </td>
-                            <td className="border border-foreground px-2 py-3 text-center align-top">
-                              {row.workConditions}
-                            </td>
-                            <td className="border border-foreground px-3 py-3 align-top">
-                              {row.segments.map((seg, segIdx) => {
-                                const isEditing = editingSegment?.sourceId === seg.sourceId;
-                                
-                                if (isEditing) {
-                                  return (
-                                    <div key={`${seg.sourceType}-${seg.sourceId}-${segIdx}`} className="space-y-2 mb-2">
-                                      <Textarea
-                                        value={editingSegment.text}
-                                        onChange={(e) => setEditingSegment({ ...editingSegment, text: e.target.value })}
-                                        className="min-h-[60px] text-sm"
-                                        autoFocus
-                                      />
-                                      <div className="flex gap-2">
-                                        <Button
-                                          size="sm"
-                                          onClick={handleSaveEdit}
-                                          disabled={patchMessage.isPending}
-                                          className="h-7"
-                                        >
-                                          <Check className="h-3 w-3 mr-1" />
-                                          Сохранить
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={handleCancelEdit}
-                                          disabled={patchMessage.isPending}
-                                          className="h-7"
-                                        >
-                                          <X className="h-3 w-3 mr-1" />
-                                          Отмена
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  );
-                                }
-                                
+                          {/* Сегменты */}
+                          <div className="space-y-1">
+                            {row.segments.map((seg, segIdx) => {
+                              const isEditing = editingSegment?.sourceId === seg.sourceId;
+
+                              if (isEditing) {
                                 return (
                                   <div
                                     key={`${seg.sourceType}-${seg.sourceId}-${segIdx}`}
-                                    className={cn(
-                                      "mb-1 last:mb-0",
-                                      seg.sourceType === 'message' &&
-                                        "text-primary/70 cursor-pointer hover:bg-primary/5 rounded px-1 py-0.5 transition-colors",
-                                      seg.isPending && "italic text-muted-foreground"
-                                    )}
-                                    onClick={() => handleSegmentClick(seg.sourceId, seg.text, !seg.isPending, seg.sourceType)}
+                                    className="space-y-2"
                                   >
-                                    {seg.text}
+                                    <Textarea
+                                      value={editingSegment.text}
+                                      onChange={(e) =>
+                                        setEditingSegment({
+                                          ...editingSegment,
+                                          text: e.target.value,
+                                        })
+                                      }
+                                      className="min-h-[60px] text-[13px] rounded-xl"
+                                      autoFocus
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={handleSaveEdit}
+                                        disabled={patchMessage.isPending}
+                                        className="h-7 rounded-lg"
+                                      >
+                                        <Check className="h-3 w-3 mr-1" />
+                                        {language === "ru" ? "Сохранить" : "Save"}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleCancelEdit}
+                                        disabled={patchMessage.isPending}
+                                        className="h-7 rounded-lg"
+                                      >
+                                        <X className="h-3 w-3 mr-1" />
+                                        {language === "ru" ? "Отмена" : "Cancel"}
+                                      </Button>
+                                    </div>
                                   </div>
                                 );
-                              })}
-                            </td>
-                            <td className="border border-foreground px-2 py-3 text-center align-top">
-                              {row.representative}
-                            </td>
-                          </tr>
+                              }
+
+                              return (
+                                <p
+                                  key={`${seg.sourceType}-${seg.sourceId}-${segIdx}`}
+                                  className={cn(
+                                    "text-[13px] leading-snug",
+                                    seg.sourceType === "message" &&
+                                      "cursor-pointer hover:text-primary transition-colors",
+                                    seg.isPending && "italic text-muted-foreground",
+                                  )}
+                                  onClick={() =>
+                                    handleSegmentClick(
+                                      seg.sourceId,
+                                      seg.text,
+                                      !seg.isPending,
+                                      seg.sourceType,
+                                    )
+                                  }
+                                >
+                                  {seg.text}
+                                </p>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Добавить новую запись */}
+            <div className="mx-4 my-3 border border-dashed border-primary/30 rounded-2xl p-4 bg-primary/[0.02]">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full border-2 border-primary/30 flex items-center justify-center shrink-0">
+                  <Plus className="h-4 w-4 text-primary/50" />
+                </div>
+                <div>
+                  <p className="text-[14px] font-medium text-primary/70">
+                    {language === "ru" ? "Добавить новую запись" : "Add new entry"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                    {language === "ru"
+                      ? "Вы можете внести сведения за прошедшие даты или обновить данные из чат-бота Telegram."
+                      : "You can add entries for past dates or update data from the Telegram chatbot."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Общий прогресс */}
+            <div className="flex items-center justify-between mx-4 my-3 px-4 py-3 bg-card border border-border/60 rounded-2xl">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  {language === "ru" ? "ОБЩИЙ ПРОГРЕСС" : "OVERALL PROGRESS"}
+                </p>
+                <p className="text-[32px] font-bold leading-tight">{progress}%</p>
+              </div>
+              <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center">
+                <Zap className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── ТИТУЛ ───────────────────────────────────────────────────── */}
+        {activeTab === "title" && (
+          <ScrollArea className="h-full px-2 py-4">
+            <SectionActionBar actions={t.actions} sectionId="title" />
+            <PlaceholderSection title={t.tabs.title} comingSoon={t.comingSoon} />
+          </ScrollArea>
+        )}
+
+        {/* ── РАЗДЕЛ 1 ────────────────────────────────────────────────── */}
+        {activeTab === "section1" && (
+          <ScrollArea className="h-full px-2 py-2">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-4">
+                <h2 className="text-lg font-bold mb-2">{t.section1.title}</h2>
+                <p className="text-sm text-muted-foreground leading-tight px-2">
+                  {t.section1.subtitle}
+                </p>
+              </div>
+              <SectionActionBar actions={t.actions} sectionId="section1" />
+              <div className="overflow-x-auto border-2 border-foreground">
+                <table className="w-full border-collapse text-sm" data-testid="section1-table">
+                  <thead>
+                    <tr>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
+                        {t.section1.rowNumber}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section1.orgName}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section1.personInfo}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section1.startDate}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section1.endDate}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section1.representative}
+                      </th>
+                    </tr>
+                    <tr>
+                      {["1","2","3","4","5","6"].map((n) => (
+                        <th key={n} className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">{n}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[0,1,2].map((i) => (
+                      <tr key={i}>
+                        {Array.from({ length: 6 }).map((_, c) => (
+                          <td key={c} className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </ScrollArea>
-          </TabsContent>
+            </div>
+          </ScrollArea>
+        )}
 
-          <TabsContent value="section4" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full px-2 py-2">
-              <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-4">
-                  <h2 className="text-lg font-bold mb-2">{t.section4.title}</h2>
-                  <p className="text-sm text-muted-foreground leading-tight px-2">
-                    {t.section4.subtitle}
-                  </p>
-                </div>
-
-                <SectionActionBar actions={t.actions} sectionId="section4" />
-
-                <div className="overflow-x-auto border-2 border-foreground">
-                  <table className="w-full border-collapse text-sm" data-testid="section4-table">
-                    <thead>
-                      <tr>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-10 italic">
-                          {t.section4.rowNumber}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section4.controlInfo}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section4.defects}
-                        </th>
-                        <th className="border border-foreground px-1 py-2 text-xs font-normal text-center align-top w-12 italic">
-                          <div className="writing-vertical-rl transform rotate-180 h-32 flex items-center justify-center">
-                            {t.section4.defectDeadline}
-                          </div>
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section4.controlSignature}
-                        </th>
-                        <th className="border border-foreground px-1 py-2 text-xs font-normal text-center align-top w-12 italic">
-                          <div className="writing-vertical-rl transform rotate-180 h-32 flex items-center justify-center">
-                            {t.section4.defectFixDate}
-                          </div>
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section4.fixSignature}
-                        </th>
-                      </tr>
-                      <tr>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">1</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">2</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">3</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">4</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">5</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">6</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">7</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+        {/* ── РАЗДЕЛ 2 ────────────────────────────────────────────────── */}
+        {activeTab === "section2" && (
+          <ScrollArea className="h-full px-2 py-2">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-4">
+                <h2 className="text-lg font-bold mb-2">{t.section2.title}</h2>
+                <p className="text-sm text-muted-foreground leading-tight px-2">
+                  {t.section2.subtitle}
+                </p>
               </div>
-            </ScrollArea>
-          </TabsContent>
-
-          <TabsContent value="section5" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full px-2 py-2">
-              <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-4">
-                  <h2 className="text-lg font-bold mb-2">{t.section5.title}</h2>
-                  <p className="text-sm text-muted-foreground leading-tight px-2">
-                    {t.section5.subtitle}
-                  </p>
-                </div>
-
-                <SectionActionBar actions={t.actions} sectionId="section5" />
-
-                <div className="overflow-x-auto border-2 border-foreground">
-                  <table className="w-full border-collapse text-sm" data-testid="section5-table">
-                    <thead>
-                      <tr>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
-                          {t.section5.rowNumber}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section5.docName}
-                        </th>
-                        <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
-                          {t.section5.signatureInfo}
-                        </th>
+              <SectionActionBar actions={t.actions} sectionId="section2" />
+              <div className="overflow-x-auto border-2 border-foreground">
+                <table className="w-full border-collapse text-sm" data-testid="section2-table">
+                  <thead>
+                    <tr>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
+                        {t.section2.rowNumber}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section2.journalName}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section2.personInfo}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section2.transferDate}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section2.signature}
+                      </th>
+                    </tr>
+                    <tr>
+                      {["1","2","3","4","5"].map((n) => (
+                        <th key={n} className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">{n}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[0,1,2].map((i) => (
+                      <tr key={i}>
+                        {Array.from({ length: 5 }).map((_, c) => (
+                          <td key={c} className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                        ))}
                       </tr>
-                      <tr>
-                        <th className="border border-foreground px-1 py-1 text-xs font-bold text-center">1</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-bold text-center">2</th>
-                        <th className="border border-foreground px-1 py-1 text-xs font-bold text-center">3</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">1</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">2</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">3</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">4</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">5</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </ScrollArea>
-          </TabsContent>
+            </div>
+          </ScrollArea>
+        )}
 
-          <TabsContent value="section6" className="flex-1 m-0 overflow-hidden">
-            <ScrollArea className="h-full px-2 py-4">
-              <SectionActionBar actions={t.actions} sectionId="section6" />
-              <PlaceholderSection title={t.tabs.section6} comingSoon={t.comingSoon} />
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+        {/* ── РАЗДЕЛ 4 ────────────────────────────────────────────────── */}
+        {activeTab === "section4" && (
+          <ScrollArea className="h-full px-2 py-2">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-4">
+                <h2 className="text-lg font-bold mb-2">{t.section4.title}</h2>
+                <p className="text-sm text-muted-foreground leading-tight px-2">
+                  {t.section4.subtitle}
+                </p>
+              </div>
+              <SectionActionBar actions={t.actions} sectionId="section4" />
+              <div className="overflow-x-auto border-2 border-foreground">
+                <table className="w-full border-collapse text-sm" data-testid="section4-table">
+                  <thead>
+                    <tr>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-10 italic">
+                        {t.section4.rowNumber}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section4.controlInfo}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section4.defects}
+                      </th>
+                      <th className="border border-foreground px-1 py-2 text-xs font-normal text-center align-top w-12 italic">
+                        {t.section4.defectDeadline}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section4.controlSignature}
+                      </th>
+                      <th className="border border-foreground px-1 py-2 text-xs font-normal text-center align-top w-12 italic">
+                        {t.section4.defectFixDate}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section4.fixSignature}
+                      </th>
+                    </tr>
+                    <tr>
+                      {["1","2","3","4","5","6","7"].map((n) => (
+                        <th key={n} className="border border-foreground px-1 py-1 text-xs font-normal text-center italic">{n}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[0,1,2].map((i) => (
+                      <tr key={i}>
+                        {Array.from({ length: 7 }).map((_, c) => (
+                          <td key={c} className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </ScrollArea>
+        )}
+
+        {/* ── РАЗДЕЛ 5 ────────────────────────────────────────────────── */}
+        {activeTab === "section5" && (
+          <ScrollArea className="h-full px-2 py-2">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-4">
+                <h2 className="text-lg font-bold mb-2">{t.section5.title}</h2>
+                <p className="text-sm text-muted-foreground leading-tight px-2">
+                  {t.section5.subtitle}
+                </p>
+              </div>
+              <SectionActionBar actions={t.actions} sectionId="section5" />
+              <div className="overflow-x-auto border-2 border-foreground">
+                <table className="w-full border-collapse text-sm" data-testid="section5-table">
+                  <thead>
+                    <tr>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
+                        {t.section5.rowNumber}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section5.docName}
+                      </th>
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
+                        {t.section5.signatureInfo}
+                      </th>
+                    </tr>
+                    <tr>
+                      {["1","2","3"].map((n) => (
+                        <th key={n} className="border border-foreground px-1 py-1 text-xs font-bold text-center">{n}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1,2,3,4,5].map((i) => (
+                      <tr key={i}>
+                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">{i}</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                        <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </ScrollArea>
+        )}
+
+        {/* ── РАЗДЕЛ 6 ────────────────────────────────────────────────── */}
+        {activeTab === "section6" && (
+          <ScrollArea className="h-full px-2 py-4">
+            <SectionActionBar actions={t.actions} sectionId="section6" />
+            <PlaceholderSection title={t.tabs.section6} comingSoon={t.comingSoon} />
+          </ScrollArea>
+        )}
       </div>
+
+      {/* FAB (только для Раздела 3) */}
+      {activeTab === "section3" && (
+        <div className="fixed bottom-20 right-4 z-40">
+          <button
+            type="button"
+            className="w-14 h-14 rounded-full bg-primary shadow-xl flex items-center justify-center"
+            onClick={() => {
+              /* TODO: открыть диалог добавления записи */
+            }}
+          >
+            <Plus className="h-6 w-6 text-white" />
+          </button>
+        </div>
+      )}
 
       <BottomNav />
     </div>

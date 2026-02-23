@@ -1,81 +1,190 @@
+/**
+ * @file: MessageBubble.tsx
+ * @description: Компонент пузыря сообщения пользователя с карточкой WorkMatchCard для отображения распознанной работы
+ * @dependencies: shared/schema, lucide-react, date-fns, @/lib/i18n, @/lib/utils
+ * @created: 2026-02-23
+ */
+
 import { Message } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { Bot, User, CheckCheck, Loader2, AlertCircle } from "lucide-react";
+import {
+  CheckCheck,
+  Loader2,
+  Link2,
+  Box,
+  ArrowRight,
+  Paperclip,
+  Clock,
+} from "lucide-react";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
+import { useLanguageStore } from "@/lib/i18n";
+
+// ---------------------------------------------------------------------------
+// WorkMatchCard
+// ---------------------------------------------------------------------------
+
+interface WorkMatchCardProps {
+  data: Message["normalizedData"];
+  isProcessing?: boolean;
+  showActions?: boolean;
+  language: string;
+}
+
+function WorkMatchCard({ data, isProcessing, showActions, language }: WorkMatchCardProps) {
+  const isRu = language === "ru";
+
+  if (isProcessing) {
+    return (
+      <div className="bg-card border border-border/60 rounded-2xl p-4 max-w-[88%]">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span>{isRu ? "Анализируем запись..." : "Analyzing..."}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex justify-start pl-1">
+        <span className="text-[11px] text-muted-foreground/60 italic">
+          {isRu ? "Не удалось распознать работу" : "Could not identify work"}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Лейбл над карточкой */}
+      <div className="flex items-center gap-1.5 px-1 mb-1">
+        <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          {isRu ? "РАБОТА УСПЕШНО СОПОСТАВЛЕНА" : "WORK MATCHED"}
+        </span>
+      </div>
+
+      {/* Карточка */}
+      <div className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm max-w-[88%]">
+        <div className="p-4 space-y-3">
+          {/* Строка: КОД ВОР + дата */}
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">
+                {isRu ? "КОД ВОР" : "WORK CODE"}
+              </p>
+              <p className="text-[18px] font-bold leading-tight">{data.workCode}</p>
+            </div>
+            {data.date && (
+              <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0 mt-1">
+                {data.date}
+              </span>
+            )}
+          </div>
+
+          {/* Описание — курсив */}
+          {data.workDescription && (
+            <p className="text-[13px] text-muted-foreground italic leading-snug">
+              «{data.workDescription}»
+            </p>
+          )}
+
+          {/* Объём + Детали */}
+          {(data.quantity !== undefined || data.unit) && (
+            <div className="flex items-center justify-between pt-1 border-t border-border/40">
+              <div className="flex items-center gap-2">
+                <Box className="h-4 w-4 text-primary" />
+                <span className="text-[22px] font-bold text-foreground leading-none">
+                  {data.quantity}
+                </span>
+                <span className="text-[13px] text-muted-foreground">{data.unit}</span>
+              </div>
+              <button
+                type="button"
+                className="text-[13px] font-medium text-primary flex items-center gap-0.5"
+              >
+                {isRu ? "Детали" : "Details"}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Кнопки быстрых действий */}
+      {showActions && (
+        <div className="flex gap-2 mt-2 pl-1">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-[12px] text-muted-foreground bg-background"
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+            {isRu ? "ФОТО/ФАЙЛ" : "PHOTO/FILE"}
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-[12px] text-muted-foreground bg-background"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            {isRu ? "ИСТОРИЯ" : "HISTORY"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MessageBubble
+// ---------------------------------------------------------------------------
 
 interface MessageBubbleProps {
   message: Message;
   isProcessing?: boolean;
+  showActions?: boolean;
 }
 
-export function MessageBubble({ message, isProcessing }: MessageBubbleProps) {
+export function MessageBubble({ message, isProcessing, showActions }: MessageBubbleProps) {
+  const { language } = useLanguageStore();
   const hasData = !!message.normalizedData;
   const isPending = !message.isProcessed;
 
+  const time = format(new Date(message.createdAt ?? new Date()), "HH:mm");
+
   return (
-    <div className="space-y-2 mb-6">
-      {/* User Message */}
-      <div className="flex justify-end pl-8">
-        <div className="bg-primary/10 text-primary-foreground p-3 rounded-2xl rounded-tr-sm max-w-[85%] shadow-sm">
-          <p className="text-sm text-foreground">{message.messageRaw}</p>
-          <div className="flex justify-end items-center gap-1 mt-1 text-[10px] text-muted-foreground/70">
-            <span>{format(new Date(message.createdAt || new Date()), "HH:mm")}</span>
+    <div className="mb-6 space-y-2">
+      {/* Bubble пользователя */}
+      <div className="flex justify-end pl-12">
+        <div
+          className={cn(
+            "bg-primary text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[82%] shadow-sm"
+          )}
+        >
+          <p className="text-[15px] leading-snug">{message.messageRaw}</p>
+          <div className="flex justify-end items-center gap-1 mt-1">
+            <span className="text-[11px] text-white/60">{time}</span>
             {isPending ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 text-white/60 animate-spin" />
             ) : (
-              <CheckCheck className="h-3 w-3 text-green-500" />
+              <CheckCheck className="h-3.5 w-3.5 text-white/60" />
             )}
           </div>
         </div>
       </div>
 
-      {/* System Response / Processed Data */}
+      {/* AI-карточка */}
       {(hasData || isProcessing) && (
-        <div className="flex justify-start pr-8">
-          <div className="flex gap-2 max-w-[90%]">
-            <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center shrink-0 border border-border">
-              <Bot className="h-4 w-4 text-secondary-foreground" />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="bg-card border border-border/50 p-3 rounded-2xl rounded-tl-sm shadow-sm">
-                {isProcessing ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing work log...
-                  </div>
-                ) : hasData ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-xs font-semibold text-primary uppercase tracking-wider">Matched Work</span>
-                      <Badge variant="outline" className="text-[10px] h-5">{message.normalizedData?.workCode}</Badge>
-                    </div>
-                    <p className="text-sm font-medium">{message.normalizedData?.workDescription}</p>
-                    
-                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-border/50">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground block">Quantity</span>
-                        <span className="text-sm font-mono">
-                          {message.normalizedData?.quantity} {message.normalizedData?.unit}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-muted-foreground block">Date</span>
-                        <span className="text-sm font-mono">{message.normalizedData?.date || "Today"}</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    Could not identify work item.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        <WorkMatchCard
+          data={message.normalizedData}
+          isProcessing={isProcessing}
+          showActions={showActions}
+          language={language}
+        />
+      )}
+
+      {/* Ошибка распознавания — только если обработано, но данных нет */}
+      {!hasData && !isProcessing && message.isProcessed && (
+        <WorkMatchCard data={null} language={language} />
       )}
     </div>
   );
