@@ -26,7 +26,16 @@ export const objects = pgTable("objects", {
   address: text("address"),
   city: text("city"),
   telegramUserId: bigint("telegram_user_id", { mode: "number" }), // Telegram user ID (owner)
+  isBlocked: boolean("is_blocked").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Admin users registry (telegram_user_id → admin access)
+export const adminUsers = pgTable("admin_users", {
+  id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+  telegramUserId: text("telegram_user_id").notNull().unique(),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const objectParties = pgTable(
@@ -677,6 +686,9 @@ export type InsertTaskMaterial = z.infer<typeof insertTaskMaterialSchema>;
 
 export type EstimatePositionMaterialLink = typeof estimatePositionMaterialLinks.$inferSelect;
 export type InsertEstimatePositionMaterialLink = z.infer<typeof insertEstimatePositionMaterialLinkSchema>;
+
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = typeof adminUsers.$inferInsert;
 
 // Request/Response Types
 export type CreateMessageRequest = {

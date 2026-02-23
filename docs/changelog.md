@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-02-23] - Admin Panel — Панель администратора
+
+### Добавлено
+- `migrations/0014_admin_panel.sql` — таблица `admin_users` (хранит Telegram userId администраторов) + поле `is_blocked` в `objects`
+- `server/middleware/adminAuth.ts` — middleware `requireAdmin`: проверяет принадлежность к таблице `admin_users`; в dev-режиме принимает заголовок `X-Admin-Override: true`
+- `server/storage.ts` — объект `adminStorage` с методами: `listUsers`, `blockUser`, `unblockUser`, `makeAdmin`, `removeAdmin`, `getStats`, `getFailedMessages`, `createCatalogMaterial`, `updateCatalogMaterial`, `deleteCatalogMaterial`, `listAdmins`
+- Admin API (`server/routes.ts`): `GET /api/admin/users`, `POST /api/admin/users/:id/block|unblock|make-admin`, `DELETE /api/admin/users/:id/admin`, `GET /api/admin/stats`, `GET /api/admin/messages/failed`, `POST /api/admin/messages/:id/reprocess`, `POST|PATCH|DELETE /api/admin/materials-catalog/:id`, `GET /api/admin/admins` — все защищены `requireAdmin`
+- `client/src/hooks/use-admin.ts` — хуки: `useAdminStats`, `useAdminUsers`, `useBlockUser`, `useUnblockUser`, `useMakeAdmin`, `useRemoveAdmin`, `useFailedMessages`, `useReprocessMessage`, `useAdminMaterials`, `useAdminCreateMaterial`, `useAdminUpdateMaterial`, `useAdminDeleteMaterial`
+- Frontend страницы: `AdminLayout.tsx` (layout с сайдбаром), `AdminDashboard.tsx` (статистика), `AdminUsers.tsx` (управление пользователями), `AdminMessages.tsx` (очередь AI), `AdminMaterials.tsx` (справочник материалов)
+- Роуты: `/admin`, `/admin/users`, `/admin/messages`, `/admin/materials` в `App.tsx`
+- Ссылка на Admin Panel в `Settings.tsx` (видна только в dev-режиме)
+
+### Безопасность
+- `requireAdmin` использует `=== 'development'` (а не `!== 'production'`) для dev-override
+- Валидация `telegramUserId` в `blockUser/unblockUser`: `parseInt` + проверка `isFinite`
+- `getStats` — `DISTINCT telegram_user_id` для корректного подсчёта уникальных пользователей
+
+### Производительность
+- `listUsers()`: устранён N+1 — используется `Promise.all` для параллельного получения counts
+- `getStats()`: 6 count-запросов выполняются через `Promise.all`
+
 ## [2026-02-23] - Ручная очистка журнала чата + эндпоинт DELETE /api/messages
 
 ### Добавлено

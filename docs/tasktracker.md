@@ -15,6 +15,23 @@
 
 ---
 
+## Задача: Admin Panel — Панель администратора
+- **Статус**: Завершена
+- **Описание**: Реализована минимальная административная панель для управления пользователями, мониторинга системы, очереди AI-обработки и глобального справочника материалов.
+- **Шаги выполнения**:
+  - [x] **ADMIN-001**: SQL-миграция `0014_admin_panel.sql` — таблица `admin_users` + `is_blocked` в `objects`
+  - [x] **ADMIN-002**: Middleware `requireAdmin` (`server/middleware/adminAuth.ts`)
+  - [x] **ADMIN-003**: Admin API — users, stats, messages queue (11 эндпоинтов)
+  - [x] **ADMIN-004**: Admin API — materials catalog CRUD (POST/PATCH/DELETE /api/admin/materials-catalog)
+  - [x] **ADMIN-005**: Frontend — `AdminLayout.tsx` + роуты в `App.tsx` + хуки `use-admin.ts`
+  - [x] **ADMIN-006**: Frontend — `AdminUsers.tsx` (список, блокировка, назначение admin)
+  - [x] **ADMIN-007**: Frontend — `AdminDashboard.tsx` + `AdminMessages.tsx`
+  - [x] **ADMIN-008**: Frontend — `AdminMaterials.tsx` (CRUD глобального каталога)
+  - [x] Code review + исправление 7 найденных проблем (N+1, try/catch, типы, security)
+- **Зависимости**: `shared/schema.ts`, `server/storage.ts`, `server/routes.ts`, `client/src/App.tsx`
+
+---
+
 ## Задача: UI Redesign — приведение интерфейса к референсу Visily
 - **Статус**: В процессе
 - **Описание**: Полное приведение всех экранов приложения к дизайн-референсу из `/docs/Visily-Export_23-02-2026_08-45-27/`. Цель — pixel-perfect соответствие макетам по компонентам, цветам, типографике и поведению.

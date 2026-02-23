@@ -15,6 +15,8 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 import { telegramAuthMiddleware } from "./middleware/telegramAuth";
+import { requireAdmin } from "./middleware/adminAuth";
+import { adminStorage } from "./storage";
 
 function addDaysISO(dateStr: string, days: number): string {
   // Expect YYYY-MM-DD. Work in UTC to avoid timezone shifts.
@@ -1926,6 +1928,172 @@ export async function registerRoutes(
     return res.status(410).json({
       message: "Эндпоинт устарел: акты АОСР теперь создаются только из графика работ (/schedule).",
     });
+  });
+
+  // ========================================
+  // ADMIN API — protected by requireAdmin
+  // ========================================
+
+  const adminAuth = [telegramAuth, requireAdmin] as const;
+
+  // GET /api/admin/users — список всех пользователей
+  app.get("/api/admin/users", ...adminAuth, async (_req, res) => {
+    try {
+      const users = await adminStorage.listUsers();
+      res.json(users);
+    } catch (err) {
+      console.error("[Admin] listUsers error:", err);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // POST /api/admin/users/:telegramUserId/block
+  app.post("/api/admin/users/:telegramUserId/block", ...adminAuth, async (req, res) => {
+    try {
+      await adminStorage.blockUser(req.params.telegramUserId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Admin] blockUser error:", err);
+      res.status(500).json({ error: "Failed to block user" });
+    }
+  });
+
+  // POST /api/admin/users/:telegramUserId/unblock
+  app.post("/api/admin/users/:telegramUserId/unblock", ...adminAuth, async (req, res) => {
+    try {
+      await adminStorage.unblockUser(req.params.telegramUserId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Admin] unblockUser error:", err);
+      res.status(500).json({ error: "Failed to unblock user" });
+    }
+  });
+
+  // POST /api/admin/users/:telegramUserId/make-admin
+  app.post("/api/admin/users/:telegramUserId/make-admin", ...adminAuth, async (req, res) => {
+    try {
+      const note = typeof req.body?.note === "string" ? req.body.note : undefined;
+      await adminStorage.makeAdmin(req.params.telegramUserId, note);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Admin] makeAdmin error:", err);
+      res.status(500).json({ error: "Failed to make admin" });
+    }
+  });
+
+  // DELETE /api/admin/users/:telegramUserId/admin
+  app.delete("/api/admin/users/:telegramUserId/admin", ...adminAuth, async (req, res) => {
+    try {
+      await adminStorage.removeAdmin(req.params.telegramUserId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Admin] removeAdmin error:", err);
+      res.status(500).json({ error: "Failed to remove admin" });
+    }
+  });
+
+  // GET /api/admin/stats — системная статистика
+  app.get("/api/admin/stats", ...adminAuth, async (_req, res) => {
+    try {
+      const stats = await adminStorage.getStats();
+      res.json(stats);
+    } catch (err) {
+      console.error("[Admin] getStats error:", err);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  // GET /api/admin/messages/failed — необработанные сообщения
+  app.get("/api/admin/messages/failed", ...adminAuth, async (_req, res) => {
+    try {
+      const msgs = await adminStorage.getFailedMessages();
+      res.json(msgs);
+    } catch (err) {
+      console.error("[Admin] getFailedMessages error:", err);
+      res.status(500).json({ error: "Failed to fetch failed messages" });
+    }
+  });
+
+  // POST /api/admin/messages/:id/reprocess — повторная обработка сообщения
+  app.post("/api/admin/messages/:id/reprocess", ...adminAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    try {
+      const msg = await storage.getMessage(id);
+      if (!msg) return res.status(404).json({ error: "Message not found" });
+
+      const normalized = await normalizeWorkMessage(msg.messageRaw);
+      await storage.updateMessageNormalized(id, normalized);
+      const updated = await storage.getMessage(id);
+      res.json(updated);
+    } catch (err) {
+      console.error("[Admin] reprocessMessage error:", err);
+      res.status(500).json({ error: "Failed to reprocess message" });
+    }
+  });
+
+  // GET /api/admin/materials-catalog — список (reuse existing, add admin create/update/delete)
+  app.post("/api/admin/materials-catalog", ...adminAuth, async (req, res) => {
+    const schema = z.object({
+      name: z.string().min(1),
+      unit: z.string().optional(),
+      gostTu: z.string().optional(),
+      description: z.string().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    try {
+      const created = await adminStorage.createCatalogMaterial(parsed.data);
+      res.status(201).json(created);
+    } catch (err) {
+      console.error("[Admin] createCatalogMaterial error:", err);
+      res.status(500).json({ error: "Failed to create material" });
+    }
+  });
+
+  app.patch("/api/admin/materials-catalog/:id", ...adminAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const schema = z.object({
+      name: z.string().min(1).optional(),
+      unit: z.string().optional(),
+      gostTu: z.string().optional(),
+      description: z.string().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    try {
+      const updated = await adminStorage.updateCatalogMaterial(id, parsed.data);
+      if (!updated) return res.status(404).json({ error: "Material not found" });
+      res.json(updated);
+    } catch (err) {
+      console.error("[Admin] updateCatalogMaterial error:", err);
+      res.status(500).json({ error: "Failed to update material" });
+    }
+  });
+
+  app.delete("/api/admin/materials-catalog/:id", ...adminAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    try {
+      const deleted = await adminStorage.deleteCatalogMaterial(id);
+      if (!deleted) return res.status(404).json({ error: "Material not found" });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Admin] deleteCatalogMaterial error:", err);
+      res.status(500).json({ error: "Failed to delete material" });
+    }
+  });
+
+  // GET /api/admin/admins — список администраторов
+  app.get("/api/admin/admins", ...adminAuth, async (_req, res) => {
+    try {
+      const admins = await adminStorage.listAdmins();
+      res.json(admins);
+    } catch (err) {
+      console.error("[Admin] listAdmins error:", err);
+      res.status(500).json({ error: "Failed to fetch admins" });
+    }
   });
 
   return httpServer;

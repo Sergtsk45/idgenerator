@@ -69,10 +69,12 @@ import {
   type Schedule,
   type ScheduleTask,
   type TaskMaterial,
-  type InsertTaskMaterial
+  type InsertTaskMaterial,
+  type AdminUser,
+  adminUsers,
 } from "@shared/schema";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql, count } from "drizzle-orm";
 
 type ObjectPartyRole = "customer" | "builder" | "designer";
 type ObjectPersonRole =
@@ -2197,3 +2199,199 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+// === ADMIN STORAGE ===
+
+export interface AdminUserRow {
+  telegramUserId: string;
+  objectId: number | null;
+  objectTitle: string | null;
+  isBlocked: boolean;
+  isAdmin: boolean;
+  objectsCount: number;
+  actsCount: number;
+  messagesCount: number;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  totalObjects: number;
+  totalActs: number;
+  totalMessages: number;
+  processedMessages: number;
+  failedMessages: number;
+  totalMaterials: number;
+}
+
+export const adminStorage = {
+  /** Список всех пользователей с агрегированной статистикой */
+  async listUsers(): Promise<AdminUserRow[]> {
+    // Один запрос: objects + count acts + count messages через LEFT JOIN с subquery
+    const rows = await db
+      .select({
+        telegramUserId: objects.telegramUserId,
+        objectId: objects.id,
+        objectTitle: objects.title,
+        isBlocked: objects.isBlocked,
+      })
+      .from(objects)
+      .orderBy(asc(objects.id));
+
+    if (rows.length === 0) return [];
+
+    // Параллельно: admin set + counts по всем объектам сразу
+    const objectIds = rows.map((r) => r.objectId);
+
+    const [adminRows, actsCountRows, messagesCountRows] = await Promise.all([
+      db.select({ id: adminUsers.telegramUserId }).from(adminUsers),
+      db
+        .select({ objectId: acts.objectId, cnt: count() })
+        .from(acts)
+        .where(inArray(acts.objectId, objectIds))
+        .groupBy(acts.objectId),
+      db
+        .select({ objectId: messages.objectId, cnt: count() })
+        .from(messages)
+        .where(and(isNull(messages.objectId) ? undefined : inArray(messages.objectId, objectIds)))
+        .groupBy(messages.objectId),
+    ]);
+
+    const adminSet = new Set(adminRows.map((r) => r.id));
+    const actsMap = new Map(actsCountRows.map((r) => [r.objectId, Number(r.cnt)]));
+    const messagesMap = new Map(messagesCountRows.map((r) => [r.objectId, Number(r.cnt)]));
+
+    return rows.map((row) => {
+      const userId = row.telegramUserId ? String(row.telegramUserId) : null;
+      return {
+        telegramUserId: userId ?? '(unknown)',
+        objectId: row.objectId,
+        objectTitle: row.objectTitle,
+        isBlocked: row.isBlocked,
+        isAdmin: userId ? adminSet.has(userId) : false,
+        objectsCount: 1,
+        actsCount: actsMap.get(row.objectId) ?? 0,
+        messagesCount: messagesMap.get(row.objectId) ?? 0,
+      };
+    });
+  },
+
+  /** Заблокировать пользователя (все его объекты) */
+  async blockUser(telegramUserId: string): Promise<void> {
+    const uid = parseInt(telegramUserId, 10);
+    if (!Number.isFinite(uid)) throw new Error(`Invalid telegramUserId: ${telegramUserId}`);
+    await db.update(objects).set({ isBlocked: true }).where(eq(objects.telegramUserId, uid));
+  },
+
+  /** Разблокировать пользователя */
+  async unblockUser(telegramUserId: string): Promise<void> {
+    const uid = parseInt(telegramUserId, 10);
+    if (!Number.isFinite(uid)) throw new Error(`Invalid telegramUserId: ${telegramUserId}`);
+    await db.update(objects).set({ isBlocked: false }).where(eq(objects.telegramUserId, uid));
+  },
+
+  /** Назначить пользователя администратором */
+  async makeAdmin(telegramUserId: string, note?: string): Promise<void> {
+    await db
+      .insert(adminUsers)
+      .values({ telegramUserId, note: note ?? null })
+      .onConflictDoNothing();
+  },
+
+  /** Снять права администратора */
+  async removeAdmin(telegramUserId: string): Promise<void> {
+    await db.delete(adminUsers).where(eq(adminUsers.telegramUserId, telegramUserId));
+  },
+
+  /** Проверить, является ли пользователь администратором */
+  async isAdmin(telegramUserId: string): Promise<boolean> {
+    const rows = await db
+      .select({ id: adminUsers.id })
+      .from(adminUsers)
+      .where(eq(adminUsers.telegramUserId, telegramUserId))
+      .limit(1);
+    return rows.length > 0;
+  },
+
+  /** Системная статистика */
+  async getStats(): Promise<AdminStats> {
+    const [totalUsersRow, totalObjectsRow, totalActsRow, totalMessagesRow, processedRow, totalMaterialsRow] =
+      await Promise.all([
+        db.select({ cnt: sql<number>`count(DISTINCT telegram_user_id)` }).from(objects),
+        db.select({ cnt: count() }).from(objects),
+        db.select({ cnt: count() }).from(acts),
+        db.select({ cnt: count() }).from(messages),
+        db.select({ cnt: count() }).from(messages).where(eq(messages.isProcessed, true)),
+        db.select({ cnt: count() }).from(materialsCatalog),
+      ]);
+
+    const totalMessages = Number(totalMessagesRow[0].cnt);
+    const processedMessages = Number(processedRow[0].cnt);
+
+    return {
+      totalUsers: Number(totalUsersRow[0].cnt),
+      totalObjects: Number(totalObjectsRow[0].cnt),
+      totalActs: Number(totalActsRow[0].cnt),
+      totalMessages,
+      processedMessages,
+      failedMessages: totalMessages - processedMessages,
+      totalMaterials: Number(totalMaterialsRow[0].cnt),
+    };
+  },
+
+  /** Список необработанных/failed сообщений */
+  async getFailedMessages(): Promise<typeof messages.$inferSelect[]> {
+    return db
+      .select()
+      .from(messages)
+      .where(eq(messages.isProcessed, false))
+      .orderBy(desc(messages.createdAt))
+      .limit(100);
+  },
+
+  /** Создать материал в глобальном каталоге */
+  async createCatalogMaterial(data: {
+    name: string;
+    unit?: string;
+    gostTu?: string;
+    description?: string;
+  }): Promise<typeof materialsCatalog.$inferSelect> {
+    const [created] = await db
+      .insert(materialsCatalog)
+      .values({
+        name: data.name,
+        baseUnit: data.unit ?? null,
+        standardRef: data.gostTu ?? null,
+        params: {},
+      })
+      .returning();
+    return created;
+  },
+
+  /** Обновить материал в глобальном каталоге */
+  async updateCatalogMaterial(
+    id: number,
+    data: Partial<{ name: string; unit: string; gostTu: string; description: string }>
+  ): Promise<typeof materialsCatalog.$inferSelect | null> {
+    const patch: Partial<{ name: string; baseUnit: string; standardRef: string }> = {};
+    if (data.name !== undefined) patch.name = data.name;
+    if (data.unit !== undefined) patch.baseUnit = data.unit;
+    if (data.gostTu !== undefined) patch.standardRef = data.gostTu;
+    const [updated] = await db
+      .update(materialsCatalog)
+      .set(patch)
+      .where(eq(materialsCatalog.id, id))
+      .returning();
+    return updated ?? null;
+  },
+
+  /** Удалить материал из глобального каталога */
+  async deleteCatalogMaterial(id: number): Promise<boolean> {
+    const result = await db.delete(materialsCatalog).where(eq(materialsCatalog.id, id)).returning();
+    return result.length > 0;
+  },
+
+  /** Список всех администраторов */
+  async listAdmins(): Promise<AdminUser[]> {
+    return db.select().from(adminUsers).orderBy(asc(adminUsers.createdAt));
+  },
+};

@@ -15,6 +15,10 @@ import SourceData from "@/pages/SourceData";
 import SourceMaterials from "@/pages/SourceMaterials";
 import SourceMaterialDetail from "@/pages/SourceMaterialDetail";
 import SourceDocuments from "@/pages/SourceDocuments";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminMessages from "@/pages/admin/AdminMessages";
+import AdminMaterials from "@/pages/admin/AdminMaterials";
 
 function Router() {
   return (
@@ -29,6 +33,11 @@ function Router() {
       <Route path="/source/materials/:id" component={SourceMaterialDetail} />
       <Route path="/source/documents" component={SourceDocuments} />
       <Route path="/settings" component={Settings} />
+      {/* Admin Panel */}
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin/users" component={AdminUsers} />
+      <Route path="/admin/messages" component={AdminMessages} />
+      <Route path="/admin/materials" component={AdminMaterials} />
       <Route component={NotFound} />
     </Switch>
   );

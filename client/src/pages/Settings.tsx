@@ -6,8 +6,9 @@
  */
 
 import { cn } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Shield } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useTelegram } from "@/hooks/useTelegram";
 import { useLanguageStore, translations } from "@/lib/i18n";
@@ -153,6 +154,30 @@ export default function Settings() {
             </div>
           </div>
         </div>
+
+        {/* Admin Panel link — visible only in dev; in prod requires server-side admin check */}
+        {import.meta.env.DEV && (
+          <>
+            <div className="px-4 pt-4 pb-1">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {language === "ru" ? "АДМИНИСТРИРОВАНИЕ" : "ADMINISTRATION"}
+              </p>
+            </div>
+            <div className="mx-4 bg-card border border-border/60 rounded-2xl">
+              <Link href="/admin">
+                <a className="flex items-center justify-between px-4 py-3.5 cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-5 w-5 text-primary" />
+                    <p className="text-[15px]">
+                      {language === "ru" ? "Панель администратора" : "Admin Panel"}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
+                </a>
+              </Link>
+            </div>
+          </>
+        )}
 
         {/* Кнопка выхода */}
         <div className="px-4 pt-4 pb-8">
