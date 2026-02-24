@@ -181,7 +181,7 @@ export default function WorkLog() {
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
                 className={cn(
-                  "shrink-0 px-5 py-2 rounded-full text-[14px] font-medium transition-colors whitespace-nowrap min-h-10 snap-start",
+                  "shrink-0 w-20 h-20 flex items-center justify-center rounded-lg text-[14px] font-medium transition-colors snap-start",
                   activeTab === tab.value
                     ? "bg-primary text-white"
                     : "bg-muted/60 text-muted-foreground hover:text-foreground",
