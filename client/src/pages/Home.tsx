@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMessages, useCreateMessage, useProcessMessage, useClearMessages } from "@/hooks/use-messages";
 import { MessageBubble } from "@/components/MessageBubble";
-import { Send, Mic, Loader2, Trash2 } from "lucide-react";
+import { KeyRound, Send, Mic, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguageStore, translations } from "@/lib/i18n";
@@ -23,6 +23,8 @@ import { useTelegram } from "@/hooks/useTelegram";
 import { Link } from "wouter";
 import { X, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { getBrowserAccessToken } from "@/lib/browser-access";
 
 export default function Home() {
   const { language } = useLanguageStore();
@@ -33,15 +35,26 @@ export default function Home() {
     : undefined;
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { data: messages = [], isLoading } = useMessages();
+  const { data: messages = [], isLoading, isError: isMessagesError, error: messagesError } = useMessages();
   const createMessage = useCreateMessage();
   const processMessage = useProcessMessage();
   const { toast } = useToast();
-  const { user: telegramUser } = useTelegram();
+  const { user: telegramUser, isInTelegram } = useTelegram();
   const { data: works = [] } = useWorks();
   const clearMessages = useClearMessages();
 
   const currentUser = telegramUser?.id ? String(telegramUser.id) : "dev_user";
+  const browserToken = getBrowserAccessToken();
+
+  const isAuthError =
+    isMessagesError &&
+    messagesError instanceof Error &&
+    /(^|\s)(401|403)(\s|:)|authentication required|telegram authentication required/i.test(
+      messagesError.message,
+    );
+
+  const needsBrowserToken = !isInTelegram && !browserToken;
+  const hasInvalidBrowserToken = !isInTelegram && !!browserToken && isAuthError;
 
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
 
@@ -49,7 +62,13 @@ export default function Home() {
     localStorage.getItem("onboarding_dismissed") === "1"
   );
 
-  const showOnboarding = !onboardingDismissed && messages.length === 0 && works.length === 0 && !isLoading;
+  const showOnboarding =
+    !needsBrowserToken &&
+    !hasInvalidBrowserToken &&
+    !onboardingDismissed &&
+    messages.length === 0 &&
+    works.length === 0 &&
+    !isLoading;
 
   const handleDismissOnboarding = () => {
     localStorage.setItem("onboarding_dismissed", "1");
@@ -109,6 +128,44 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen bg-background bg-grain">
       <Header title={t.title} subtitle={objectSubtitle} showAvatar />
+
+      {/* Browser access banner (outside Telegram) */}
+      {!isInTelegram && (needsBrowserToken || hasInvalidBrowserToken) && (
+        <div className="px-4 pt-3">
+          <div className="max-w-md mx-auto">
+            <Alert variant={hasInvalidBrowserToken ? "destructive" : "default"}>
+              <KeyRound className="h-4 w-4" />
+              <AlertTitle>
+                {language === "ru"
+                  ? hasInvalidBrowserToken
+                    ? "Неверный токен"
+                    : "Нужен токен"
+                  : hasInvalidBrowserToken
+                    ? "Invalid token"
+                    : "Access token required"}
+              </AlertTitle>
+              <AlertDescription>
+                <p>
+                  {language === "ru"
+                    ? hasInvalidBrowserToken
+                      ? "Текущий access-token не подходит. Обновите токен, чтобы приложение работало в браузере."
+                      : "Чтобы работать в браузере (вне Telegram), задайте access-token."
+                    : hasInvalidBrowserToken
+                      ? "Your current access token is not valid. Update it to use the app in browser."
+                      : "To use the app in browser (outside Telegram), set an access token."}
+                </p>
+                <div className="mt-3">
+                  <Link href="/login">
+                    <Button size="sm" variant={hasInvalidBrowserToken ? "secondary" : "default"}>
+                      {language === "ru" ? "Перейти к входу" : "Go to login"}
+                    </Button>
+                  </Link>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </div>
+        </div>
+      )}
 
       {/* Кнопка очистки истории — показывается когда есть сообщения */}
       {sortedMessages.length > 0 && !isLoading && (
@@ -205,6 +262,31 @@ export default function Home() {
           {isLoading ? (
             <div className="flex justify-center items-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+            </div>
+          ) : !isInTelegram && (needsBrowserToken || hasInvalidBrowserToken) ? (
+            <div className="text-center py-20 opacity-70">
+              <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <KeyRound className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="font-semibold text-lg">
+                {language === "ru"
+                  ? hasInvalidBrowserToken
+                    ? "Нужен корректный токен"
+                    : "Нужен токен"
+                  : hasInvalidBrowserToken
+                    ? "Valid token required"
+                    : "Token required"}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-2">
+                {language === "ru"
+                  ? "Откройте приложение в Telegram или настройте access-token для браузера."
+                  : "Open the app in Telegram or configure an access token for browser access."}
+              </p>
+              <div className="mt-4">
+                <Link href="/login">
+                  <Button>{language === "ru" ? "Перейти к входу" : "Go to login"}</Button>
+                </Link>
+              </div>
             </div>
           ) : sortedMessages.length === 0 ? (
             <div className="text-center py-20 opacity-50">

@@ -11,6 +11,8 @@
   - `server/middleware/browserTokenAuth.ts`: заголовок `X-App-Access-Token` (значение сравнивается с `APP_ACCESS_TOKEN`).
   - `client/src/pages/Login.tsx`, роут `/login`: экран ввода токена, сохранение в localStorage.
   - `client/src/lib/queryClient.ts`, `client/src/hooks/use-messages.ts`, `client/src/hooks/use-admin.ts`: добавлен заголовок `X-App-Access-Token` при наличии токена.
+  - `client/src/hooks/use-section3.ts`: запрос `/api/worklog/section3` теперь тоже отправляет `X-Telegram-Init-Data` / `X-App-Access-Token` (иначе ЖР не обновлялся в MiniApp/production).
+  - `client/src/pages/Home.tsx`: явный баннер/экран для браузера вне Telegram — если не задан или неверный access-token, показывается подсказка и кнопка перехода на `/login`.
 
 ---
 
