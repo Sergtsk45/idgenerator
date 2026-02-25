@@ -94,13 +94,13 @@ export default function Home() {
       setTimeout(() => {
         processMessage.mutate(newMessage.id);
       }, 1000);
-    } catch {
+    } catch (err) {
+      const details = err instanceof Error ? err.message : "";
+      const baseDescription =
+        language === "ru" ? "Не удалось отправить сообщение" : "Failed to send message";
       toast({
         title: language === "ru" ? "Ошибка" : "Error",
-        description:
-          language === "ru"
-            ? "Не удалось отправить сообщение"
-            : "Failed to send message",
+        description: details ? `${baseDescription}. ${details}` : baseDescription,
         variant: "destructive",
       });
     }
