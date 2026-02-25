@@ -1136,12 +1136,15 @@ export default function Schedule() {
           if (!open) setSelectedTask(null);
         }}
       >
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent
+          className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col touch-pan-y overscroll-contain overflow-x-hidden"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>{t.edit}</DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y pr-1">
             <div className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="grid gap-2">
