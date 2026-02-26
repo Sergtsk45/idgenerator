@@ -247,7 +247,6 @@ export default function SelectTaskMaterials() {
                 variant="outline"
                 className="w-full"
                 onClick={() => setAddDialogOpen(true)}
-                disabled={availableMaterials.length === 0}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 {t.addMaterial}
@@ -385,42 +384,69 @@ export default function SelectTaskMaterials() {
           </DialogHeader>
 
           <div className="grid gap-4">
-            {/* Search input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder={t.searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+            {/* Empty state: no materials in project */}
+            {(projectMaterials as ProjectMaterial[]).length === 0 && availableMaterials.length === 0 ? (
+              <div className="text-center py-8 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {language === "ru" 
+                    ? "Сначала добавьте материалы в проект" 
+                    : "Add materials to project first"}
+                </p>
+                <Button
+                  onClick={() => {
+                    setAddDialogOpen(false);
+                    navigate("/source/materials");
+                  }}
+                >
+                  {language === "ru" ? "Перейти к материалам" : "Go to materials"}
+                </Button>
+              </div>
+            ) : (projectMaterials as ProjectMaterial[]).length > 0 && availableMaterials.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">
+                  {language === "ru" 
+                    ? "Все материалы уже добавлены в задачу" 
+                    : "All materials already added to task"}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Search input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder={t.searchPlaceholder}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
 
-            {/* Materials list */}
-            <div className="max-h-[300px] overflow-y-auto border rounded-lg">
-              {filteredAvailableMaterials.length === 0 ? (
-                <div className="text-center py-8 text-sm text-muted-foreground">
-                  {searchQuery.trim()
-                    ? (language === "ru" ? "Материалы не найдены" : "No materials found")
-                    : t.noMaterials}
+                {/* Materials list */}
+                <div className="max-h-[300px] overflow-y-auto border rounded-lg">
+                  {filteredAvailableMaterials.length === 0 ? (
+                    <div className="text-center py-8 text-sm text-muted-foreground">
+                      {language === "ru" ? "Материалы не найдены" : "No materials found"}
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {filteredAvailableMaterials.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleAddMaterial(m.id)}
+                          className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent transition-colors text-left"
+                        >
+                          <Check className="h-4 w-4 shrink-0 opacity-0" />
+                          <span className="text-sm flex-1 min-w-0 break-words">{m.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="divide-y">
-                  {filteredAvailableMaterials.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => handleAddMaterial(m.id)}
-                      className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent transition-colors text-left"
-                    >
-                      <Check className="h-4 w-4 shrink-0 opacity-0" />
-                      <span className="text-sm flex-1 min-w-0 break-words">{m.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           <DialogFooter>

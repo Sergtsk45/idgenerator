@@ -1454,13 +1454,59 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Schedule task not found" });
       }
 
-      const nextActNumber = input.actNumber !== undefined ? input.actNumber : (existing as any).actNumber;
-      const nextTemplateId =
-        input.actTemplateId !== undefined ? input.actTemplateId : ((existing as any).actTemplateId ?? null);
+      const scheduleId = Number((existing as any).scheduleId);
+      const existingActNumber = (existing as any).actNumber;
+      const existingTemplateId = (existing as any).actTemplateId ?? null;
+      
+      const nextActNumber = input.actNumber !== undefined ? input.actNumber : existingActNumber;
+      let nextTemplateId = input.actTemplateId !== undefined ? input.actTemplateId : existingTemplateId;
 
-      // If changing actTemplateId for a task inside an actNumber group, enforce one template per actNumber.
+      // BLOCK A: Enforce rule when actNumber changes (task enters or moves to an act)
+      if (input.actNumber !== undefined && input.actNumber !== existingActNumber && input.actNumber != null) {
+        const tasksInTargetAct = await storage.getTasksByActNumber(scheduleId, Number(input.actNumber));
+        const groupTemplateId = tasksInTargetAct
+          .map((t: any) => (t as any).actTemplateId)
+          .find((v: any) => v != null) ?? null;
+
+        if (groupTemplateId != null) {
+          if (existingActNumber == null) {
+            // Sub-case A1: Task had NO actNumber — entering act for the first time.
+            // Always ask user to confirm applying the act type to this task only.
+            if (!input.updateAllTasks) {
+              return res.status(409).json({
+                message: "В акте уже назначен тип. Назначить тип текущей задаче?",
+                actNumber: input.actNumber,
+                currentTemplateId: groupTemplateId,
+                otherTasksCount: Math.max(0, tasksInTargetAct.length),
+                conflictKind: "actNumberAssign" as const,
+              });
+            }
+            // Confirmed: apply type to this task only (other tasks already have it)
+            input.actTemplateId = groupTemplateId;
+            nextTemplateId = groupTemplateId;
+          } else {
+            // Sub-case A2: Task already had actNumber — moving to a different act.
+            // Conflict only if task has a different type.
+            const taskWantsTemplateId = input.actTemplateId !== undefined ? input.actTemplateId : existingTemplateId;
+            if (taskWantsTemplateId != null && taskWantsTemplateId !== groupTemplateId && !input.updateAllTasks) {
+              return res.status(409).json({
+                message: "В акте уже назначен другой тип. Добавить работу с типом из акта?",
+                actNumber: input.actNumber,
+                currentTemplateId: groupTemplateId,
+                otherTasksCount: Math.max(0, tasksInTargetAct.length),
+                conflictKind: "actNumberChange" as const,
+              });
+            }
+            // Auto-apply group type to task
+            input.actTemplateId = groupTemplateId;
+            nextTemplateId = groupTemplateId;
+          }
+        }
+      }
+
+      // BLOCK B: Enforce rule when actTemplateId changes (sync across all tasks in act)
       if (input.actTemplateId !== undefined && nextActNumber != null) {
-        const tasksInAct = await storage.getTasksByActNumber(Number((existing as any).scheduleId), Number(nextActNumber));
+        const tasksInAct = await storage.getTasksByActNumber(scheduleId, Number(nextActNumber));
         const distinct = Array.from(
           new Set(tasksInAct.map((t: any) => (t as any).actTemplateId).filter((v: any) => v != null)),
         );
@@ -1468,22 +1514,21 @@ export async function registerRoutes(
         const conflict = distinct.length > 0 && (distinct.length > 1 || distinct[0] !== nextTemplateId);
         if (conflict && !input.updateAllTasks) {
           return res.status(409).json({
-            message:
-              "В этом акте уже выбран другой тип. Включите updateAllTasks=true, чтобы изменить тип для всех задач акта.",
+            message: "В этом акте уже выбран другой тип. Изменить тип для всех задач акта?",
             actNumber: nextActNumber,
             currentTemplateId: distinct[0] ?? null,
             otherTasksCount: Math.max(0, tasksInAct.length - 1),
+            conflictKind: "templateChange" as const,
           });
         }
 
-        // Sync templateId across all tasks of the same actNumber if confirmed.
-        if (conflict && input.updateAllTasks) {
-          await storage.updateActTemplateForActNumber({
-            scheduleId: Number((existing as any).scheduleId),
-            actNumber: Number(nextActNumber),
-            actTemplateId: nextTemplateId,
-          });
-        }
+        // Always sync templateId across ALL tasks of the same actNumber
+        // (even if no conflict — ensures rule enforcement)
+        await storage.updateActTemplateForActNumber({
+          scheduleId,
+          actNumber: Number(nextActNumber),
+          actTemplateId: nextTemplateId,
+        });
 
         // Also update act record (if exists) to keep list view consistent before next generate-acts.
         const act = await storage.getActByNumber(Number(nextActNumber));

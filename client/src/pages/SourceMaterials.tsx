@@ -18,12 +18,14 @@ import { MaterialCard, type ProjectMaterialListItem } from "@/components/materia
 import { MaterialWizard } from "@/components/materials/MaterialWizard";
 import { useLanguageStore } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 type Filter = "all" | "catalog" | "local" | "attention";
 
 export default function SourceMaterials() {
   const [, setLocation] = useLocation();
   const { language } = useLanguageStore();
+  const { toast } = useToast();
   const currentObject = useCurrentObject();
   const objectId = currentObject.data?.id;
 
@@ -34,6 +36,22 @@ export default function SourceMaterials() {
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const list = (materialsQuery.data ?? []) as any[];
+  const canAddMaterial = Number.isFinite(objectId) && (objectId as number) > 0;
+
+  const openWizard = () => {
+    if (!canAddMaterial) {
+      toast({
+        title: language === "ru" ? "Объект ещё не загружен" : "Object is not loaded yet",
+        description:
+          language === "ru"
+            ? "Подождите загрузки объекта и попробуйте снова."
+            : "Wait until the object loads and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setWizardOpen(true);
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -129,7 +147,7 @@ export default function SourceMaterials() {
           ) : filtered.length === 0 ? (
             <div className="py-10 text-center text-muted-foreground">
               <div className="mb-3">{language === "ru" ? "Материалы не найдены" : "No materials found"}</div>
-              <Button onClick={() => setWizardOpen(true)} className="rounded-xl">
+              <Button onClick={openWizard} className="rounded-xl">
                 <Plus className="h-4 w-4 mr-2" />
                 {language === "ru" ? "Добавить материал" : "Add material"}
               </Button>
@@ -152,15 +170,13 @@ export default function SourceMaterials() {
 
       {/* FAB */}
       <div className="fixed bottom-20 right-4 z-40">
-        {Number.isFinite(objectId) ? (
-          <Button
-            size="icon"
-            className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
-            onClick={() => setWizardOpen(true)}
-          >
-            <Plus className="h-6 w-6" />
-          </Button>
-        ) : null}
+        <Button
+          size="icon"
+          className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
+          onClick={openWizard}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
       </div>
 
       {Number.isFinite(objectId) ? (

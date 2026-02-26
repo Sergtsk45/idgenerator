@@ -915,6 +915,7 @@ export const api = {
           actNumber: z.number().int().positive().nullable(),
           currentTemplateId: z.number().int().positive().nullable(),
           otherTasksCount: z.number().int().min(0),
+          conflictKind: z.enum(["actNumberAssign", "actNumberChange", "templateChange"]).optional(),
         }),
       },
     },

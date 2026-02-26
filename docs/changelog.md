@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-02-26] - График: диалог разрешения конфликтов типа акта
+### Добавлено
+- При конфликте типа акта (409) — диалог с выбором: применить тип из акта к задаче или изменить тип для всех задач акта.
+- `conflictKind`: actNumberAssign, actNumberChange, templateChange.
+- Выбор шаблона акта через `sessionStorage.selectedActTemplateId` вместо `history.state`.
+
+### Изменено
+- `server/routes.ts`: 409 с полями actNumber, currentTemplateId, conflictKind; логика BLOCK A/B.
+- `Schedule.tsx`: updateAllTasks по умолчанию undefined; обработка 409 и handleActConflictAccept.
+
+---
+
+## [2026-02-26] - Материалы: понятные empty-state при добавлении
+### Исправлено
+- `client/src/pages/SelectTaskMaterials.tsx`: диалог «Добавить материал» теперь показывает явные состояния:
+  - если в проекте нет материалов — текст «Сначала добавьте материалы в проект» + кнопка перехода на `/source/materials`
+  - если все материалы проекта уже добавлены в задачу — текст «Все материалы уже добавлены в задачу»
+- `client/src/pages/SourceMaterials.tsx`: кнопка «Добавить материал» больше не “молчит”, если текущий объект ещё не загрузился — показывается toast с причиной.
+
 ## [2026-02-25] - Telegram MiniApp: исправлена отправка сообщений в production
 ### Исправлено
 - `client/src/hooks/use-messages.ts`: все запросы к `/api/messages` теперь отправляют `X-Telegram-Init-Data` (нужно для `telegramAuth` в production); улучшено извлечение текста ошибки из ответа API (`message`/`error`/text).

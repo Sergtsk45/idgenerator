@@ -68,20 +68,15 @@ export default function SelectActTemplate() {
   };
 
   const handleSelect = (templateId: string) => {
-    // Navigate back with selected template ID in state
+    // Store selected template ID in sessionStorage (synchronous, no race condition)
+    sessionStorage.setItem("selectedActTemplateId", templateId);
     window.history.back();
-    // Set state for the previous page to pick up
-    setTimeout(() => {
-      window.history.replaceState({ selectedTemplateId: templateId }, document.title);
-    }, 0);
   };
 
   const handleClear = () => {
-    // Navigate back with null to clear selection
+    // Store clear signal in sessionStorage
+    sessionStorage.setItem("selectedActTemplateId", "__clear__");
     window.history.back();
-    setTimeout(() => {
-      window.history.replaceState({ selectedTemplateId: null }, document.title);
-    }, 0);
   };
 
   const isSearching = search.trim() !== "";

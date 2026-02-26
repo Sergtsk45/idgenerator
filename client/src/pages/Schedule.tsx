@@ -109,6 +109,15 @@ export default function Schedule() {
   const [editProjectDrawings, setEditProjectDrawings] = useState<string>("");
   const [editNormativeRefs, setEditNormativeRefs] = useState<string>("");
   const [editExecutiveSchemes, setEditExecutiveSchemes] = useState<ExecutiveSchemeItem[]>([]);
+  
+  // Act type conflict dialog state
+  const [actConflictDialogOpen, setActConflictDialogOpen] = useState(false);
+  const [actConflictData, setActConflictData] = useState<{
+    actNumber: number;
+    currentTemplateId: number | null;
+    otherTasksCount: number;
+    conflictKind?: "actNumberAssign" | "actNumberChange" | "templateChange";
+  } | null>(null);
 
   const { data: estimates = [] } = useEstimates();
   const activeEstimateId = scheduleEstimateId;
@@ -140,19 +149,18 @@ export default function Schedule() {
   // Handle return from SelectActTemplate / SelectTaskMaterials sub-pages
   useEffect(() => {
     const handlePopState = () => {
-      const state = window.history.state;
-
       // Check if returning from a sub-page (taskId was saved before navigate)
       const savedTaskIdStr = sessionStorage.getItem("scheduleEditTaskId");
       if (savedTaskIdStr) {
         sessionStorage.removeItem("scheduleEditTaskId");
         const savedTaskId = Number(savedTaskIdStr);
 
-        // Template selection result (only from SelectActTemplate)
+        // Template selection result (from SelectActTemplate via sessionStorage)
         let resolvedTemplateId: string | null | undefined = undefined;
-        if (state?.selectedTemplateId !== undefined) {
-          resolvedTemplateId = state.selectedTemplateId === null ? null : String(state.selectedTemplateId);
-          window.history.replaceState({}, document.title);
+        const storedTemplateId = sessionStorage.getItem("selectedActTemplateId");
+        if (storedTemplateId !== null) {
+          sessionStorage.removeItem("selectedActTemplateId");
+          resolvedTemplateId = storedTemplateId === "__clear__" ? null : storedTemplateId;
         }
 
         const currentTasks = tasksRef.current;
@@ -174,17 +182,6 @@ export default function Schedule() {
             setPendingEditTemplateId(resolvedTemplateId);
           }
         }
-        return;
-      }
-
-      // Legacy: SelectActTemplate return without savedTaskId (dialog was already open)
-      if (state?.selectedTemplateId !== undefined) {
-        if (state.selectedTemplateId === null) {
-          setEditActTemplateId("");
-        } else {
-          setEditActTemplateId(String(state.selectedTemplateId));
-        }
-        window.history.replaceState({}, document.title);
       }
     };
 
@@ -641,8 +638,8 @@ export default function Schedule() {
           projectDrawings: editProjectDrawings.trim() ? editProjectDrawings : null,
           normativeRefs: editNormativeRefs.trim() ? editNormativeRefs : null,
           executiveSchemes: (editExecutiveSchemes ?? []).filter((s) => String(s?.title ?? "").trim().length > 0),
-          // change type for all tasks of this actNumber (with backend warning mechanics)
-          updateAllTasks: nextActNumber != null && nextActTemplateId != null ? true : undefined,
+          // Do not auto-send updateAllTasks — let backend enforce rules and return 409 if needed
+          updateAllTasks: undefined,
         },
         scheduleId: scheduleId ?? undefined,
       });
@@ -652,6 +649,88 @@ export default function Schedule() {
         description: language === "ru" ? "Данные задачи обновлены" : "Task data updated",
         duration: 1800,
       });
+      setEditOpen(false);
+    } catch (err: any) {
+      // Check if this is a 409 conflict error (act type mismatch)
+      if (err?.status === 409 && err?.data?.actNumber && err?.data?.currentTemplateId !== undefined) {
+        setActConflictData({
+          actNumber: err.data.actNumber,
+          currentTemplateId: err.data.currentTemplateId,
+          otherTasksCount: err.data.otherTasksCount ?? 0,
+          conflictKind: err.data.conflictKind,
+        });
+        setActConflictDialogOpen(true);
+        return;
+      }
+      
+      toast({
+        title: t.errorTitle,
+        description: err?.message || t.updateError,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleActConflictAccept = async () => {
+    if (!selectedTask || !actConflictData) return;
+    
+    try {
+      const conflictKind = actConflictData.conflictKind;
+      
+      if (conflictKind === "actNumberAssign" || conflictKind === "actNumberChange") {
+        // Scenario A: task entering act (no prev actNumber) or moving to act with different type
+        // Apply the act's type to this task and re-save
+        const conflictTemplateId = actConflictData.currentTemplateId;
+        setEditActTemplateId(conflictTemplateId ? String(conflictTemplateId) : "");
+        
+        // Close conflict dialog
+        setActConflictDialogOpen(false);
+        setActConflictData(null);
+        
+        // Show success message
+        toast({
+          title: language === "ru" ? "Тип акта применён" : "Act type applied",
+          description: language === "ru" 
+            ? "Тип акта из существующего акта применён к текущей работе" 
+            : "Act type from existing act applied to current task",
+          duration: 2000,
+        });
+      } else {
+        // Scenario: changing type for all tasks in act (templateChange)
+        // Re-send request with updateAllTasks: true
+        setActConflictDialogOpen(false);
+        setActConflictData(null);
+        
+        const durationNum = Number(editDurationDays.trim() || "1");
+        const nextActNumber = editActNumber.trim() === "" ? null : Number(editActNumber);
+        const nextActTemplateId = editActTemplateId.trim() === "" ? null : Number(editActTemplateId);
+        const nextQuantity = editQuantity.trim() === "" ? null : Number(editQuantity);
+        const nextUnit = editUnit.trim() || null;
+        
+        await patchTask.mutateAsync({
+          id: selectedTask.id,
+          patch: {
+            startDate: editStartDate,
+            durationDays: durationNum,
+            actNumber: nextActNumber,
+            actTemplateId: nextActTemplateId,
+            quantity: nextQuantity,
+            unit: nextUnit,
+            projectDrawings: editProjectDrawings.trim() ? editProjectDrawings : null,
+            normativeRefs: editNormativeRefs.trim() ? editNormativeRefs : null,
+            executiveSchemes: (editExecutiveSchemes ?? []).filter((s) => String(s?.title ?? "").trim().length > 0),
+            updateAllTasks: true, // Confirmed by user
+          },
+          scheduleId: scheduleId ?? undefined,
+        });
+        
+        toast({
+          title: language === "ru" ? "Сохранено" : "Saved",
+          description: language === "ru" ? "Тип акта изменён для всех задач" : "Act type changed for all tasks",
+          duration: 2000,
+        });
+        setEditOpen(false);
+      }
     } catch (err: any) {
       toast({
         title: t.errorTitle,
@@ -659,6 +738,12 @@ export default function Schedule() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleActConflictReject = () => {
+    // Close conflict dialog and return to editing
+    setActConflictDialogOpen(false);
+    setActConflictData(null);
   };
 
   const [viewOffsetDays, setViewOffsetDays] = useState(0);
@@ -1396,6 +1481,75 @@ export default function Schedule() {
               {t.save}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Act type conflict dialog */}
+      <Dialog open={actConflictDialogOpen} onOpenChange={setActConflictDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {language === "ru" ? "Конфликт типа акта" : "Act type conflict"}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Template info block — shared across all conflict kinds */}
+            <p className="text-sm text-muted-foreground">
+              {language === "ru"
+                ? `В акте №${actConflictData?.actNumber ?? ""} назначен тип:`
+                : `Act #${actConflictData?.actNumber ?? ""} has assigned type:`}
+            </p>
+
+            {actConflictData?.currentTemplateId && (
+              <div className="p-3 border rounded-lg bg-muted/50">
+                <div className="text-sm font-medium">
+                  {(() => {
+                    const tpl = (templatesData?.templates ?? []).find(
+                      (t: any) => t.id === actConflictData.currentTemplateId
+                    );
+                    if (!tpl) return `ID: ${actConflictData.currentTemplateId}`;
+                    return `${String(tpl.code ?? "")} — ${
+                      language === "ru"
+                        ? String(tpl.title ?? "")
+                        : String((tpl as any).titleEn ?? tpl.title ?? "")
+                    }`;
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Question text depends on conflict kind */}
+            <p className="text-sm">
+              {actConflictData?.conflictKind === "actNumberAssign" && (
+                language === "ru"
+                  ? "Назначить этот тип текущей задаче?"
+                  : "Assign this type to the current task?"
+              )}
+              {actConflictData?.conflictKind === "actNumberChange" && (
+                language === "ru"
+                  ? "Добавить текущую работу в акт с этим типом?"
+                  : "Add current task to this act with this type?"
+              )}
+              {actConflictData?.conflictKind === "templateChange" && (
+                language === "ru"
+                  ? `Изменить тип для всех задач акта (ещё ${actConflictData?.otherTasksCount ?? 0} задач)?`
+                  : `Change type for all tasks in act (${actConflictData?.otherTasksCount ?? 0} more tasks)?`
+              )}
+              {!actConflictData?.conflictKind && (
+                language === "ru" ? "Применить тип к текущей задаче?" : "Apply type to current task?"
+              )}
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={handleActConflictReject}>
+              {language === "ru" ? "Нет" : "No"}
+            </Button>
+            <Button onClick={handleActConflictAccept}>
+              {language === "ru" ? "Да" : "Yes"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
