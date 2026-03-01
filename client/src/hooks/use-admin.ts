@@ -214,3 +214,29 @@ export function useAdminDeleteMaterial() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "materials-catalog"] }),
   });
 }
+
+export function useAdminImportMaterials() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      mode: "merge" | "replace";
+      items: Array<{
+        name: string;
+        unit?: string;
+        gostTu?: string;
+        category?: "material" | "equipment" | "product";
+      }>;
+    }) => {
+      const res = await adminMutate("POST", "/api/admin/materials-catalog/import", data);
+      return res.json() as Promise<{
+        received: number;
+        created: number;
+        updated: number;
+        skipped: number;
+      }>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "materials-catalog"] });
+    },
+  });
+}

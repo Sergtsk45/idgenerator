@@ -5,13 +5,14 @@
  * @created: 2026-02-23
  */
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { AdminLayout } from "./AdminLayout";
 import {
   useAdminMaterials,
   useAdminCreateMaterial,
   useAdminUpdateMaterial,
   useAdminDeleteMaterial,
+  useAdminImportMaterials,
   type CatalogMaterial,
 } from "@/hooks/use-admin";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, FileUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { parseMaterialsExcel } from "@/lib/materialsParser";
 
 interface MaterialForm {
   name: string;
@@ -118,11 +120,14 @@ export default function AdminMaterials() {
   const createMaterial = useAdminCreateMaterial();
   const updateMaterial = useAdminUpdateMaterial();
   const deleteMaterial = useAdminDeleteMaterial();
+  const importMaterials = useAdminImportMaterials();
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<CatalogMaterial | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = (materials ?? []).filter(
     (m) =>
@@ -170,6 +175,40 @@ export default function AdminMaterials() {
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const items = await parseMaterialsExcel(file);
+
+      const result = await importMaterials.mutateAsync({
+        mode: "merge",
+        items,
+      });
+
+      toast({
+        title: "Импорт завершён",
+        description: `Получено: ${result.received}. Создано: ${result.created}. Обновлено: ${result.updated}. Пропущено: ${result.skipped}.`,
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      toast({
+        title: "Ошибка импорта",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   return (
     <AdminLayout title="Справочник материалов">
       <div className="max-w-3xl mx-auto space-y-4">
@@ -183,6 +222,21 @@ export default function AdminMaterials() {
               className="pl-8"
             />
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+          >
+            <FileUp className="h-4 w-4 mr-1" />
+            {isImporting ? "Импорт..." : "Импорт"}
+          </Button>
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Добавить
