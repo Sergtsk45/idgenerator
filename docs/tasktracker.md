@@ -2,6 +2,29 @@
 
 ---
 
+## Задача: Массовый импорт материалов из Excel
+- **Статус**: Завершена
+- **Описание**: Реализован функционал массового импорта справочника материалов в глобальный каталог из Excel-файла через админ-панель. Администраторы могут загружать материалы с дедупликацией по названию (case-insensitive).
+- **Шаги выполнения**:
+  - [x] IMPORT-001: Создать парсер Excel `client/src/lib/materialsParser.ts` с валидацией
+  - [x] IMPORT-002: Backend API `POST /api/admin/materials-catalog/import` с транзакционной обработкой
+  - [x] IMPORT-003: Хук React Query `useAdminImportMaterials()` в `client/src/hooks/use-admin.ts`
+  - [x] IMPORT-004: UI кнопка импорта в `AdminMaterials.tsx` с file input
+  - [x] IMPORT-005: Валидация на клиенте (размер ≤10MB, формат .xlsx/.xls)
+  - [x] IMPORT-006: Валидация на сервере (Zod-схемы, длина названия ≤500)
+  - [x] IMPORT-007: Дедупликация по названию (case-insensitive) в режиме merge
+  - [x] IMPORT-008: Статистика импорта (получено/создано/обновлено/пропущено)
+  - [x] IMPORT-009: Документация `docs/materials-import-guide.md`
+  - [x] IMPORT-010: Обновление `docs/project.md` и `docs/changelog.md`
+- **Файлы**:
+  - Клиент: `client/src/lib/materialsParser.ts`, `client/src/hooks/use-admin.ts`, `client/src/pages/admin/AdminMaterials.tsx`
+  - Сервер: `server/storage.ts`, `server/routes.ts`, `server/middleware/adminAuth.ts`
+  - Shared: `shared/routes.ts`
+  - Документация: `docs/materials-import-guide.md`, `docs/project.md`, `docs/changelog.md`, `docs/tasktracker.md`
+- **Зависимости**: Admin Panel (завершена), Excel парсер (использован существующий `xlsx` пакет)
+
+---
+
 ## Задача: График работ — UX-исправления диалога «Редактирование задачи»
 - **Статус**: Завершена
 - **Описание**: 4 UX-проблемы в диалоге «Редактирование задачи» на вкладке «График работ».
@@ -1131,6 +1154,406 @@ server/fonts/TimesNewRomanBoldItalic.ttf
     - Документация `docs/telegram-haptic-guide.md` с матрицей использования, примерами по сценариям и best practices
 - **Зависимости**: нет (шаги 6–8 зависят от наличия Bot Token)
 - **Примечание**: Шаги 6-7 (серверная валидация и привязка к userId) остаются для будущей реализации при необходимости многопользовательского режима
+
+---
+
+## Задача: Импорт материалов из счетов поставщиков (PDF → локальные материалы проекта)
+- **Статус**: В процессе
+- **Описание**: Добавить возможность импорта материалов из PDF-счетов поставщиков в локальный список материалов проекта. Кнопка «Добавить файл» появляется только на вкладке «Локальные» страницы `/source/materials`. PDF парсится микросервисом invoice-extractor (Python/Flask), пользователь видит предпросмотр позиций с чекбоксами и inline-редактированием, затем подтверждает импорт. Дубликаты по имени (case-insensitive) пропускаются. Партии/цены не сохраняются.
+- **План**: `ai_docs/develop/plans/2026-03-01-invoice-import-materials.md`
+- **Шаги выполнения**:
+
+### Фаза 1: Инфраструктура (INV-001 + INV-002)
+
+  **INV-001: Реструктуризация invoice-extractor в пакет `services/invoice-extractor/`**
+
+  - [x] **INV-001-A**: Создать каталог `services/invoice-extractor/app/` с `__init__.py`
+  - [x] **INV-001-B**: Скопировать 5 Python-модулей в пакет `app/`:
+    - `extractor.py` → `services/invoice-extractor/app/extractor.py` (импортирует `app.llm_client`, `app.normalizer`)
+    - `llm_client.py` → `services/invoice-extractor/app/llm_client.py` (без внутренних импортов)
+    - `normalizer.py` → `services/invoice-extractor/app/normalizer.py` (без внутренних импортов)
+    - `validators.py` → `services/invoice-extractor/app/validators.py` (без внутренних импортов)
+    - `excel_builder.py` → `services/invoice-extractor/app/excel_builder.py` (без внутренних импортов)
+  - [x] **INV-001-C**: Скопировать файлы верхнего уровня (без изменений — импорты из `app.` уже корректны):
+    - `run.py` → `services/invoice-extractor/run.py`
+    - `requirements.txt` → `services/invoice-extractor/requirements.txt`
+    - `gunicorn.conf.py` → `services/invoice-extractor/gunicorn.conf.py`
+    - `.env.example` → `services/invoice-extractor/.env.example`
+  - [x] **INV-001-D**: Обновить `Dockerfile` — скопировать и адаптировать:
+    - WORKDIR `/app` (оставляем — Python package `app/` будет в `/app/app/`, `from app.extractor` найдёт `/app/app/extractor.py` через CWD в sys.path)
+    - Добавить `curl` в `apt-get install` для healthcheck
+    - Итоговая структура внутри контейнера:
+      ```
+      /app/
+      ├── run.py
+      ├── gunicorn.conf.py
+      ├── requirements.txt
+      └── app/
+          ├── __init__.py
+          ├── extractor.py
+          ├── llm_client.py
+          ├── normalizer.py
+          ├── validators.py
+          └── excel_builder.py
+      ```
+  - [x] **INV-001-E**: Создать `services/invoice-extractor/.dockerignore` (исключить `__pycache__`, `.env`, `uploads/`, `outputs/`, `.git`)
+  - [x] **INV-001-F**: Проверить сборку: `docker build -t invoice-extractor services/invoice-extractor/`
+
+  **Критерии приёмки INV-001:**
+  - `docker build` проходит без ошибок
+  - Внутри контейнера `python -c "from app.extractor import extract_invoice; print('OK')"` — успешно
+  - `testFiles/files_invoice-extractor/` остаётся без изменений (старая копия)
+
+  **INV-002: Docker Compose — сервис invoice-extractor**
+
+  - [x] **INV-002-A**: Создать `docker-compose.yml` в корне проекта:
+    - Сервис `invoice-extractor`:
+      - `build.context`: `./services/invoice-extractor`
+      - `ports`: `5050:5000` (внешний 5050, внутренний 5000)
+      - `environment`: LLM_PROVIDER, ANTHROPIC_API_KEY, OPENAI_API_KEY, MAX_FILE_SIZE_MB, MAX_PAGES, REQUEST_TIMEOUT_SEC (через `${VAR:-default}` из `.env`)
+      - `restart`: `unless-stopped`
+      - `healthcheck`: `curl -f http://localhost:5000/health` (interval 30s, timeout 10s, retries 3)
+    - Сеть: default bridge (для dev — доступ по `localhost:5050`)
+  - [x] **INV-002-B**: Добавить переменную `INVOICE_EXTRACTOR_URL` в `.env` корня проекта:
+    - Для dev: `INVOICE_EXTRACTOR_URL=http://localhost:5050`
+    - Для Docker-сети: `INVOICE_EXTRACTOR_URL=http://invoice-extractor:5000`
+  - [x] **INV-002-C**: Проверить: `docker run -p 5050:5000 invoice-extractor` → `curl http://localhost:5050/health` → `{"status": "ok", "version": "1.0.0"}` ✓
+    - Примечание: `docker compose` plugin не установлен, использован `docker run` для верификации; `docker-compose.yml` корректен для docker compose v2
+
+  **Критерии приёмки INV-002:**
+  - `docker compose up invoice-extractor` успешно стартует
+  - Healthcheck проходит (`docker compose ps` показывает `healthy`)
+  - `curl http://localhost:5050/health` возвращает `{"status": "ok", "version": "1.0.0"}`
+
+### Фаза 2: Backend API (INV-003 — INV-006)
+
+  **INV-003: Shared routes — Zod-схемы для `parseInvoice` и `bulkCreate`**
+
+  Файл: `shared/routes.ts`, секция `projectMaterials` (после `saveToCatalog`, строка ~285, перед закрывающей `}` секции)
+
+  - [ ] **INV-003-A**: Добавить роут `parseInvoice`:
+    ```
+    parseInvoice: {
+      method: "POST",
+      path: "/api/objects/:objectId/materials/parse-invoice",
+      // input пустой — файл приходит через multipart/form-data, Zod не валидирует binary
+      input: z.object({}),
+      responses: {
+        200: z.object({
+          items: z.array(z.object({
+            name: z.string(),
+            unit: z.string().optional().default(""),
+            qty: z.union([z.number(), z.string()]).optional(),
+            price: z.union([z.number(), z.string()]).optional(),
+            amount_w_vat: z.union([z.number(), z.string()]).optional(),
+            vat_rate: z.string().optional(),
+          })),
+          invoice_number: z.string().optional(),
+          invoice_date: z.string().optional(),
+          supplier_name: z.string().optional(),
+          warnings: z.array(z.string()).optional(),
+        }),
+        400: z.object({ message: z.string() }),
+        502: z.object({ message: z.string() }),
+      },
+    }
+    ```
+    Ключевое: `items[].name` и `items[].unit` — это то, что пойдёт в `nameOverride`/`baseUnitOverride`; `qty`, `price`, `amount_w_vat` — только для отображения в превью
+
+  - [ ] **INV-003-B**: Добавить роут `bulkCreate`:
+    ```
+    bulkCreate: {
+      method: "POST",
+      path: "/api/objects/:objectId/materials/bulk",
+      input: z.object({
+        items: z.array(z.object({
+          nameOverride: z.string().trim().min(1),
+          baseUnitOverride: z.string().trim().optional(),
+        })).min(1).max(500),
+      }),
+      responses: {
+        200: z.object({
+          created: z.number().int().nonnegative(),
+          skipped: z.number().int().nonnegative(),
+          materials: z.array(z.custom<typeof projectMaterials.$inferSelect>()),
+        }),
+        400: z.object({ message: z.string() }),
+      },
+    }
+    ```
+    Ограничение `.max(500)` — защита от случайной загрузки огромного массива
+
+  - [ ] **INV-003-C**: Проверить `npm run check` — TypeScript компилируется без ошибок
+
+  **Критерии приёмки INV-003:**
+  - Типы `api.projectMaterials.parseInvoice` и `api.projectMaterials.bulkCreate` доступны из `@shared/routes`
+  - Zod-схемы корректно парсят тестовые данные
+  - Нет TypeScript-ошибок
+
+  ---
+
+  **INV-004: Storage — метод `bulkCreateProjectMaterials`**
+
+  Файл: `server/storage.ts`
+
+  - [ ] **INV-004-A**: Добавить сигнатуру в интерфейс `IStorage` (после `saveProjectMaterialToCatalog`, строка ~153):
+    ```typescript
+    bulkCreateProjectMaterials(
+      objectId: number,
+      items: Array<{ nameOverride: string; baseUnitOverride?: string }>
+    ): Promise<{ created: number; skipped: number; materials: ProjectMaterial[] }>;
+    ```
+
+  - [ ] **INV-004-B**: Реализовать метод в `DatabaseStorage` (после `createProjectMaterial`, строка ~755):
+    Алгоритм:
+    1. Если `items.length === 0` → возврат `{ created: 0, skipped: 0, materials: [] }`
+    2. Запросить существующие материалы объекта:
+       ```sql
+       SELECT name_override FROM project_materials
+       WHERE object_id = $objectId AND deleted_at IS NULL
+       ```
+    3. Построить `Set<string>` из `nameOverride.trim().toLowerCase()` — для case-insensitive сравнения
+    4. Дедупликация входного массива (внутренние дубли — оставляем первый):
+       ```typescript
+       const seen = new Set<string>();
+       for (const item of items) {
+         const key = item.nameOverride.trim().toLowerCase();
+         if (existingNames.has(key) || seen.has(key)) { skipped++; continue; }
+         seen.add(key);
+         toCreate.push(item);
+       }
+       ```
+    5. Если `toCreate.length === 0` → возврат с `skipped`
+    6. Bulk insert:
+       ```typescript
+       const created = await db
+         .insert(projectMaterials)
+         .values(toCreate.map(item => ({
+           objectId,
+           nameOverride: item.nameOverride.trim(),
+           baseUnitOverride: item.baseUnitOverride?.trim() || null,
+           paramsOverride: {},
+         })))
+         .returning();
+       ```
+    7. Возврат `{ created: created.length, skipped, materials: created }`
+
+  - [ ] **INV-004-C**: Проверить edge cases:
+    - Пустой массив → `{ created: 0, skipped: 0, materials: [] }`
+    - Все дубликаты → `{ created: 0, skipped: N, materials: [] }`
+    - Внутренние дубли: `["Кирпич", "кирпич", "КИРПИЧ"]` → создаётся 1, пропускается 2
+    - Soft-deleted материалы (`deletedAt IS NOT NULL`) не считаются дубликатами
+
+  **Критерии приёмки INV-004:**
+  - Дубликаты по имени (case-insensitive, с trim) пропускаются
+  - Дубликаты внутри входного массива дедуплицируются (первый побеждает)
+  - Возвращает точные счётчики `created`/`skipped`
+  - Soft-deleted материалы не блокируют создание новых с тем же именем
+
+  ---
+
+  **INV-005: Server routes — proxy-эндпоинт parse-invoice**
+
+  Файл: `server/routes.ts` (после handler'а `projectMaterials.create`, строка ~221)
+
+  - [ ] **INV-005-A**: Установить зависимость `multer` + типы:
+    ```bash
+    npm install multer @types/multer
+    ```
+    `multer` не установлен в проекте — нужен для приёма `multipart/form-data` с PDF-файлом
+
+  - [ ] **INV-005-B**: Добавить импорт и настройку multer в начале `server/routes.ts`:
+    ```typescript
+    import multer from 'multer';
+    const invoiceUpload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+      fileFilter: (_req, file, cb) => {
+        if (file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf')) {
+          cb(null, true);
+        } else {
+          cb(new Error('Only PDF files are accepted'));
+        }
+      },
+    });
+    ```
+    - `memoryStorage()` — файл хранится в RAM, не пишется на диск
+    - Лимит 50 MB — совпадает с лимитом в invoice-extractor
+    - Фильтр по MIME + расширению (двойная проверка)
+
+  - [ ] **INV-005-C**: Реализовать handler:
+    ```typescript
+    app.post(
+      api.projectMaterials.parseInvoice.path,
+      invoiceUpload.single('file'),
+      async (req, res) => {
+        // 1. Валидация objectId
+        const objectId = Number(req.params.objectId);
+        if (!Number.isFinite(objectId) || objectId <= 0) {
+          return res.status(400).json({ message: "Invalid objectId" });
+        }
+        // 2. Проверка файла
+        if (!req.file) {
+          return res.status(400).json({ message: "PDF file is required" });
+        }
+        // 3. Формирование запроса к invoice-extractor
+        const extractorUrl = process.env.INVOICE_EXTRACTOR_URL || 'http://localhost:5050';
+        const formData = new FormData();
+        formData.append('file', new Blob([req.file.buffer], { type: 'application/pdf' }), req.file.originalname);
+        formData.append('output', 'json');
+        // 4. Запрос с таймаутом
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 150_000); // 2.5 мин
+        try {
+          const response = await fetch(`${extractorUrl}/convert`, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+          if (!response.ok) {
+            const errBody = await response.text().catch(() => '');
+            console.error(`Invoice extractor error ${response.status}:`, errBody);
+            return res.status(502).json({ message: `Invoice extractor returned ${response.status}` });
+          }
+          const data = await response.json();
+          // 5. Маппинг ответа в нашу Zod-схему
+          return res.status(200).json({
+            items: (data.items || []).map((item: any) => ({
+              name: String(item.name || '').trim(),
+              unit: String(item.unit || '').trim(),
+              qty: item.qty ?? '',
+              price: item.price ?? '',
+              amount_w_vat: item.amount_w_vat ?? '',
+              vat_rate: item.vat_rate ?? '',
+            })).filter((item: any) => item.name.length > 0),
+            invoice_number: data.invoice_number || undefined,
+            invoice_date: data.invoice_date || undefined,
+            supplier_name: data.supplier?.name || undefined,
+            warnings: data.warnings || [],
+          });
+        } catch (err: any) {
+          clearTimeout(timeout);
+          if (err.name === 'AbortError') {
+            return res.status(502).json({ message: "Invoice extractor timeout" });
+          }
+          console.error("Invoice parse-invoice proxy error:", err);
+          return res.status(502).json({ message: "Invoice extractor unavailable" });
+        }
+      }
+    );
+    ```
+
+  - [ ] **INV-005-D**: Добавить обработку ошибки multer (файл слишком большой):
+    ```typescript
+    // Глобальный error handler для multer в registerRoutes или после роута
+    app.use((err: any, req: any, res: any, next: any) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ message: "File too large (max 50 MB)" });
+        }
+        return res.status(400).json({ message: err.message });
+      }
+      if (err.message === 'Only PDF files are accepted') {
+        return res.status(400).json({ message: err.message });
+      }
+      next(err);
+    });
+    ```
+
+  - [ ] **INV-005-E**: Добавить `INVOICE_EXTRACTOR_URL` в `.env` проекта (для dev)
+
+  **Критерии приёмки INV-005:**
+  - PDF-файл корректно проксируется в invoice-extractor через `FormData`
+  - Ответ маппится в Zod-схему `parseInvoice.responses[200]`
+  - Позиции с пустым `name` фильтруются
+  - Ошибки extractor'а: 502 (недоступен / ошибка) с понятным сообщением
+  - Таймаут: 502 через 2.5 минуты
+  - Превышение размера файла: 400 «File too large»
+  - Не-PDF файл: 400 «Only PDF files are accepted»
+  - Файл не записывается на диск (memoryStorage)
+
+  ---
+
+  **INV-006: Server routes — bulk-create endpoint**
+
+  Файл: `server/routes.ts` (после handler'а parse-invoice)
+
+  - [ ] **INV-006-A**: Реализовать handler по паттерну существующих:
+    ```typescript
+    app.post(api.projectMaterials.bulkCreate.path, async (req, res) => {
+      const objectId = Number(req.params.objectId);
+      if (!Number.isFinite(objectId) || objectId <= 0) {
+        return res.status(400).json({ message: "Invalid objectId" });
+      }
+      try {
+        const { items } = api.projectMaterials.bulkCreate.input.parse(req.body);
+        const result = await storage.bulkCreateProjectMaterials(objectId, items);
+        return res.status(200).json(result);
+      } catch (err) {
+        if (err instanceof z.ZodError) {
+          return res.status(400).json({ message: err.errors[0].message });
+        }
+        console.error("Bulk create materials failed:", err);
+        return res.status(500).json({ message: "Internal Server Error" });
+      }
+    });
+    ```
+
+  - [ ] **INV-006-B**: Проверить `npm run check` — нет TypeScript-ошибок после всех изменений
+
+  **Критерии приёмки INV-006:**
+  - Валидация `objectId` (400 если невалидный)
+  - Валидация `req.body` через Zod (400 при ошибке)
+  - Вызов `storage.bulkCreateProjectMaterials` — дубликаты пропускаются
+  - Ответ `{ created, skipped, materials }` — точные счётчики
+  - Ошибки обрабатываются (400 Zod, 500 прочие)
+
+  ---
+
+  **Зависимости и порядок выполнения фазы 2:**
+
+  ```
+  INV-003 (Zod-схемы) ──┬──► INV-004 (Storage) ──► INV-006 (bulk-create route)
+                         │
+                         ├──► INV-005 (parse-invoice route) ← зависит от INV-002 (Docker)
+                         │
+                         └──► INV-007 (фронтенд хуки, фаза 3)
+  ```
+
+  Параллельно можно: INV-004 + INV-005 (после завершения INV-003)
+  NPM-зависимость: `multer` + `@types/multer` (INV-005-A)
+
+### Фаза 3: Frontend (INV-007 — INV-009)
+
+  - [ ] **INV-007**: Хуки `useParseInvoice` и `useBulkCreateMaterials` в `use-materials.ts`
+  - [ ] **INV-008**: Компонент `InvoicePreviewDialog.tsx` (таблица, чекбоксы, inline-edit, result summary)
+  - [ ] **INV-009**: Компонент `InvoiceImportButton.tsx` + интеграция в `SourceMaterials.tsx` (только вкладка «Локальные»)
+
+### Фаза 4: Финализация (INV-010)
+
+  - [ ] **INV-010**: Документация (`changelog.md`, `project.md`, `tasktracker.md`) + тестирование
+
+- **Файлы (создать)**:
+  - `services/invoice-extractor/` — весь пакет (из `testFiles/files_invoice-extractor/`)
+  - `services/invoice-extractor/app/__init__.py`
+  - `services/invoice-extractor/app/extractor.py`
+  - `services/invoice-extractor/app/llm_client.py`
+  - `services/invoice-extractor/app/normalizer.py`
+  - `services/invoice-extractor/app/validators.py`
+  - `services/invoice-extractor/app/excel_builder.py`
+  - `services/invoice-extractor/.dockerignore`
+  - `docker-compose.yml`
+  - `client/src/components/materials/InvoicePreviewDialog.tsx`
+  - `client/src/components/materials/InvoiceImportButton.tsx`
+- **Файлы (изменить)**:
+  - `shared/routes.ts` — два новых эндпоинта
+  - `server/storage.ts` — `bulkCreateProjectMaterials`
+  - `server/routes.ts` — два новых роута
+  - `client/src/hooks/use-materials.ts` — два новых хука
+  - `client/src/pages/SourceMaterials.tsx` — кнопка + диалог
+  - `docs/project.md`, `docs/changelog.md`, `docs/tasktracker.md`
+- **Зависимости**: Docker, LLM API-ключи (Anthropic/OpenAI), пакеты NPM: `multer`, `@types/multer`
 
 ---
 

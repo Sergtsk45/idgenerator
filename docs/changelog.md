@@ -1,5 +1,37 @@
 # Changelog
 
+## [2026-03-01] - Инфраструктура микросервиса invoice-extractor (INV-001, INV-002)
+### Добавлено
+- **Микросервис `services/invoice-extractor/`**: реструктуризация сервиса парсинга PDF-счетов в отдельный пакет с правильной структурой Python-пакета `app/`
+- **`services/invoice-extractor/app/`**: Python-пакет с модулями `extractor`, `llm_client`, `normalizer`, `validators`, `excel_builder`
+- **`services/invoice-extractor/Dockerfile`**: обновлённый Dockerfile с добавлением `curl` для healthcheck
+- **`services/invoice-extractor/.dockerignore`**: исключение `__pycache__`, `.env`, `uploads/`, `outputs/`
+- **`docker-compose.yml`**: конфигурация для запуска invoice-extractor на порту `5050:5000` с healthcheck
+- **`INVOICE_EXTRACTOR_URL`**: переменная окружения добавлена в `.env` (default: `http://localhost:5050`)
+
+## [2026-02-26] - Массовый импорт материалов из Excel
+### Добавлено
+- **Импорт материалов из Excel**: администраторы могут загружать справочник материалов из Excel-файла (.xlsx/.xls) в глобальный каталог
+- **Backend API**: `POST /api/admin/materials-catalog/import` — endpoint для массового импорта с поддержкой режимов merge/replace
+- **Парсер Excel**: `client/src/lib/materialsParser.ts` — клиентский парсинг Excel с валидацией формата, размера и структуры данных
+- **UI импорта**: кнопка "Импорт" в админ-панели материалов с обработкой файлов и отображением результатов
+- **Транзакционная обработка**: весь импорт выполняется в одной DB-транзакции с rollback при ошибках
+- **Case-insensitive дедупликация**: материалы сравниваются по названию без учёта регистра
+- **Статистика импорта**: детальный отчёт о количестве полученных, созданных, обновлённых и пропущенных записей
+- **Валидация данных**: проверка обязательных полей, длины названия (≤500 символов), формата файла и размера (≤10 МБ)
+
+### Изменено
+- `shared/routes.ts`: добавлены типы и Zod-схемы для импорта материалов (ImportMaterialItem, ImportMaterialsRequest, ImportMaterialsResponse)
+- `server/storage.ts`: метод `importMaterialsCatalog()` для массового создания/обновления материалов
+- `server/routes.ts`: endpoint импорта с admin-авторизацией и обработкой ошибок
+- `client/src/hooks/use-admin.ts`: хук `useAdminImportMaterials()` с инвалидацией кэша
+- `client/src/pages/admin/AdminMaterials.tsx`: UI кнопки импорта с file input и toast-уведомлениями
+
+### Документация
+- `docs/materials-import-guide.md`: полное руководство по импорту материалов с примерами и best practices
+
+---
+
 ## [2026-02-26] - Исправлена авторизация запросов useCurrentObject
 ### Исправлено
 - `client/src/hooks/use-source-data.ts`: хуки `useCurrentObject`, `useSourceData`, `useSaveSourceData` теперь передают заголовки авторизации (`X-Telegram-Init-Data` / `X-App-Access-Token`). Ранее их отсутствие приводило к 401 от `GET /api/object/current`, из-за чего `objectId` не определялся и при добавлении материала появлялся тост «Нет объекта».
