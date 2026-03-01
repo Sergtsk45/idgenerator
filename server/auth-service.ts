@@ -5,11 +5,17 @@
  * @created: 2026-03-01
  */
 
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { db } from './db';
 import { users, authProviders } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+
+// Ensure crypto is available globally for jose
+if (!globalThis.crypto) {
+  globalThis.crypto = crypto as any;
+}
 
 const BCRYPT_ROUNDS = 12;
 const JWT_ALGORITHM = 'HS256';
