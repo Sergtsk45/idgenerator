@@ -169,6 +169,30 @@ export const api = {
         400: z.object({ message: z.string() }),
       },
     },
+    import: {
+      method: "POST" as const,
+      path: "/api/admin/materials-catalog/import",
+      input: z.object({
+        mode: z.enum(["merge", "replace"]),
+        items: z.array(
+          z.object({
+            name: z.string().min(1),
+            unit: z.string().optional(),
+            gostTu: z.string().optional(),
+            category: z.enum(["material", "equipment", "product"]).optional(),
+          })
+        ).max(5000),
+      }),
+      responses: {
+        200: z.object({
+          received: z.number(),
+          created: z.number(),
+          updated: z.number(),
+          skipped: z.number(),
+        }),
+        400: z.object({ message: z.string() }),
+      },
+    },
   },
   projectMaterials: {
     list: {
@@ -257,6 +281,47 @@ export const api = {
         200: z.custom<typeof materialsCatalog.$inferSelect>(),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
+      },
+    },
+    parseInvoice: {
+      method: "POST" as const,
+      path: "/api/objects/:objectId/materials/parse-invoice",
+      input: z.object({}),
+      responses: {
+        200: z.object({
+          items: z.array(z.object({
+            name: z.string(),
+            unit: z.string().optional().default(""),
+            qty: z.union([z.number(), z.string()]).optional(),
+            price: z.union([z.number(), z.string()]).optional(),
+            amount_w_vat: z.union([z.number(), z.string()]).optional(),
+            vat_rate: z.string().optional(),
+          })),
+          invoice_number: z.string().optional(),
+          invoice_date: z.string().optional(),
+          supplier_name: z.string().optional(),
+          warnings: z.array(z.string()).optional(),
+        }),
+        400: z.object({ message: z.string() }),
+        502: z.object({ message: z.string() }),
+      },
+    },
+    bulkCreate: {
+      method: "POST" as const,
+      path: "/api/objects/:objectId/materials/bulk",
+      input: z.object({
+        items: z.array(z.object({
+          nameOverride: z.string().trim().min(1),
+          baseUnitOverride: z.string().trim().optional(),
+        })).min(1).max(500),
+      }),
+      responses: {
+        200: z.object({
+          created: z.number().int().nonnegative(),
+          skipped: z.number().int().nonnegative(),
+          materials: z.array(z.custom<typeof projectMaterials.$inferSelect>()),
+        }),
+        400: z.object({ message: z.string() }),
       },
     },
   },
@@ -1083,3 +1148,7 @@ export type {
 export type PartyDto = z.infer<typeof partyDtoSchema>;
 export type PersonDto = z.infer<typeof personDtoSchema>;
 export type SourceDataDto = z.infer<typeof sourceDataDtoSchema>;
+
+export type ImportMaterialItem = z.infer<typeof api.materialsCatalog.import.input>["items"][number];
+export type ImportMaterialsRequest = z.infer<typeof api.materialsCatalog.import.input>;
+export type ImportMaterialsResponse = z.infer<typeof api.materialsCatalog.import.responses[200]>;

@@ -83,7 +83,7 @@ import {
   adminUsers,
 } from "@shared/schema";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql, count } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql, count } from "drizzle-orm";
 
 type ObjectPartyRole = "customer" | "builder" | "designer";
 type ObjectPersonRole =
@@ -151,6 +151,10 @@ export interface IStorage {
     patch: Partial<Pick<ProjectMaterial, "nameOverride" | "baseUnitOverride" | "paramsOverride" | "catalogMaterialId" | "deletedAt">>
   ): Promise<ProjectMaterial | undefined>;
   saveProjectMaterialToCatalog(id: number): Promise<MaterialCatalog>;
+  bulkCreateProjectMaterials(
+    objectId: number,
+    items: Array<{ nameOverride: string; baseUnitOverride?: string }>
+  ): Promise<{ created: number; skipped: number; materials: ProjectMaterial[] }>;
 
   // Material Batches
   createBatch(projectMaterialId: number, data: Omit<InsertMaterialBatch, "objectId" | "projectMaterialId">): Promise<MaterialBatch>;
@@ -395,7 +399,7 @@ export class DatabaseStorage implements IStorage {
       all = await db
         .select()
         .from(objects)
-        .where(sql`${objects.telegramUserId} IS NULL`);
+        .where(isNull(objects.telegramUserId));
     }
     
     if (all.length === 1) return all[0];
@@ -811,6 +815,59 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async bulkCreateProjectMaterials(
+    objectId: number,
+    items: Array<{ nameOverride: string; baseUnitOverride?: string }>
+  ): Promise<{ created: number; skipped: number; materials: ProjectMaterial[] }> {
+    if (items.length === 0) {
+      return { created: 0, skipped: 0, materials: [] };
+    }
+
+    const existingMaterials = await db
+      .select({ nameOverride: projectMaterials.nameOverride })
+      .from(projectMaterials)
+      .where(and(eq(projectMaterials.objectId, objectId as any), isNull(projectMaterials.deletedAt)));
+
+    const existingNames = new Set<string>(
+      existingMaterials.map((m) => String(m.nameOverride ?? "").trim().toLowerCase())
+    );
+
+    const seen = new Set<string>();
+    const toCreate: Array<{ nameOverride: string; baseUnitOverride: string | null }> = [];
+    let skipped = 0;
+
+    for (const item of items) {
+      const key = item.nameOverride.trim().toLowerCase();
+      if (existingNames.has(key) || seen.has(key)) {
+        skipped++;
+        continue;
+      }
+      seen.add(key);
+      toCreate.push({
+        nameOverride: item.nameOverride.trim(),
+        baseUnitOverride: item.baseUnitOverride?.trim() || null,
+      });
+    }
+
+    if (toCreate.length === 0) {
+      return { created: 0, skipped, materials: [] };
+    }
+
+    const created = await db
+      .insert(projectMaterials)
+      .values(
+        toCreate.map((item) => ({
+          objectId,
+          nameOverride: item.nameOverride,
+          baseUnitOverride: item.baseUnitOverride,
+          paramsOverride: {},
+        })) as any
+      )
+      .returning();
+
+    return { created: created.length, skipped, materials: created };
+  }
+
   async createBatch(projectMaterialId: number, data: Omit<InsertMaterialBatch, "objectId" | "projectMaterialId">): Promise<MaterialBatch> {
     const [material] = await db.select({ objectId: projectMaterials.objectId }).from(projectMaterials).where(eq(projectMaterials.id, projectMaterialId as any));
     if (!material) throw new Error("PROJECT_MATERIAL_NOT_FOUND");
@@ -916,7 +973,7 @@ export class DatabaseStorage implements IStorage {
             and(
               eq(documentBindings.projectMaterialId, updated.projectMaterialId as any),
               eq(documentBindings.bindingRole, updated.bindingRole as any),
-              sql`${documentBindings.id} <> ${updated.id}`
+              ne(documentBindings.id, updated.id as any)
             )
           );
       }
@@ -1278,6 +1335,78 @@ export class DatabaseStorage implements IStorage {
       }
 
       return { created, updated };
+    });
+  }
+
+  async importMaterialsCatalog(
+    items: Array<{
+      name: string;
+      unit?: string;
+      gostTu?: string;
+      category?: "material" | "equipment" | "product";
+    }>,
+    mode: "merge" | "replace"
+  ): Promise<{ created: number; updated: number; skipped: number }> {
+    return await db.transaction(async (tx) => {
+      if (mode === "replace") {
+        await tx
+          .update(materialsCatalog)
+          .set({ deletedAt: new Date() })
+          .where(isNull(materialsCatalog.deletedAt));
+      }
+
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+
+      // Получить все существующие материалы одним запросом
+      const existingMaterials = await tx
+        .select({ id: materialsCatalog.id, name: materialsCatalog.name })
+        .from(materialsCatalog)
+        .where(isNull(materialsCatalog.deletedAt));
+
+      // Создать Map для быстрого поиска (ключ - имя в нижнем регистре)
+      const existingMap = new Map(
+        existingMaterials.map((m) => [m.name.toLowerCase(), m.id])
+      );
+
+      for (const item of items) {
+        const name = String(item.name || "").trim();
+        if (!name || name.length > 500) {
+          skipped++;
+          continue;
+        }
+
+        const key = name.toLowerCase();
+        const existingId = existingMap.get(key);
+
+        if (existingId && mode === "merge") {
+          await tx
+            .update(materialsCatalog)
+            .set({
+              baseUnit: item.unit || null,
+              standardRef: item.gostTu || null,
+              category: item.category || null,
+              updatedAt: new Date(),
+            })
+            .where(eq(materialsCatalog.id, existingId));
+          updated++;
+        } else if (!existingId) {
+          const [inserted] = await tx.insert(materialsCatalog).values({
+            name,
+            baseUnit: item.unit || null,
+            standardRef: item.gostTu || null,
+            category: item.category || null,
+          }).returning();
+          // Добавить в Map для последующих итераций
+          existingMap.set(key, inserted.id);
+          created++;
+        } else {
+          skipped++;
+        }
+      }
+
+      return { created, updated, skipped };
     });
   }
 

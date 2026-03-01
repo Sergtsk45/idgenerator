@@ -186,3 +186,46 @@ export function useDeleteBatch(batchId: number, projectMaterialId?: number, obje
   });
 }
 
+export function useParseInvoice(objectId: number) {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const url = buildUrl(api.projectMaterials.parseInvoice.path, { objectId });
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(url, {
+        method: api.projectMaterials.parseInvoice.method,
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to parse invoice");
+      }
+      return api.projectMaterials.parseInvoice.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useBulkCreateMaterials(objectId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: Array<{ nameOverride: string; baseUnitOverride?: string }>) => {
+      const url = buildUrl(api.projectMaterials.bulkCreate.path, { objectId });
+      const res = await fetch(url, {
+        method: api.projectMaterials.bulkCreate.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to bulk create materials");
+      }
+      return api.projectMaterials.bulkCreate.responses[200].parse(await res.json());
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path, objectId] });
+    },
+  });
+}
+

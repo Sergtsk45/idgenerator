@@ -9,14 +9,16 @@
 
 ## Ключевые сценарии (как сейчас)
 - **Импорт ВОР из Excel**: пользователь загружает `.xlsx`, клиент парсит файл и отправляет позиции на сервер одним запросом `POST /api/works/import` в режиме **merge** (без авто-удаления данных).
-- **Импорт Сметы/ЛСР из Excel (ГРАНД‑Смета)**: на экране `/works` пользователь переключается в режим “Смета”, загружает `.xlsx`; клиент парсит выгрузку (поиск строки заголовка `№ п/п / Обоснование / Наименование работ и затрат`, разбор позиций/ресурсов) и отправляет JSON на `POST /api/estimates/import`. Смета хранится отдельными таблицами и отображается на вкладке ВОР.
+- **Импорт Сметы/ЛСР из Excel (ГРАНД‑Смета)**: на экране `/works` пользователь переключается в режим "Смета", загружает `.xlsx`; клиент парсит выгрузку (поиск строки заголовка `№ п/п / Обоснование / Наименование работ и затрат`, разбор позиций/ресурсов) и отправляет JSON на `POST /api/estimates/import`. Смета хранится отдельными таблицами и отображается на вкладке ВОР.
+- **Импорт материалов из PDF-счётов** (новое): пользователь загружает PDF-счёт поставщика на вкладке "Локальные" материалов; сервер отправляет файл в микросервис invoice-extractor, который парсит таблицу материалов и возвращает структурированные данные; пользователь просматривает таблицу в диалоге, может отредактировать данные и подтвердить импорт.
+- **Массовый импорт материалов из Excel**: администраторы могут загружать справочник материалов в глобальный каталог через админ-панель. Клиент парсит Excel-файл (колонки: №, Наименование, Ед. изм., ГОСТ/ТУ, Категория) и отправляет JSON на `POST /api/admin/materials-catalog/import` в режиме **merge** (дедупликация по названию, case-insensitive). Полное руководство в `docs/materials-import-guide.md`.
 - **Журнал работ**: пользователь отправляет сообщение о выполненной работе; сервер сохраняет raw-текст и пытается извлечь структуру через OpenAI (workCode/quantity/date/location и т.д.).
 - **Генерация актов АОСР (только из графика работ)**: на экране `/schedule` для задачи задаются:
   - `actNumber` — номер акта (уникальный бизнес‑идентификатор),
   - `actTemplateId` — тип акта (шаблон из каталога),
   - документация/схемы (`projectDrawings`, `normativeRefs`, `executiveSchemes`),
   - материалы задачи (через `task_materials`).
-  По кнопке “Сформировать/обновить акты из графика” сервер:
+  По кнопке "Сформировать/обновить акты из графика" сервер:
   - группирует задачи по `actNumber`,
   - вычисляет `dateStart/dateEnd`,
   - формирует `worksData` по источнику графика (ВОР/Смета),
@@ -39,7 +41,7 @@
     - Документация: `docs/telegram-auth-testing.md`, скрипт для тестирования: `scripts/generate-mock-initdata.js`
     - **Доступ в браузере (вне Telegram)**:
       - Если Telegram `initData` недоступен, сервер может принимать `X-App-Access-Token` (значение сверяется с `APP_ACCESS_TOKEN`).
-      - При валидном токене запросы выполняются от имени “псевдо-пользователя” (`telegramUserId = -1`) — это режим для ручной работы/отладки в браузере.
+      - При валидном токене запросы выполняются от имени "псевдо-пользователя" (`telegramUserId = -1`) — это режим для ручной работы/отладки в браузере.
       - Экран ввода токена: `/login` (`client/src/pages/Login.tsx`), токен хранится в localStorage и автоматически добавляется в заголовки запросов.
   - **Хуки**: 
     - `useTelegram()` — доступ к WebApp, user, initData, themeParams, colorScheme
@@ -48,10 +50,16 @@
     - `useTelegramHaptic()` — тактильная обратная связь (impact/notification/selectionChanged, см. `docs/telegram-haptic-guide.md`)
   - **Тема**: `TelegramThemeProvider` автоматически применяет тему Telegram, CSS-переменные (`--tg-theme-*`)
   - **Бот**: Инструкция по созданию и настройке бота в `docs/telegram-bot-setup.md`
+- **Invoice Extractor** (микросервис): Python/Flask сервис для парсинга PDF-счетов поставщиков
+  - **Расположение**: `services/invoice-extractor/`
+  - **Функции**: извлечение таблиц материалов из PDF, структурирование в JSON
+  - **Docker**: образ с Python 3.10+, портированный на `5050:5000` через docker-compose
+  - **API**: `POST /parse` — загрузка PDF (multipart/form-data), возврат структурированного JSON с таблицами
+  - **Интеграция**: backend proxy `POST /api/parse-invoice` с multer, SSRF-защита, rate-limiting
 - **Backend**: Express + TypeScript. REST API с типами/валидацией на базе `shared/routes.ts` (Zod).
 - **База данных**: PostgreSQL + Drizzle ORM. Схема описана в `shared/schema.ts`.
 - **AI**: OpenAI API (через переменные окружения интеграции), используется для нормализации сообщений.
-- **Навигация UI**: основные разделы в `BottomNav`, доступ к `Settings` — через выпадающее меню “гамбургера” в `Header`.
+- **Навигация UI**: основные разделы в `BottomNav`, доступ к `Settings` — через выпадающее меню "гамбургера" в `Header`.
   - Порядок вкладок `BottomNav` (слева направо): **ВОР → График работ → Акты → ЖР → Исходные**
   - **Главная** (`/`) вынесена в кнопку в правом верхнем углу `Header` (иконка микрофона).
 
@@ -61,6 +69,7 @@ flowchart LR
   UI[React MiniApp UI] -->|REST| API[Express API]
   API --> DB[(PostgreSQL)]
   API -->|OpenAI Chat Completions| AI[OpenAI]
+  API -->|PDF parse| IE[Invoice Extractor]
 
   subgraph Data
     DB --> W[works (BoQ)]
@@ -87,18 +96,20 @@ flowchart LR
 ## Структура репозитория (важное)
 - `client/` — фронтенд (Vite root)
   - `client/src/pages/*` — страницы: `Works` (ВОР/ВОИР), `Schedule` (график работ), `Home` (главная/чат-журнал), `Acts` (акты), `WorkLog` (ЖР/ОЖР), `Settings` (язык), `SourceData` (исходные), `SourceMaterials`/`SourceMaterialDetail` (материалы), `SourceDocuments` (документы качества).
-    - `SourceData` (`/source-data`) — “дашборд” исходных данных: sticky-текущий объект + адрес, горизонтальные карточки сторон и карточки-разделы (материалы/документы/исполнительные/протоколы) + блок реквизитов/ответственных для редактирования.
+    - `SourceData` (`/source-data`) — "дашборд" исходных данных: sticky-текущий объект + адрес, горизонтальные карточки сторон и карточки-разделы (материалы/документы/исполнительные/протоколы) + блок реквизитов/ответственных для редактирования.
   - `client/src/components/*` — общие компоненты (включая нижнюю навигацию).
   - `client/src/hooks/*` — react-query хуки для API.
   - `client/src/lib/*` — queryClient, i18n, utils.
+  - `client/src/lib/materialsParser.ts` — парсер Excel-файла для импорта материалов.
 - `server/` — бэкенд (Express)
   - `server/index.ts` — входная точка, в dev подключает Vite middleware, в prod — статические файлы из `dist/public`.
-  - `server/routes.ts` — регистрация API роутов для works/messages/acts.
+  - `server/routes.ts` — регистрация API роутов для works/messages/acts/admin.
   - `server/storage.ts` — слой доступа к данным (Drizzle).
   - `server/db.ts` — подключение к Postgres через `DATABASE_URL`.
   - `server/pdfGenerator.ts` — генерация PDF (pdfmake), включая АОСР по шаблону `server/templates/aosr/aosr-template.json`.
   - `server/templates/aosr/` — шаблоны и каталог шаблонов актов (`aosr-template.json`, `templates-catalog.json`).
   - `server/replit_integrations/*` — заготовки интеграций (чат, генерация изображений, batch-утилиты).
+  - `server/middleware/adminAuth.ts` — middleware для проверки admin-роли при доступе к защищённым endpoint'ам.
 - `shared/` — общий код для frontend/backend
   - `shared/schema.ts` — Drizzle таблицы + Zod-схемы/типы.
   - `shared/routes.ts` — контракт API (пути, методы, схемы).
@@ -111,16 +122,16 @@ flowchart LR
 - `objects`: объект строительства (MVP: один «текущий объект» на пользователя), используется как якорь для исходных данных плейсхолдеров. Содержит поле `telegramUserId` для привязки к пользователю Telegram.
 - `object_parties`: стороны объекта (заказчик/подрядчик/проектировщик) с реквизитами (минимум — `fullName`, дополнительно — ИНН/КПП/ОГРН, юр.адрес, телефон, email, реквизиты СРО). Эти данные используются при экспорте АОСР в PDF (если не переопределены через `formData`).
 - `object_responsible_persons`: ответственные лица/подписанты по ролям (ФИО/должность/основание + опционально line/sign).
-- `materials_catalog`: глобальный справочник материалов (наименование, ГОСТ/ТУ, ед. изм., параметры).
+- `materials_catalog`: глобальный справочник материалов (наименование, ГОСТ/ТУ, ед. изм., параметры). Импортируется администраторами через API `POST /api/admin/materials-catalog/import`.
 - `project_materials`: материалы в рамках объекта (локальные либо привязанные к справочнику) + агрегаты для UI.
 - `material_batches`: партии/поставки материалов на объект.
 - `documents`: реестр документов качества (сертификаты/паспорта/протоколы и т.п.), scope: `project|global`.
 - `document_bindings`: привязки документов к объекту/материалу/партии + флаги `useInActs`/`isPrimary`.
-- `act_material_usages`: список материалов для п.3 АОСР “При выполнении работ применены…” (с порядком, опциональной привязкой к работе/партии/документу качества).
+- `act_material_usages`: список материалов для п.3 АОСР "При выполнении работ применены…" (с порядком, опциональной привязкой к работе/партии/документу качества).
 - `act_document_attachments`: формальные приложения к АОСР (уникально по (actId, documentId)), отдельно от `attachments`.
 - `works`: позиции ВОР/ВОИР (код, описание, единицы, плановый объём, синонимы).
 - `estimates`: шапка сметы/ЛСР (код, название, регион/квартал, итоги) — импортируется из Excel-выгрузки ГРАНД‑Сметы.
-- `estimate_sections`: разделы сметы (номер/название) — опционально (если файл содержит “Раздел N...”).
+- `estimate_sections`: разделы сметы (номер/название) — опционально (если файл содержит "Раздел N...").
 - `estimate_positions`: позиции сметы (№ п/п, обоснование/шифр, наименование, ед. изм., количество, суммы/примечания).
 - `position_resources`: ресурсы внутри позиции сметы (код/тип, наименование, ед. изм., количество, суммы).
 - `messages`: исходный текст, нормализованные поля (json), флаги обработки.
@@ -130,6 +141,7 @@ flowchart LR
 - `schedule_tasks`: задачи графика (полосы Ганта), содержащие `startDate`/`durationDays`/`orderIndex`, номер акта `actNumber`, тип акта `actTemplateId` и поля документации/схем (`projectDrawings`, `normativeRefs`, `executiveSchemes`).
 - `task_materials`: материалы, привязанные к задаче графика (источник для `act_material_usages` и `act_document_attachments` при генерации актов).
 - `estimate_position_material_links`: привязка подстроки сметы (`estimate_positions`, вспомогательные строки) к материалу проекта (`project_materials`) для вычисления статуса документов качества в графике работ.
+- `admin_users`: таблица администраторов системы (привязка `telegramUserId` и статус блокировки).
 
 Дополнительно (задел под AI-чат):
 - `conversations` и chat-`messages` (см. `shared/schema.ts` + `server/replit_integrations/chat/*`).
@@ -139,9 +151,12 @@ flowchart LR
 
 Текущие ресурсы:
 - **Object (MVP current)**: `GET /api/object/current`, `PATCH /api/object/current`, `GET /api/object/current/source-data`, `PUT /api/object/current/source-data`
-- **Materials Catalog**: `GET /api/materials-catalog`, `POST /api/materials-catalog`
+- **Materials Catalog**: `GET /api/materials-catalog`, `POST /api/materials-catalog`, `POST /api/admin/materials-catalog/import` (массовый импорт из Excel, только для администраторов)
 - **Project Materials**: `GET /api/objects/:objectId/materials`, `POST /api/objects/:objectId/materials`, `GET /api/project-materials/:id`, `PATCH /api/project-materials/:id`, `POST /api/project-materials/:id/save-to-catalog`
 - **Material Batches**: `POST /api/project-materials/:id/batches`, `PATCH /api/material-batches/:id`, `DELETE /api/material-batches/:id` (dev-only)
+- **Invoice Import** (новые endpoints):
+  - `POST /api/parse-invoice` — загрузка и парсинг PDF-счёта через invoice-extractor (multipart/form-data, rate-limited 10 req/min на пользователя)
+  - `POST /api/bulk-create-materials` — массовое создание материалов проекта с дедупликацией по названию (case-insensitive)
 - **Documents**: `GET /api/documents`, `POST /api/documents`
 - **Document Bindings**: `POST /api/document-bindings`, `PATCH /api/document-bindings/:id`, `DELETE /api/document-bindings/:id`
 - **Act material usages**: `GET /api/acts/:id/material-usages`, `PUT /api/acts/:id/material-usages`
@@ -152,6 +167,11 @@ flowchart LR
 - **Acts**: `GET /api/acts`, `GET /api/acts/:id`, `POST /api/acts/:id/export`
   - `POST /api/acts/generate` и `POST /api/acts/create-with-templates` — **устарели** (410), создание актов только из графика работ
 - **Act Templates**: `GET /api/act-templates`
+- **Admin Panel** (только для администраторов):
+  - **Users**: `GET /api/admin/users`, `POST /api/admin/users/:id/block|unblock|make-admin`, `DELETE /api/admin/users/:id/admin`, `GET /api/admin/admins`
+  - **Stats**: `GET /api/admin/stats`
+  - **Messages Queue**: `GET /api/admin/messages/failed`, `POST /api/admin/messages/:id/reprocess`
+  - **Materials Catalog**: `POST /api/admin/materials-catalog/import`, `POST /api/admin/materials-catalog`, `PATCH /api/admin/materials-catalog/:id`, `DELETE /api/admin/materials-catalog/:id`
 - **Schedules**: 
   - `GET /api/schedules/default`, `POST /api/schedules`, `GET /api/schedules/:id`
   - `POST /api/schedules/:id/bootstrap-from-works` — создать задачи из ВОР
@@ -182,6 +202,10 @@ flowchart LR
   - `AI_INTEGRATIONS_OPENAI_BASE_URL`
 - **Telegram**
   - `TELEGRAM_BOT_TOKEN` — токен бота для валидации initData (обязателен в production, опционален в dev).
+- **Admin & Auth**
+  - `APP_ACCESS_TOKEN` — токен для доступа в браузере вне Telegram (опционален, для разработки).
+- **Invoice Extractor**
+  - `INVOICE_EXTRACTOR_URL` — URL микросервиса invoice-extractor (default: `http://localhost:5050`)
 - **Server**
   - `PORT` — порт HTTP (по умолчанию 5000).
   - `ENABLE_DEMO_SEED=true` — (только dev) включить сидирование демо-работ в пустую БД. В production игнорируется.
@@ -203,12 +227,15 @@ flowchart LR
 - `docs/db-migrations.md`
 
 ## Текущее состояние и ограничения (важно для планирования)
-- Импорт Excel парсится на **клиенте**, но отправляется на сервер **одним bulk-запросом** `POST /api/works/import` (без авто-очистки).
+- Импорт Excel парсится на **клиенте**, но отправляется на сервер **одним bulk-запросом** (`POST /api/works/import`, `POST /api/admin/materials-catalog/import` и т.д.) без авто-очистки.
+- Импорт PDF-счётов выполняется через микросервис invoice-extractor: клиент загружает файл через multer на `/api/parse-invoice`, обработка выполняется в отдельном процессе.
 - AI-нормализация сообщений выполняется синхронно в обработчике `POST /api/messages` (с попыткой вернуть уже обновлённую запись).
-- Контракт API и реализация должны оставаться синхронизированными (пример: `messages/:id/process`, `works/import`).
+- Контракт API и реализация должны оставаться синхронизированными (пример: `messages/:id/process`, `works/import`, `admin/materials-catalog/import`, `parse-invoice`).
+- Импорт материалов использует **дедупликацию по названию** (case-insensitive) для безопасного merge-режима.
 
 ## Связанные документы
 - `/docs/improvements.md` — перечень улучшений и расширений (приоритеты и идеи).
+- `/docs/materials-import-guide.md` — подробное руководство по импорту материалов из Excel.
 - `/docs/telegram-bot-setup.md` — пошаговая инструкция по созданию и настройке Telegram-бота.
 - `/docs/telegram-buttons-guide.md` — руководство по использованию нативных кнопок Telegram (MainButton, BackButton).
 - `/docs/telegram-haptic-guide.md` — руководство по использованию тактильной обратной связи (HapticFeedback).

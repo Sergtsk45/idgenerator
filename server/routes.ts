@@ -4,6 +4,8 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import OpenAI from "openai";
+import multer from "multer";
+import rateLimit from "express-rate-limit";
 import {
   buildActDataFromSourceData,
   buildAttachmentsText,
@@ -87,6 +89,35 @@ If no work matches, set workCode to null.`,
 
   return JSON.parse(completion.choices[0].message.content || "{}");
 }
+
+const invoiceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are accepted'));
+    }
+  },
+});
+
+const ALLOWED_EXTRACTOR_URLS = [
+  'http://localhost:5050',
+  'http://invoice-extractor:5000',
+];
+
+function validateExtractorUrl(url: string): boolean {
+  return ALLOWED_EXTRACTOR_URLS.includes(url);
+}
+
+const invoiceParseRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many invoice parse requests, please try again later" },
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -274,6 +305,112 @@ export async function registerRoutes(
         return res.status(400).json({ message: "nameOverride is required for local materials" });
       }
       console.error("Save project material to catalog failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post(
+    api.projectMaterials.parseInvoice.path,
+    invoiceParseRateLimiter,
+    (req, res, next) => {
+      invoiceUpload.single('file')(req, res, (err) => {
+        if (err) {
+          if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+              return res.status(400).json({ message: "File too large (max 50 MB)" });
+            }
+            return res.status(400).json({ message: err.message });
+          }
+          if (err.message === 'Only PDF files are accepted') {
+            return res.status(400).json({ message: err.message });
+          }
+          return res.status(500).json({ message: "File upload failed" });
+        }
+        next();
+      });
+    },
+    async (req, res) => {
+      const objectId = Number(req.params.objectId);
+      if (!Number.isFinite(objectId) || objectId <= 0) {
+        return res.status(400).json({ message: "Invalid objectId" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "PDF file is required" });
+      }
+
+      const extractorUrl = process.env.INVOICE_EXTRACTOR_URL || 'http://localhost:5050';
+      
+      if (!validateExtractorUrl(extractorUrl)) {
+        console.error(`Invalid INVOICE_EXTRACTOR_URL: ${extractorUrl}`);
+        return res.status(502).json({ message: "Invoice extractor configuration error" });
+      }
+
+      const formData = new FormData();
+      formData.append('file', new Blob([req.file.buffer], { type: 'application/pdf' }), req.file.originalname);
+      formData.append('output', 'json');
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 150_000);
+
+      try {
+        const response = await fetch(`${extractorUrl}/convert`, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          const errBody = await response.text().catch(() => '');
+          console.error(`Invoice extractor error ${response.status}:`, errBody);
+          return res.status(502).json({ message: `Invoice extractor returned ${response.status}` });
+        }
+
+        const data = await response.json();
+        return res.status(200).json({
+          items: (data.items || []).map((item: any) => ({
+            name: String(item.name || '').trim(),
+            unit: String(item.unit || '').trim(),
+            qty: item.qty ?? '',
+            price: item.price ?? '',
+            amount_w_vat: item.amount_w_vat ?? '',
+            vat_rate: item.vat_rate ?? '',
+          })).filter((item: any) => item.name.length > 0),
+          invoice_number: data.invoice_number || undefined,
+          invoice_date: data.invoice_date || undefined,
+          supplier_name: data.supplier?.name || undefined,
+          warnings: data.warnings || [],
+        });
+      } catch (err: any) {
+        clearTimeout(timeout);
+        if (err.name === 'AbortError') {
+          return res.status(502).json({ message: "Invoice extractor timeout" });
+        }
+        console.error("Invoice parse-invoice proxy error:", err);
+        return res.status(502).json({ message: "Invoice extractor unavailable" });
+      } finally {
+        if (req.file) {
+          (req.file as any).buffer = null;
+        }
+      }
+    }
+  );
+
+  app.post(api.projectMaterials.bulkCreate.path, async (req, res) => {
+    const objectId = Number(req.params.objectId);
+    if (!Number.isFinite(objectId) || objectId <= 0) {
+      return res.status(400).json({ message: "Invalid objectId" });
+    }
+    try {
+      const { items } = api.projectMaterials.bulkCreate.input.parse(req.body);
+      const result = await storage.bulkCreateProjectMaterials(objectId, items);
+      return res.status(200).json(result);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("Bulk create materials failed:", err);
       return res.status(500).json({ message: "Internal Server Error" });
     }
   });
@@ -2212,6 +2349,34 @@ export async function registerRoutes(
     } catch (err) {
       console.error("[Admin] deleteCatalogMaterial error:", err);
       res.status(500).json({ error: "Failed to delete material" });
+    }
+  });
+
+  // POST /api/admin/materials-catalog/import — массовый импорт материалов
+  app.post("/api/admin/materials-catalog/import", ...adminAuth, async (req, res) => {
+    const schema = api.materialsCatalog.import.input;
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        message: "Невалидные данные: " + parsed.error.errors.map(e => e.message).join(", ")
+      });
+    }
+
+    try {
+      const { mode, items } = parsed.data;
+      const result = await storage.importMaterialsCatalog(items, mode);
+      
+      res.json({
+        received: items.length,
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+      });
+    } catch (err) {
+      console.error("[Admin] importMaterialsCatalog error:", err);
+      res.status(500).json({ 
+        message: "Ошибка при импорте материалов: " + (err instanceof Error ? err.message : String(err))
+      });
     }
   });
 

@@ -16,6 +16,8 @@ import { useCurrentObject } from "@/hooks/use-source-data";
 import { useProjectMaterials } from "@/hooks/use-materials";
 import { MaterialCard, type ProjectMaterialListItem } from "@/components/materials/MaterialCard";
 import { MaterialWizard } from "@/components/materials/MaterialWizard";
+import { InvoiceImportButton } from "@/components/materials/InvoiceImportButton";
+import { InvoicePreviewDialog } from "@/components/materials/InvoicePreviewDialog";
 import { useLanguageStore } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +36,8 @@ export default function SourceMaterials() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [parsedInvoice, setParsedInvoice] = useState<any>(null);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
 
   const list = (materialsQuery.data ?? []) as any[];
   const canAddMaterial = Number.isFinite(objectId) && (objectId as number) > 0;
@@ -51,6 +55,11 @@ export default function SourceMaterials() {
       return;
     }
     setWizardOpen(true);
+  };
+
+  const handleInvoiceParsed = (data: any) => {
+    setParsedInvoice(data);
+    setPreviewDialogOpen(true);
   };
 
   const filtered = useMemo(() => {
@@ -169,7 +178,10 @@ export default function SourceMaterials() {
       </div>
 
       {/* FAB */}
-      <div className="fixed bottom-20 right-4 z-40">
+      <div className="fixed bottom-20 right-4 z-40 flex items-center gap-3">
+        {filter === "local" && Number.isFinite(objectId) && (
+          <InvoiceImportButton objectId={objectId as number} onParsed={handleInvoiceParsed} />
+        )}
         <Button
           size="icon"
           className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
@@ -180,7 +192,15 @@ export default function SourceMaterials() {
       </div>
 
       {Number.isFinite(objectId) ? (
-        <MaterialWizard objectId={objectId as number} open={wizardOpen} onOpenChange={setWizardOpen} />
+        <>
+          <MaterialWizard objectId={objectId as number} open={wizardOpen} onOpenChange={setWizardOpen} />
+          <InvoicePreviewDialog
+            objectId={objectId as number}
+            open={previewDialogOpen}
+            onOpenChange={setPreviewDialogOpen}
+            parsedData={parsedInvoice}
+          />
+        </>
       ) : null}
 
       <BottomNav />

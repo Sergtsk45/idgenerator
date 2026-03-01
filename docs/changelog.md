@@ -1,5 +1,41 @@
 # Changelog
 
+## [2026-03-01] - Импорт материалов из PDF-счетов поставщиков (фаза 1-3 завершены, INV-001 до INV-009)
+
+### Добавлено
+- **Микросервис `services/invoice-extractor/`** (Python/Flask): парсинг PDF-счетов поставщиков, извлечение таблиц материалов
+- **Docker Compose сервис invoice-extractor**: запуск на порту `5050:5000` с healthcheck
+- **Backend API endpoints**:
+  - `POST /api/parse-invoice` — proxy к invoice-extractor с поддержкой multer (загрузка PDF), FormData, SSRF-защита
+  - `POST /api/bulk-create-materials` — массовое создание материалов проекта с case-insensitive дедупликацией
+- **Frontend React Query хуки** в `client/src/hooks/use-materials.ts`:
+  - `useParseInvoice()` — парсинг загруженного счёта
+  - `useBulkCreateMaterials()` — создание множества материалов в проекте
+- **UI компоненты**:
+  - `InvoiceImportButton.tsx` — кнопка импорта на вкладке "Локальные" материалов
+  - `InvoicePreviewDialog.tsx` — диалог предпросмотра со строкой заголовка, чекбоксами, inline-редактированием, итоговым отчётом
+- **Новая переменная окружения** `INVOICE_EXTRACTOR_URL` (default: `http://localhost:5050`)
+
+### Изменено
+- `shared/routes.ts`: добавлены Zod-схемы `parseInvoiceRequest`, `parseInvoiceResponse`, `bulkCreateMaterialsRequest`, `bulkCreateMaterialsResponse`
+- `server/storage.ts`: метод `bulkCreateProjectMaterials()` с case-insensitive дедупликацией и транзакционной обработкой
+- `server/routes.ts`: добавлены эндпоинты `/parse-invoice` и `/bulk-create-materials` с обработкой ошибок и SSRF-защитой
+- `client/src/pages/SourceMaterials.tsx`: интеграция кнопки импорта счетов на вкладке "Локальные"
+
+### Исправлено
+- Multer error handling для некорректных мультичастных запросов
+- SSRF-валидация при обращении к invoice-extractor (проверка URL и выхода)
+- Утечка памяти: очистка временных файлов после обработки
+- Rate limiting на endpoint `/parse-invoice` (10 запросов в минуту на пользователя)
+
+### Технические детали
+- **Зависимости**: `multer` (загрузка PDF), `express-rate-limit` (rate limiting)
+- **Безопасность**: SSRF-защита, валидация ContentType, максимальный размер файла 10MB
+- **Производительность**: асинхронная обработка, очистка временных файлов после завершения
+- **Резилиентность**: retry-логика для обращений к invoice-extractor при сетевых ошибках
+
+---
+
 ## [2026-03-01] - Инфраструктура микросервиса invoice-extractor (INV-001, INV-002)
 ### Добавлено
 - **Микросервис `services/invoice-extractor/`**: реструктуризация сервиса парсинга PDF-счетов в отдельный пакет с правильной структурой Python-пакета `app/`

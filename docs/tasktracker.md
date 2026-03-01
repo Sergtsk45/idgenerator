@@ -2,6 +2,33 @@
 
 ---
 
+## Задача: Импорт материалов из PDF-счетов поставщиков (Invoice Import)
+- **Статус**: Завершена
+- **Описание**: Реализован полный функционал импорта материалов из PDF-счётов поставщиков через микросервис invoice-extractor. Трёхфазная реализация: инфраструктура, backend API, frontend UI.
+- **Этапы реализации**:
+  - [x] **Фаза 1: Инфраструктура (INV-001, INV-002)**
+    - [x] INV-001: Реструктуризация сервиса `services/invoice-extractor/` в правильный Python-пакет с app/
+    - [x] INV-002: Docker Compose сервис для invoice-extractor с healthcheck на 5050:5000
+  - [x] **Фаза 2: Backend API (INV-003 до INV-006)**
+    - [x] INV-003: Zod-схемы в `shared/routes.ts` для parseInvoice и bulkCreate endpoints
+    - [x] INV-004: `bulkCreateProjectMaterials()` в `server/storage.ts` с дедупликацией case-insensitive
+    - [x] INV-005: Эндпоинт `POST /api/parse-invoice` с multer, FormData proxy, SSRF-защита, rate-limiting (10 req/min)
+    - [x] INV-006: Эндпоинт `POST /api/bulk-create-materials` для массового создания материалов
+  - [x] **Фаза 3: Frontend (INV-007 до INV-009)**
+    - [x] INV-007: Хуки `useParseInvoice()` и `useBulkCreateMaterials()` в `client/src/hooks/use-materials.ts`
+    - [x] INV-008: `InvoicePreviewDialog.tsx` с таблицей, чекбоксами, inline-редактированием, итогом
+    - [x] INV-009: `InvoiceImportButton.tsx` и интеграция в `SourceMaterials.tsx` (видна только на вкладке "Локальные")
+- **Файлы**:
+  - Инфраструктура: `services/invoice-extractor/`, `docker-compose.yml`
+  - Backend: `server/routes.ts`, `server/storage.ts`
+  - Frontend: `client/src/hooks/use-materials.ts`, `client/src/components/materials/InvoiceImportButton.tsx`, `client/src/components/materials/InvoicePreviewDialog.tsx`
+  - Shared: `shared/routes.ts`
+  - Env: `INVOICE_EXTRACTOR_URL` (default: `http://localhost:5050`)
+- **Зависимости**: multer, express-rate-limit
+- **Документация**: `docs/changelog.md`, `docs/project.md` (обновлены)
+
+---
+
 ## Задача: Массовый импорт материалов из Excel
 - **Статус**: Завершена
 - **Описание**: Реализован функционал массового импорта справочника материалов в глобальный каталог из Excel-файла через админ-панель. Администраторы могут загружать материалы с дедупликацией по названию (case-insensitive).
@@ -1158,7 +1185,7 @@ server/fonts/TimesNewRomanBoldItalic.ttf
 ---
 
 ## Задача: Импорт материалов из счетов поставщиков (PDF → локальные материалы проекта)
-- **Статус**: В процессе
+- **Статус**: Завершена
 - **Описание**: Добавить возможность импорта материалов из PDF-счетов поставщиков в локальный список материалов проекта. Кнопка «Добавить файл» появляется только на вкладке «Локальные» страницы `/source/materials`. PDF парсится микросервисом invoice-extractor (Python/Flask), пользователь видит предпросмотр позиций с чекбоксами и inline-редактированием, затем подтверждает импорт. Дубликаты по имени (case-insensitive) пропускаются. Партии/цены не сохраняются.
 - **План**: `ai_docs/develop/plans/2026-03-01-invoice-import-materials.md`
 - **Шаги выполнения**:
@@ -1231,7 +1258,7 @@ server/fonts/TimesNewRomanBoldItalic.ttf
 
   Файл: `shared/routes.ts`, секция `projectMaterials` (после `saveToCatalog`, строка ~285, перед закрывающей `}` секции)
 
-  - [ ] **INV-003-A**: Добавить роут `parseInvoice`:
+  - [x] **INV-003-A**: Добавить роут `parseInvoice`:
     ```
     parseInvoice: {
       method: "POST",
@@ -1260,7 +1287,7 @@ server/fonts/TimesNewRomanBoldItalic.ttf
     ```
     Ключевое: `items[].name` и `items[].unit` — это то, что пойдёт в `nameOverride`/`baseUnitOverride`; `qty`, `price`, `amount_w_vat` — только для отображения в превью
 
-  - [ ] **INV-003-B**: Добавить роут `bulkCreate`:
+  - [x] **INV-003-B**: Добавить роут `bulkCreate`:
     ```
     bulkCreate: {
       method: "POST",
@@ -1283,7 +1310,7 @@ server/fonts/TimesNewRomanBoldItalic.ttf
     ```
     Ограничение `.max(500)` — защита от случайной загрузки огромного массива
 
-  - [ ] **INV-003-C**: Проверить `npm run check` — TypeScript компилируется без ошибок
+  - [x] **INV-003-C**: Проверить `npm run check` — TypeScript компилируется без ошибок
 
   **Критерии приёмки INV-003:**
   - Типы `api.projectMaterials.parseInvoice` и `api.projectMaterials.bulkCreate` доступны из `@shared/routes`
@@ -1296,7 +1323,7 @@ server/fonts/TimesNewRomanBoldItalic.ttf
 
   Файл: `server/storage.ts`
 
-  - [ ] **INV-004-A**: Добавить сигнатуру в интерфейс `IStorage` (после `saveProjectMaterialToCatalog`, строка ~153):
+  - [x] **INV-004-A**: Добавить сигнатуру в интерфейс `IStorage` (после `saveProjectMaterialToCatalog`, строка ~153):
     ```typescript
     bulkCreateProjectMaterials(
       objectId: number,
@@ -1304,7 +1331,7 @@ server/fonts/TimesNewRomanBoldItalic.ttf
     ): Promise<{ created: number; skipped: number; materials: ProjectMaterial[] }>;
     ```
 
-  - [ ] **INV-004-B**: Реализовать метод в `DatabaseStorage` (после `createProjectMaterial`, строка ~755):
+  - [x] **INV-004-B**: Реализовать метод в `DatabaseStorage` (после `createProjectMaterial`, строка ~755):
     Алгоритм:
     1. Если `items.length === 0` → возврат `{ created: 0, skipped: 0, materials: [] }`
     2. Запросить существующие материалы объекта:
@@ -1338,7 +1365,7 @@ server/fonts/TimesNewRomanBoldItalic.ttf
        ```
     7. Возврат `{ created: created.length, skipped, materials: created }`
 
-  - [ ] **INV-004-C**: Проверить edge cases:
+  - [x] **INV-004-C**: Проверить edge cases:
     - Пустой массив → `{ created: 0, skipped: 0, materials: [] }`
     - Все дубликаты → `{ created: 0, skipped: N, materials: [] }`
     - Внутренние дубли: `["Кирпич", "кирпич", "КИРПИЧ"]` → создаётся 1, пропускается 2
@@ -1526,13 +1553,21 @@ server/fonts/TimesNewRomanBoldItalic.ttf
 
 ### Фаза 3: Frontend (INV-007 — INV-009)
 
-  - [ ] **INV-007**: Хуки `useParseInvoice` и `useBulkCreateMaterials` в `use-materials.ts`
-  - [ ] **INV-008**: Компонент `InvoicePreviewDialog.tsx` (таблица, чекбоксы, inline-edit, result summary)
-  - [ ] **INV-009**: Компонент `InvoiceImportButton.tsx` + интеграция в `SourceMaterials.tsx` (только вкладка «Локальные»)
+  - [x] **INV-007**: Хуки `useParseInvoice` и `useBulkCreateMaterials` в `use-materials.ts`
+  - [x] **INV-008**: Компонент `InvoicePreviewDialog.tsx` (таблица, чекбоксы, inline-edit, result summary)
+  - [x] **INV-009**: Компонент `InvoiceImportButton.tsx` + интеграция в `SourceMaterials.tsx` (только вкладка «Локальные»)
 
 ### Фаза 4: Финализация (INV-010)
 
-  - [ ] **INV-010**: Документация (`changelog.md`, `project.md`, `tasktracker.md`) + тестирование
+  - [x] **INV-010**: Документация (`changelog.md`, `project.md`, `tasktracker.md`) + тестирование
+
+### Исправления после code review
+
+  - [x] **FIX-001**: Multer error handler - перемещён в сам роут (callback pattern)
+  - [x] **FIX-002**: SSRF защита - whitelist валидация для `INVOICE_EXTRACTOR_URL`
+  - [x] **FIX-003**: Memory leak - очистка `req.file.buffer` в finally block
+  - [x] **FIX-004**: Rate limiting - добавлен `express-rate-limit` (10 запросов/15 мин)
+  - [x] **FIX-005**: useMemo → useEffect для side effect в InvoicePreviewDialog
 
 - **Файлы (создать)**:
   - `services/invoice-extractor/` — весь пакет (из `testFiles/files_invoice-extractor/`)
