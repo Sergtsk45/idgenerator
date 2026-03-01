@@ -8,7 +8,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { getTelegramInitData } from "@/lib/telegram";
-import { getBrowserAccessToken } from "@/lib/browser-access";
+import { getAuthToken } from "@/lib/auth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,8 +63,8 @@ function adminHeaders(): HeadersInit {
   const initData = getTelegramInitData();
   if (initData) headers["X-Telegram-Init-Data"] = initData;
 
-  const accessToken = getBrowserAccessToken();
-  if (accessToken) headers["X-App-Access-Token"] = accessToken;
+  const authToken = getAuthToken();
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
   return headers;
 }

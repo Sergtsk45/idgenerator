@@ -1,12 +1,14 @@
 /**
  * @file: telegramAuth.ts
  * @description: Middleware для валидации Telegram WebApp initData
- * @dependencies: crypto (Node.js built-in)
+ * @dependencies: crypto (Node.js built-in), auth-service
  * @created: 2026-02-20
+ * @updated: 2026-03-01
  */
 
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import { authService } from '../auth-service';
 
 /**
  * Данные пользователя Telegram, извлечённые из initData
@@ -29,6 +31,12 @@ declare global {
     interface Request {
       telegramUser?: TelegramUser;
       telegramInitData?: Record<string, string>;
+      user?: {
+        id: number;
+        displayName: string;
+        email: string | null;
+        role: string;
+      };
     }
   }
 }
@@ -120,15 +128,16 @@ function parseUserFromInitData(initData: string): TelegramUser | null {
  * 2. Тела запроса (req.body.initData)
  * 
  * При успешной валидации добавляет в req:
- * - req.telegramUser - данные пользователя
+ * - req.telegramUser - данные пользователя Telegram
  * - req.telegramInitData - все параметры initData
+ * - req.user - унифицированный user из базы данных
  * 
  * При ошибке валидации возвращает 401 Unauthorized
  * 
  * @param options.required - если false, пропускает запросы без initData (для опциональной аутентификации)
  */
 export function telegramAuthMiddleware(options: { required?: boolean } = { required: true }) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
     // Если токен не настроен:
@@ -165,6 +174,18 @@ export function telegramAuthMiddleware(options: { required?: boolean } = { requi
       return;
     }
 
+    // Проверяем auth_date (не старше 600 секунд)
+    const params = new URLSearchParams(initData);
+    const authDateStr = params.get('auth_date');
+    
+    if (authDateStr) {
+      const authDate = Number(authDateStr);
+      if (Number.isFinite(authDate) && !authService.validateTelegramAuthDate(authDate)) {
+        res.status(401).json({ error: 'Telegram authentication data expired' });
+        return;
+      }
+    }
+
     // Валидируем подпись
     const isValid = validateTelegramInitData(initData, botToken);
 
@@ -174,19 +195,36 @@ export function telegramAuthMiddleware(options: { required?: boolean } = { requi
     }
 
     // Парсим данные пользователя
-    const user = parseUserFromInitData(initData);
+    const telegramUser = parseUserFromInitData(initData);
 
-    if (!user) {
+    if (!telegramUser) {
       res.status(401).json({ error: 'Invalid user data in initData' });
       return;
     }
 
-    // Добавляем данные в request
-    req.telegramUser = user;
-    
-    // Парсим все параметры initData для дополнительного использования
-    const params = new URLSearchParams(initData);
+    // Добавляем данные в request (сохраняем для обратной совместимости)
+    req.telegramUser = telegramUser;
     req.telegramInitData = Object.fromEntries(params.entries());
+
+    // Создаём или находим пользователя в базе данных
+    try {
+      const user = await authService.findOrCreateUserByProvider(
+        'telegram',
+        String(telegramUser.id),
+        telegramUser as unknown as Record<string, unknown>
+      );
+
+      req.user = {
+        id: user.id,
+        displayName: user.displayName,
+        email: user.email,
+        role: user.role,
+      };
+    } catch (error) {
+      console.error('[TelegramAuth] Failed to find/create user:', error);
+      res.status(500).json({ error: 'Failed to authenticate user' });
+      return;
+    }
 
     next();
   };

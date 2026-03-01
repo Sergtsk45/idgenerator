@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TelegramThemeProvider } from "@/components/TelegramThemeProvider";
+import { AuthGuard } from "@/components/AuthGuard";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Works from "@/pages/Works";
@@ -12,6 +13,7 @@ import Acts from "@/pages/Acts";
 import Schedule from "@/pages/Schedule";
 import Settings from "@/pages/Settings";
 import Login from "@/pages/Login";
+import Register from "@/pages/Register";
 import SourceData from "@/pages/SourceData";
 import SourceMaterials from "@/pages/SourceMaterials";
 import SourceMaterialDetail from "@/pages/SourceMaterialDetail";
@@ -26,24 +28,96 @@ import AdminMaterials from "@/pages/admin/AdminMaterials";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/works" component={Works} />
-      <Route path="/worklog" component={WorkLog} />
-      <Route path="/acts" component={Acts} />
-      <Route path="/schedule" component={Schedule} />
-      <Route path="/source-data" component={SourceData} />
-      <Route path="/source/materials" component={SourceMaterials} />
-      <Route path="/source/materials/:id" component={SourceMaterialDetail} />
-      <Route path="/source/documents" component={SourceDocuments} />
-      <Route path="/select-act-template" component={SelectActTemplate} />
-      <Route path="/select-task-materials" component={SelectTaskMaterials} />
-      <Route path="/settings" component={Settings} />
+      {/* Публичные роуты */}
       <Route path="/login" component={Login} />
-      {/* Admin Panel */}
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/users" component={AdminUsers} />
-      <Route path="/admin/messages" component={AdminMessages} />
-      <Route path="/admin/materials" component={AdminMaterials} />
+      <Route path="/register" component={Register} />
+      
+      {/* Защищённые роуты */}
+      <Route path="/">
+        <AuthGuard>
+          <Home />
+        </AuthGuard>
+      </Route>
+      <Route path="/works">
+        <AuthGuard>
+          <Works />
+        </AuthGuard>
+      </Route>
+      <Route path="/worklog">
+        <AuthGuard>
+          <WorkLog />
+        </AuthGuard>
+      </Route>
+      <Route path="/acts">
+        <AuthGuard>
+          <Acts />
+        </AuthGuard>
+      </Route>
+      <Route path="/schedule">
+        <AuthGuard>
+          <Schedule />
+        </AuthGuard>
+      </Route>
+      <Route path="/source-data">
+        <AuthGuard>
+          <SourceData />
+        </AuthGuard>
+      </Route>
+      <Route path="/source/materials">
+        <AuthGuard>
+          <SourceMaterials />
+        </AuthGuard>
+      </Route>
+      <Route path="/source/materials/:id">
+        {(params) => (
+          <AuthGuard>
+            <SourceMaterialDetail params={params} />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/source/documents">
+        <AuthGuard>
+          <SourceDocuments />
+        </AuthGuard>
+      </Route>
+      <Route path="/select-act-template">
+        <AuthGuard>
+          <SelectActTemplate />
+        </AuthGuard>
+      </Route>
+      <Route path="/select-task-materials">
+        <AuthGuard>
+          <SelectTaskMaterials />
+        </AuthGuard>
+      </Route>
+      <Route path="/settings">
+        <AuthGuard>
+          <Settings />
+        </AuthGuard>
+      </Route>
+      
+      {/* Admin Panel - защищённые роуты */}
+      <Route path="/admin">
+        <AuthGuard>
+          <AdminDashboard />
+        </AuthGuard>
+      </Route>
+      <Route path="/admin/users">
+        <AuthGuard>
+          <AdminUsers />
+        </AuthGuard>
+      </Route>
+      <Route path="/admin/messages">
+        <AuthGuard>
+          <AdminMessages />
+        </AuthGuard>
+      </Route>
+      <Route path="/admin/materials">
+        <AuthGuard>
+          <AdminMaterials />
+        </AuthGuard>
+      </Route>
+      
       <Route component={NotFound} />
     </Switch>
   );

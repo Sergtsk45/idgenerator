@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getTelegramInitData } from "./telegram";
-import { getBrowserAccessToken } from "./browser-access";
+import { getAuthToken, clearAuthToken } from "./auth";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -10,7 +10,9 @@ async function throwIfResNotOk(res: Response) {
 }
 
 /**
- * Создаёт заголовки для API-запросов, включая Telegram initData
+ * Создаёт заголовки для API-запросов с приоритетом аутентификации:
+ * 1. JWT токен (Authorization: Bearer)
+ * 2. Telegram initData (X-Telegram-Init-Data)
  */
 function createHeaders(includeContentType: boolean): HeadersInit {
   const headers: HeadersInit = {};
@@ -19,16 +21,18 @@ function createHeaders(includeContentType: boolean): HeadersInit {
     headers["Content-Type"] = "application/json";
   }
   
-  // Добавляем Telegram initData, если доступен
+  // Приоритет 1: JWT токен
+  const jwtToken = getAuthToken();
+  if (jwtToken) {
+    headers["Authorization"] = `Bearer ${jwtToken}`;
+    return headers;
+  }
+  
+  // Приоритет 2: Telegram initData
   const initData = getTelegramInitData();
   if (initData) {
     headers["X-Telegram-Init-Data"] = initData;
-  }
-
-  // Браузерный доступ (вне Telegram) по access-token
-  const accessToken = getBrowserAccessToken();
-  if (accessToken) {
-    headers["X-App-Access-Token"] = accessToken;
+    return headers;
   }
   
   return headers;
@@ -46,6 +50,13 @@ export async function apiRequest(
     credentials: "include",
   });
 
+  // Обработка 401: очистка JWT и редирект на логин
+  if (res.status === 401 && getAuthToken()) {
+    clearAuthToken();
+    window.location.href = '/login';
+    throw new Error('401: Unauthorized');
+  }
+
   await throwIfResNotOk(res);
   return res;
 }
@@ -61,8 +72,16 @@ export const getQueryFn: <T>(options: {
       credentials: "include",
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (res.status === 401) {
+      if (unauthorizedBehavior === "returnNull") {
+        return null;
+      }
+      
+      // Очистка JWT и редирект на логин при 401
+      if (getAuthToken()) {
+        clearAuthToken();
+        window.location.href = '/login';
+      }
     }
 
     await throwIfResNotOk(res);

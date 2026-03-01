@@ -3,7 +3,7 @@ import { api } from "@shared/routes";
 import type { Section3Row } from "@shared/routes";
 import { useAppSettings } from "@/lib/app-settings";
 import { getTelegramInitData } from "@/lib/telegram";
-import { getBrowserAccessToken } from "@/lib/browser-access";
+import { getAuthToken } from "@/lib/auth";
 
 function createHeaders(): HeadersInit {
   const headers: HeadersInit = {};
@@ -11,8 +11,8 @@ function createHeaders(): HeadersInit {
   const initData = getTelegramInitData();
   if (initData) headers["X-Telegram-Init-Data"] = initData;
 
-  const accessToken = getBrowserAccessToken();
-  if (accessToken) headers["X-App-Access-Token"] = accessToken;
+  const authToken = getAuthToken();
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
   return headers;
 }

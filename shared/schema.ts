@@ -19,24 +19,51 @@ import { z } from "zod";
 
 // === TABLE DEFINITIONS ===
 
+// Users (Internal user registry)
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  displayName: text("display_name").notNull(),
+  email: text("email").unique(),
+  passwordHash: text("password_hash"),
+  role: text("role").notNull().default("user"),
+  isBlocked: boolean("is_blocked").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastLoginAt: timestamp("last_login_at"),
+}, (t) => ({
+  emailIdx: index("users_email_idx").on(t.email),
+  roleCheck: check("users_role_check", sql`role IN ('user', 'admin')`),
+}));
+
+// Auth Providers (Multi-provider authentication)
+export const authProviders = pgTable("auth_providers", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  externalId: text("external_id"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  userIdIdx: index("auth_providers_user_id_idx").on(t.userId),
+  providerExternalIdIdx: index("auth_providers_provider_external_id_idx").on(t.provider, t.externalId),
+  providerExternalIdUnique: uniqueIndex("auth_providers_provider_external_id_uq").on(t.provider, t.externalId),
+  providerCheck: check("auth_providers_provider_check", sql`provider IN ('telegram', 'email', 'phone')`),
+}));
+
 // Construction Objects (Объекты строительства)
 export const objects = pgTable("objects", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(), // e.g. "ЖК Северный, корпус 2"
   address: text("address"),
   city: text("city"),
-  telegramUserId: bigint("telegram_user_id", { mode: "number" }), // Telegram user ID (owner)
+  userId: integer("user_id").notNull().references(() => users.id),
   isBlocked: boolean("is_blocked").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  userIdIdx: index("objects_user_id_idx").on(t.userId),
+}));
 
-// Admin users registry (telegram_user_id → admin access)
-export const adminUsers = pgTable("admin_users", {
-  id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
-  telegramUserId: text("telegram_user_id").notNull().unique(),
-  note: text("note"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
 
 export const objectParties = pgTable(
   "object_parties",
@@ -277,7 +304,7 @@ export const positionResources = pgTable(
 // Messages (Raw and Normalized)
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(), // Telegram User ID (string)
+  userId: integer("user_id").references(() => users.id),
   objectId: integer("object_id").references(() => objects.id, { onDelete: "set null" }), // Construction object
   messageRaw: text("message_raw").notNull(), // Original text
   // Normalized data extracted from LLM
@@ -294,7 +321,9 @@ export const messages = pgTable("messages", {
   }>(),
   createdAt: timestamp("created_at").defaultNow(),
   isProcessed: boolean("is_processed").default(false),
-});
+}, (t) => ({
+  userIdIdx: index("messages_user_id_idx").on(t.userId),
+}));
 
 // Type for a single work item in an act (with explicit source)
 export type ActWorkItem = {
@@ -664,6 +693,8 @@ export const estimatePositionMaterialLinks = pgTable(
 
 // === SCHEMAS ===
 
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, lastLoginAt: true });
+export const insertAuthProviderSchema = createInsertSchema(authProviders).omit({ id: true, createdAt: true });
 export const insertWorkSchema = createInsertSchema(works).omit({ id: true });
 export const insertWorkCollectionSchema = createInsertSchema(workCollections).omit({ id: true, createdAt: true });
 export const insertWorkSectionSchema = createInsertSchema(workSections).omit({ id: true });
@@ -703,6 +734,12 @@ export const actWorkItemSchema = z.object({
 });
 
 // === EXPLICIT API TYPES ===
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type AuthProvider = typeof authProviders.$inferSelect;
+export type InsertAuthProvider = z.infer<typeof insertAuthProviderSchema>;
 
 export type Work = typeof works.$inferSelect;
 export type InsertWork = z.infer<typeof insertWorkSchema>;
@@ -781,8 +818,6 @@ export type InsertTaskMaterial = z.infer<typeof insertTaskMaterialSchema>;
 export type EstimatePositionMaterialLink = typeof estimatePositionMaterialLinks.$inferSelect;
 export type InsertEstimatePositionMaterialLink = z.infer<typeof insertEstimatePositionMaterialLinkSchema>;
 
-export type AdminUser = typeof adminUsers.$inferSelect;
-export type InsertAdminUser = typeof adminUsers.$inferInsert;
 
 // Request/Response Types
 export type CreateMessageRequest = {

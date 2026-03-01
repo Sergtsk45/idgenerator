@@ -48,3 +48,35 @@ export function getTelegramUser() {
 
   return window.Telegram?.WebApp?.initDataUnsafe?.user || null;
 }
+
+/**
+ * Получает ID пользователя Telegram из initData
+ * Парсит initData как URLSearchParams, извлекает поле user и возвращает его id
+ */
+export function getTelegramUserId(): number | null {
+  const initData = getTelegramInitData();
+  
+  if (!initData) {
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams(initData);
+    const userParam = params.get('user');
+    
+    if (!userParam) {
+      return null;
+    }
+
+    const userData = JSON.parse(userParam);
+    
+    if (typeof userData.id === 'number') {
+      return userData.id;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[Telegram] Failed to parse user ID from initData:', error);
+    return null;
+  }
+}

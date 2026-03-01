@@ -37,12 +37,13 @@
   - **Аутентификация**: 
     - Серверная валидация `initData` через middleware `server/middleware/telegramAuth.ts` (HMAC-SHA-256 с Bot Token)
     - Клиент автоматически передаёт `initData` в заголовке `X-Telegram-Init-Data` (см. `client/src/lib/queryClient.ts`)
-    - Данные пользователя привязываются к `telegramUserId` в таблице `objects`
+    - Данные пользователя привязываются к внутреннему `users.id` через таблицу `auth_providers`
     - Документация: `docs/telegram-auth-testing.md`, скрипт для тестирования: `scripts/generate-mock-initdata.js`
     - **Доступ в браузере (вне Telegram)**:
-      - Если Telegram `initData` недоступен, сервер может принимать `X-App-Access-Token` (значение сверяется с `APP_ACCESS_TOKEN`).
-      - При валидном токене запросы выполняются от имени "псевдо-пользователя" (`telegramUserId = -1`) — это режим для ручной работы/отладки в браузере.
-      - Экран ввода токена: `/login` (`client/src/pages/Login.tsx`), токен хранится в localStorage и автоматически добавляется в заголовки запросов.
+      - Реализована мультипровайдерная аутентификация через JWT (email/phone/telegram)
+      - Экран входа: `/login`, регистрации: `/register` (`client/src/pages/Login.tsx`, `Register.tsx`)
+      - JWT токен хранится в localStorage и автоматически добавляется в заголовок `Authorization: Bearer <token>`
+      - Таблицы: `users` (внутренний реестр), `auth_providers` (привязки провайдеров к пользователям)
   - **Хуки**: 
     - `useTelegram()` — доступ к WebApp, user, initData, themeParams, colorScheme
     - `useTelegramMainButton()` — управление главной кнопкой действия (см. `docs/telegram-buttons-guide.md`)
@@ -71,6 +72,11 @@ flowchart LR
   API -->|OpenAI Chat Completions| AI[OpenAI]
   API -->|PDF parse| IE[Invoice Extractor]
 
+  subgraph Auth
+    DB --> U[users]
+    DB --> AP[auth_providers]
+  end
+  
   subgraph Data
     DB --> W[works (BoQ)]
     DB --> E[estimates (LSR)]
@@ -117,9 +123,62 @@ flowchart LR
   - Скрипт: `attached_assets/GESN/gesn_pdf_to_sqlite.py`
   - Результат: SQLite-файл (`--db`) и лог (`--log`). При относительном пути файлы сохраняются рядом со скриптом (в `attached_assets/GESN/`).
 
+## Аутентификация (мультипровайдерная система)
+
+### Архитектура
+Система поддерживает несколько провайдеров аутентификации через единый интерфейс:
+- **Telegram**: Вход в Telegram MiniApp через initData → валидация на сервере → JWT токен
+- **Email/Password**: Регистрация и вход через браузер → хеширование пароля (bcrypt) → JWT токен
+- **Готовность к расширению**: Phone, OAuth2 (Google, GitHub и т.д.)
+
+### JWT токены
+- **Алгоритм**: HS256
+- **Срок жизни**: 7 дней (настраивается через `JWT_EXPIRES_IN`)
+- **Хранение на клиенте**: localStorage
+- **Отправка**: автоматически в заголовке `Authorization: Bearer <token>`
+
+### Компоненты
+- **`server/auth-service.ts`**: центральный сервис с методами:
+  - `hashPassword()` / `verifyPassword()` — bcrypt (rounds=12)
+  - `generateJWT()` / `verifyJWT()` — JWT операции
+  - `findOrCreateUserByProvider()` — поиск/создание пользователя через провайдера
+  - `validateTelegramAuthDate()` — проверка свежести Telegram auth_date (< 600 сек)
+- **`server/middleware/auth.ts`**: unified middleware с поддержкой JWT, Telegram initData, legacy browser token
+- **`server/routes/auth.ts`**: API endpoints регистрации/входа/профиля
+- **`client/src/lib/auth.ts`**: утилиты для работы с JWT на клиенте
+- **`client/src/hooks/use-auth.ts`**: React Query хуки для аутентификации
+- **Таблицы БД**:
+  - `users` — реестр пользователей (id, email, password_hash, role, isBlocked, createdAt, updatedAt)
+  - `auth_providers` — привязки провайдеров (userId, provider: 'telegram'|'email', providerUserId, linkedAt)
+
+### API endpoints
+- `POST /api/auth/register` — регистрация по email/паролю
+- `POST /api/auth/login` — вход по email/паролю
+- `POST /api/auth/login/telegram` — вход через Telegram (POST initData → JWT)
+- `GET /api/auth/me` — информация о текущем пользователе
+- `POST /api/auth/link-provider` — привязка дополнительного провайдера к существующему аккаунту
+
+### Rate limiting
+- `/auth/login` — 5 попыток/минута на IP
+- `/auth/register` — 3 попытки/час на IP
+
+### Безопасность
+- Пароли хешируются через bcrypt (cost factor 12)
+- JWT секрет обязателен в production (`JWT_SECRET` env, >= 32 символа)
+- Telegram auth_date проверяется на свежесть (защита от replay)
+- Rate limiting защищает от brute force атак
+- Поддержка блокировки пользователей (`users.isBlocked`)
+
+### Миграция с legacy системы
+Существующие пользователи Telegram автоматически мигрированы:
+- SQL миграция `0018_users_auth_providers.sql` — создание таблиц users и auth_providers, копирование данных
+- SQL миграция `0019_drop_legacy_telegram_columns.sql` — удаление legacy колонок (admin_users, telegram_user_id)
+
 ## Модель данных (текущее состояние)
 Основные таблицы:
-- `objects`: объект строительства (MVP: один «текущий объект» на пользователя), используется как якорь для исходных данных плейсхолдеров. Содержит поле `telegramUserId` для привязки к пользователю Telegram.
+- `users`: реестр пользователей системы (id, email, password_hash, role, isBlocked, created_at, updated_at)
+- `auth_providers`: привязки провайдеров (id, user_id, provider, provider_user_id, linked_at)
+- `objects`: объект строительства (MVP: один «текущий объект» на пользователя), используется как якорь для исходных данных плейсхолдеров. Связь с пользователем через `users.id`.
 - `object_parties`: стороны объекта (заказчик/подрядчик/проектировщик) с реквизитами (минимум — `fullName`, дополнительно — ИНН/КПП/ОГРН, юр.адрес, телефон, email, реквизиты СРО). Эти данные используются при экспорте АОСР в PDF (если не переопределены через `formData`).
 - `object_responsible_persons`: ответственные лица/подписанты по ролям (ФИО/должность/основание + опционально line/sign).
 - `materials_catalog`: глобальный справочник материалов (наименование, ГОСТ/ТУ, ед. изм., параметры). Импортируется администраторами через API `POST /api/admin/materials-catalog/import`.
@@ -150,6 +209,12 @@ flowchart LR
 Определён в `shared/routes.ts`, реализован в `server/routes.ts`.
 
 Текущие ресурсы:
+- **Auth** (новое):
+  - `POST /api/auth/register` — регистрация по email/паролю (request: { email, password }, response: { user, token })
+  - `POST /api/auth/login` — вход по email/паролю (request: { email, password }, response: { user, token })
+  - `POST /api/auth/login/telegram` — вход через Telegram (request: { initData }, response: { user, token })
+  - `GET /api/auth/me` — информация о текущем пользователе (требует JWT)
+  - `POST /api/auth/link-provider` — привязка дополнительного провайдера к аккаунту (требует JWT)
 - **Object (MVP current)**: `GET /api/object/current`, `PATCH /api/object/current`, `GET /api/object/current/source-data`, `PUT /api/object/current/source-data`
 - **Materials Catalog**: `GET /api/materials-catalog`, `POST /api/materials-catalog`, `POST /api/admin/materials-catalog/import` (массовый импорт из Excel, только для администраторов)
 - **Project Materials**: `GET /api/objects/:objectId/materials`, `POST /api/objects/:objectId/materials`, `GET /api/project-materials/:id`, `PATCH /api/project-materials/:id`, `POST /api/project-materials/:id/save-to-catalog`
@@ -191,19 +256,17 @@ flowchart LR
 - `POST /api/works/import` — bulk импорт ВОР, режим **merge** по умолчанию (без очистки существующих данных).
 - `GET /api/pdfs/:filename` — выдача сгенерированных PDF из `generated_pdfs/`.
 
-Примечание по безопасности:
-- `DELETE /api/works` — деструктивная операция очистки ВОР. В production без явного подтверждения через query `resetSchedule=1` эндпоинт недоступен (404). В UI операция сопровождается предупреждением и выполняется со сбросом графика/актов.
-
 ## Переменные окружения
 - **DB**
   - `DATABASE_URL` — строка подключения к PostgreSQL (обязательна).
+- **Authentication**
+  - `JWT_SECRET` — секретный ключ для подписи JWT токенов (обязателен в production, минимум 32 символа).
+  - `JWT_EXPIRES_IN` — время жизни JWT токена (опционально, по умолчанию: `7d`).
 - **AI**
   - `AI_INTEGRATIONS_OPENAI_API_KEY`
   - `AI_INTEGRATIONS_OPENAI_BASE_URL`
 - **Telegram**
   - `TELEGRAM_BOT_TOKEN` — токен бота для валидации initData (обязателен в production, опционален в dev).
-- **Admin & Auth**
-  - `APP_ACCESS_TOKEN` — токен для доступа в браузере вне Telegram (опционален, для разработки).
 - **Invoice Extractor**
   - `INVOICE_EXTRACTOR_URL` — URL микросервиса invoice-extractor (default: `http://localhost:5050`)
 - **Server**

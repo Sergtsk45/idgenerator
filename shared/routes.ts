@@ -103,7 +103,101 @@ export const section3RowSchema = z.object({
 });
 export type Section3Row = z.infer<typeof section3RowSchema>;
 
+const registerSchema = z.object({
+  displayName: z.string().min(2, 'Display name must be at least 2 characters'),
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+const loginSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+const linkProviderSchema = z.object({
+  provider: z.enum(['telegram', 'email', 'phone']),
+  externalId: z.string().min(1),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+const linkEmailSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+const userResponseSchema = z.object({
+  id: z.number(),
+  displayName: z.string(),
+  email: z.string().nullable(),
+  role: z.string(),
+});
+
+const authResponseSchema = z.object({
+  user: userResponseSchema,
+  token: z.string(),
+});
+
 export const api = {
+  auth: {
+    loginTelegram: {
+      method: 'POST' as const,
+      path: '/api/auth/login/telegram',
+      responses: {
+        200: authResponseSchema,
+        401: z.object({ error: z.string() }),
+      },
+    },
+    register: {
+      method: 'POST' as const,
+      path: '/api/auth/register',
+      input: registerSchema,
+      responses: {
+        201: authResponseSchema,
+        400: z.object({ error: z.string(), details: z.array(z.any()).optional() }),
+        409: z.object({ error: z.string() }),
+      },
+    },
+    login: {
+      method: 'POST' as const,
+      path: '/api/auth/login',
+      input: loginSchema,
+      responses: {
+        200: authResponseSchema,
+        401: z.object({ error: z.string() }),
+        403: z.object({ error: z.string() }),
+      },
+    },
+    me: {
+      method: 'GET' as const,
+      path: '/api/auth/me',
+      responses: {
+        200: userResponseSchema,
+        401: z.object({ error: z.string() }),
+      },
+    },
+    linkEmail: {
+      method: 'POST' as const,
+      path: '/api/auth/link-email',
+      input: linkEmailSchema,
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        400: z.object({ error: z.string(), details: z.array(z.any()).optional() }),
+        401: z.object({ error: z.string() }),
+        409: z.object({ error: z.string() }),
+      },
+    },
+    linkProvider: {
+      method: 'POST' as const,
+      path: '/api/auth/link-provider',
+      input: linkProviderSchema,
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        400: z.object({ error: z.string(), details: z.array(z.any()).optional() }),
+        401: z.object({ error: z.string() }),
+        409: z.object({ error: z.string() }),
+      },
+    },
+  },
   object: {
     current: {
       method: 'GET' as const,

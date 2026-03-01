@@ -6,7 +6,7 @@
  */
 
 import { cn } from "@/lib/utils";
-import { ChevronRight, KeyRound, Shield } from "lucide-react";
+import { ChevronRight, KeyRound, Shield, Mail } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -15,36 +15,111 @@ import { useLanguageStore, translations } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/app-settings";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
-import { getBrowserAccessToken } from "@/lib/browser-access";
+import { getAuthToken } from "@/lib/auth";
+import { useAuth } from "@/hooks/use-auth";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 
 export default function Settings() {
   const { language, setLanguage } = useLanguageStore();
   const { showWorkVolumes, setShowWorkVolumes } = useAppSettings();
-  const { user, isInTelegram } = useTelegram();
+  const { user: telegramUser, isInTelegram } = useTelegram();
+  const { user: authUser, logout } = useAuth();
   const { toast } = useToast();
   const t = translations[language].settings;
-  const browserToken = getBrowserAccessToken();
+  const authToken = getAuthToken();
 
-  const fullName =
-    [user?.first_name, user?.last_name].filter(Boolean).join(" ") ||
-    (language === "ru" ? "Пользователь" : "User");
+  const [showLinkEmail, setShowLinkEmail] = useState(false);
+  const [linkEmail, setLinkEmail] = useState("");
+  const [linkPassword, setLinkPassword] = useState("");
+  const [isLinking, setIsLinking] = useState(false);
 
-  const userSubtitle = user?.username
-    ? `@${user.username}`
-    : isInTelegram
-      ? "Telegram"
-      : language === "ru"
-        ? "Dev режим"
-        : "Dev mode";
+  const user = authUser || telegramUser;
+
+  const fullName = authUser 
+    ? authUser.displayName
+    : [telegramUser?.first_name, telegramUser?.last_name].filter(Boolean).join(" ") ||
+      (language === "ru" ? "Пользователь" : "User");
+
+  const userSubtitle = authUser?.email
+    ? authUser.email
+    : telegramUser?.username
+      ? `@${telegramUser.username}`
+      : isInTelegram
+        ? "Telegram"
+        : language === "ru"
+          ? "Dev режим"
+          : "Dev mode";
 
   const handleSignOut = () => {
+    logout();
     toast({
-      title: language === "ru" ? "Функция недоступна" : "Not available",
-      description:
-        language === "ru"
-          ? "Выход из аккаунта будет добавлен позже"
-          : "Sign out will be added later",
+      title: language === "ru" ? "Выход выполнен" : "Signed out",
     });
+  };
+
+  const handleLinkEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Валидация
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(linkEmail)) {
+      toast({
+        title: language === "ru" ? "Неверный формат email" : "Invalid email format",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (linkPassword.length < 8) {
+      toast({
+        title: language === "ru" ? "Пароль должен содержать минимум 8 символов" : "Password must be at least 8 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLinking(true);
+    try {
+      const res = await fetch('/api/auth/link-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+        body: JSON.stringify({
+          email: linkEmail,
+          password: linkPassword,
+        }),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: 'Failed to link email' }));
+        throw new Error(error.error || 'Failed to link email');
+      }
+      
+      toast({
+        title: language === "ru" ? "Email привязан" : "Email linked",
+        description: language === "ru" ? "Теперь вы можете входить через email" : "You can now sign in with email",
+      });
+      setShowLinkEmail(false);
+      setLinkEmail("");
+      setLinkPassword("");
+      
+      // Обновить данные пользователя
+      window.location.reload();
+    } catch (error) {
+      toast({
+        title: language === "ru" ? "Ошибка" : "Error",
+        description: error instanceof Error ? error.message : language === "ru" ? "Не удалось привязать email" : "Failed to link email",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLinking(false);
+    }
   };
 
   return (
@@ -57,7 +132,7 @@ export default function Settings() {
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shrink-0">
               <span className="text-[22px] font-bold text-primary-foreground">
-                {user?.first_name?.[0] ?? "U"}
+                {fullName[0]?.toUpperCase() ?? "U"}
               </span>
             </div>
             <div className="flex-1 min-w-0">
@@ -71,6 +146,117 @@ export default function Settings() {
             <div className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" />
           </div>
         </div>
+
+        {/* Секция: Безопасность */}
+        {authUser && !authUser.email && (
+          <>
+            <div className="px-4 pt-2 pb-1">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {language === "ru" ? "БЕЗОПАСНОСТЬ" : "SECURITY"}
+              </p>
+            </div>
+            <div className="mx-4 bg-card border border-border/60 rounded-2xl p-4">
+              {!showLinkEmail ? (
+                <button
+                  type="button"
+                  onClick={() => setShowLinkEmail(true)}
+                  className="w-full flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-5 w-5 text-primary" />
+                    <div className="flex flex-col items-start">
+                      <p className="text-[15px]">
+                        {language === "ru" ? "Привязать email" : "Link email"}
+                      </p>
+                      <p className="text-[12px] text-muted-foreground">
+                        {language === "ru" ? "Для входа через email и пароль" : "For email and password login"}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
+                </button>
+              ) : (
+                <form onSubmit={handleLinkEmail} className="space-y-3">
+                  <div className="space-y-2">
+                    <label htmlFor="linkEmail" className="text-[12px] font-medium">
+                      Email
+                    </label>
+                    <Input
+                      id="linkEmail"
+                      type="email"
+                      value={linkEmail}
+                      onChange={(e) => setLinkEmail(e.target.value)}
+                      placeholder={language === "ru" ? "example@mail.com" : "example@mail.com"}
+                      disabled={isLinking}
+                      autoComplete="email"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="linkPassword" className="text-[12px] font-medium">
+                      {language === "ru" ? "Пароль" : "Password"}
+                    </label>
+                    <Input
+                      id="linkPassword"
+                      type="password"
+                      value={linkPassword}
+                      onChange={(e) => setLinkPassword(e.target.value)}
+                      placeholder={language === "ru" ? "Минимум 8 символов" : "Minimum 8 characters"}
+                      disabled={isLinking}
+                      autoComplete="new-password"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button type="submit" className="flex-1" disabled={isLinking}>
+                      {isLinking ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {language === "ru" ? "Привязка..." : "Linking..."}
+                        </>
+                      ) : (
+                        language === "ru" ? "Привязать" : "Link"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setShowLinkEmail(false);
+                        setLinkEmail("");
+                        setLinkPassword("");
+                      }}
+                      disabled={isLinking}
+                    >
+                      {language === "ru" ? "Отмена" : "Cancel"}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </>
+        )}
+
+        {authUser && authUser.email && (
+          <>
+            <div className="px-4 pt-2 pb-1">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {language === "ru" ? "БЕЗОПАСНОСТЬ" : "SECURITY"}
+              </p>
+            </div>
+            <div className="mx-4 bg-card border border-border/60 rounded-2xl divide-y divide-border/40">
+              <div className="flex items-center justify-between px-4 py-3.5">
+                <div className="flex items-center gap-3">
+                  <Mail className="h-5 w-5 text-primary" />
+                  <div className="flex flex-col">
+                    <p className="text-[15px]">Email</p>
+                    <p className="text-[12px] text-muted-foreground">{authUser.email}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Секция: Язык */}
         <div className="px-4 pt-2 pb-1">
@@ -173,9 +359,9 @@ export default function Settings() {
                     {language === "ru" ? "Access-token" : "Access token"}
                   </p>
                   <p className="text-[12px] text-muted-foreground">
-                    {browserToken
-                      ? (language === "ru" ? "Настроено" : "Configured")
-                      : (language === "ru" ? "Не задан" : "Not set")}
+                    {authUser || authToken
+                      ? (language === "ru" ? "Выполнен вход" : "Logged in")
+                      : (language === "ru" ? "Не выполнен вход" : "Not logged in")}
                   </p>
                 </div>
               </div>

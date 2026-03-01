@@ -27,6 +27,8 @@ import {
   schedules,
   scheduleTasks,
   taskMaterials,
+  users,
+  type User,
   type InsertWork,
   type InsertEstimate,
   type InsertEstimateSection,
@@ -79,8 +81,6 @@ import {
   type ScheduleTask,
   type TaskMaterial,
   type InsertTaskMaterial,
-  type AdminUser,
-  adminUsers,
 } from "@shared/schema";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql, count } from "drizzle-orm";
@@ -109,7 +109,7 @@ function isMainEstimatePosition(position: { code?: string | null }): boolean {
 
 export interface IStorage {
   // Objects / Source data (MVP: single default object)
-  getOrCreateDefaultObject(telegramUserId?: number): Promise<DbObject>;
+  getOrCreateDefaultObject(userId: number): Promise<DbObject>;
   getObject(id: number): Promise<DbObject | undefined>;
   updateObject(id: number, patch: Partial<Pick<InsertObject, "title" | "address" | "city">>): Promise<DbObject>;
   getObjectSourceData(objectId: number): Promise<SourceDataDto>;
@@ -251,18 +251,18 @@ export interface IStorage {
   deleteEstimate(id: number, options?: { resetScheduleIfInUse?: boolean }): Promise<boolean>;
 
   // Messages
-  getMessages(userId?: string): Promise<Message[]>;
+  getMessages(userId: number): Promise<Message[]>;
   getMessage(id: number): Promise<Message | undefined>;
   createMessage(message: InsertMessage): Promise<Message>;
   updateMessageNormalized(id: number, normalizedData: any): Promise<Message>;
   patchMessage(id: number, data: { messageRaw?: string; normalizedData?: any }): Promise<Message | undefined>;
-  clearMessages(userId?: string): Promise<void>;
+  clearMessages(userId: number): Promise<void>;
 
   // Acts
   getActs(): Promise<Act[]>;
   getAct(id: number): Promise<Act | undefined>;
   getActByNumber(actNumber: number): Promise<Act | undefined>;
-  createAct(act: InsertAct): Promise<Act>;
+  createAct(act: InsertAct, userId: number): Promise<Act>;
   upsertActByNumber(data: {
     actNumber: number;
     actTemplateId?: number | null;
@@ -274,7 +274,7 @@ export interface IStorage {
     projectDrawingsAgg?: string | null;
     normativeRefsAgg?: string | null;
     executiveSchemesAgg?: Array<{ title: string; fileUrl?: string }> | null;
-  }): Promise<{ act: Act; created: boolean }>;
+  }, userId: number): Promise<{ act: Act; created: boolean }>;
 
   deleteActByNumber(actNumber: number): Promise<boolean>;
   
@@ -381,26 +381,16 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  async getOrCreateDefaultObject(telegramUserId?: number): Promise<DbObject> {
-    // MVP: single "current" object per user (if telegramUserId provided).
+  async getOrCreateDefaultObject(userId: number): Promise<DbObject> {
+    // MVP: single "current" object per user.
     // IMPORTANT: do NOT rely on title to find the current object,
     // because title is user-editable via source-data and would lead to duplicates.
     
-    // Если передан telegramUserId, ищем объект для этого пользователя
-    let all: DbObject[];
-    if (telegramUserId !== undefined) {
-      all = await db
-        .select()
-        .from(objects)
-        .where(eq(objects.telegramUserId, telegramUserId));
-    } else {
-      // Для обратной совместимости: если telegramUserId не передан,
-      // ищем объекты без привязки к пользователю (legacy)
-      all = await db
-        .select()
-        .from(objects)
-        .where(isNull(objects.telegramUserId));
-    }
+    // Ищем объект для этого пользователя по user_id
+    const all: DbObject[] = await db
+      .select()
+      .from(objects)
+      .where(eq(objects.userId, userId));
     
     if (all.length === 1) return all[0];
     if (all.length > 1) {
@@ -453,7 +443,7 @@ export class DatabaseStorage implements IStorage {
         title: defaultTitle, 
         address: null, 
         city: null,
-        telegramUserId: telegramUserId ?? null
+        userId: userId
       })
       .returning();
     return created;
@@ -1840,13 +1830,10 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getMessages(userId?: string): Promise<Message[]> {
-    if (userId) {
-      return await db.select().from(messages)
-        .where(eq(messages.userId, userId))
-        .orderBy(desc(messages.createdAt));
-    }
-    return await db.select().from(messages).orderBy(desc(messages.createdAt));
+  async getMessages(userId: number): Promise<Message[]> {
+    return await db.select().from(messages)
+      .where(eq(messages.userId, userId))
+      .orderBy(desc(messages.createdAt));
   }
 
   async getMessage(id: number): Promise<Message | undefined> {
@@ -1900,12 +1887,8 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async clearMessages(userId?: string): Promise<void> {
-    if (userId) {
-      await db.delete(messages).where(eq(messages.userId, userId));
-    } else {
-      await db.delete(messages);
-    }
+  async clearMessages(userId: number): Promise<void> {
+    await db.delete(messages).where(eq(messages.userId, userId));
   }
 
   async getActs(): Promise<Act[]> {
@@ -1922,8 +1905,8 @@ export class DatabaseStorage implements IStorage {
     return act;
   }
 
-  async createAct(act: InsertAct): Promise<Act> {
-    const defaultObject = await this.getOrCreateDefaultObject();
+  async createAct(act: InsertAct, userId: number): Promise<Act> {
+    const defaultObject = await this.getOrCreateDefaultObject(userId);
     const objectId = (act as any).objectId ?? defaultObject.id;
     const [newAct] = await db
       .insert(acts)
@@ -1943,9 +1926,9 @@ export class DatabaseStorage implements IStorage {
     projectDrawingsAgg?: string | null;
     normativeRefsAgg?: string | null;
     executiveSchemesAgg?: Array<{ title: string; fileUrl?: string }> | null;
-  }): Promise<{ act: Act; created: boolean }> {
+  }, userId: number): Promise<{ act: Act; created: boolean }> {
     const existing = await this.getActByNumber(data.actNumber);
-    const defaultObject = await this.getOrCreateDefaultObject();
+    const defaultObject = await this.getOrCreateDefaultObject(userId);
 
     if (existing) {
       const nextStatus =
@@ -2591,97 +2574,108 @@ export interface AdminStats {
 export const adminStorage = {
   /** Список всех пользователей с агрегированной статистикой */
   async listUsers(): Promise<AdminUserRow[]> {
-    // Один запрос: objects + count acts + count messages через LEFT JOIN с subquery
+    // JOIN users + objects для получения полной информации
     const rows = await db
       .select({
-        telegramUserId: objects.telegramUserId,
+        userId: users.id,
+        displayName: users.displayName,
+        email: users.email,
+        role: users.role,
+        isBlocked: users.isBlocked,
         objectId: objects.id,
         objectTitle: objects.title,
-        isBlocked: objects.isBlocked,
       })
-      .from(objects)
-      .orderBy(asc(objects.id));
+      .from(users)
+      .leftJoin(objects, eq(objects.userId, users.id))
+      .orderBy(asc(users.id));
 
     if (rows.length === 0) return [];
 
-    // Параллельно: admin set + counts по всем объектам сразу
-    const objectIds = rows.map((r) => r.objectId);
-
-    const [adminRows, actsCountRows, messagesCountRows] = await Promise.all([
-      db.select({ id: adminUsers.telegramUserId }).from(adminUsers),
+    // Подсчет актов и сообщений по пользователям
+    const userIds = Array.from(new Set(rows.map((r) => r.userId)));
+    
+    const [actsCountRows, messagesCountRows] = await Promise.all([
       db
-        .select({ objectId: acts.objectId, cnt: count() })
+        .select({ 
+          userId: objects.userId,
+          cnt: count() 
+        })
         .from(acts)
-        .where(inArray(acts.objectId, objectIds))
-        .groupBy(acts.objectId),
+        .innerJoin(objects, eq(acts.objectId, objects.id))
+        .where(inArray(objects.userId, userIds))
+        .groupBy(objects.userId),
       db
-        .select({ objectId: messages.objectId, cnt: count() })
+        .select({ 
+          userId: messages.userId,
+          cnt: count() 
+        })
         .from(messages)
-        .where(and(isNull(messages.objectId) ? undefined : inArray(messages.objectId, objectIds)))
-        .groupBy(messages.objectId),
+        .where(inArray(messages.userId, userIds))
+        .groupBy(messages.userId),
     ]);
 
-    const adminSet = new Set(adminRows.map((r) => r.id));
-    const actsMap = new Map(actsCountRows.map((r) => [r.objectId, Number(r.cnt)]));
-    const messagesMap = new Map(messagesCountRows.map((r) => [r.objectId, Number(r.cnt)]));
+    const actsMap = new Map(actsCountRows.map((r) => [r.userId, Number(r.cnt)]));
+    const messagesMap = new Map(messagesCountRows.map((r) => [r.userId, Number(r.cnt)]));
 
-    return rows.map((row) => {
-      const userId = row.telegramUserId ? String(row.telegramUserId) : null;
-      return {
-        telegramUserId: userId ?? '(unknown)',
-        objectId: row.objectId,
-        objectTitle: row.objectTitle,
-        isBlocked: row.isBlocked,
-        isAdmin: userId ? adminSet.has(userId) : false,
-        objectsCount: 1,
-        actsCount: actsMap.get(row.objectId) ?? 0,
-        messagesCount: messagesMap.get(row.objectId) ?? 0,
-      };
-    });
+    // Группируем по пользователям
+    const userMap = new Map<number, AdminUserRow>();
+    
+    for (const row of rows) {
+      if (!userMap.has(row.userId)) {
+        userMap.set(row.userId, {
+          telegramUserId: String(row.userId), // Теперь это internal user ID
+          objectId: row.objectId,
+          objectTitle: row.objectTitle,
+          isBlocked: row.isBlocked,
+          isAdmin: row.role === 'admin',
+          objectsCount: 1,
+          actsCount: actsMap.get(row.userId) ?? 0,
+          messagesCount: messagesMap.get(row.userId) ?? 0,
+        });
+      } else {
+        const existing = userMap.get(row.userId)!;
+        existing.objectsCount += 1;
+      }
+    }
+
+    return Array.from(userMap.values());
   },
 
-  /** Заблокировать пользователя (все его объекты) */
-  async blockUser(telegramUserId: string): Promise<void> {
-    const uid = parseInt(telegramUserId, 10);
-    if (!Number.isFinite(uid)) throw new Error(`Invalid telegramUserId: ${telegramUserId}`);
-    await db.update(objects).set({ isBlocked: true }).where(eq(objects.telegramUserId, uid));
+  /** Заблокировать пользователя */
+  async blockUser(userId: number): Promise<void> {
+    await db.update(users).set({ isBlocked: true }).where(eq(users.id, userId));
   },
 
   /** Разблокировать пользователя */
-  async unblockUser(telegramUserId: string): Promise<void> {
-    const uid = parseInt(telegramUserId, 10);
-    if (!Number.isFinite(uid)) throw new Error(`Invalid telegramUserId: ${telegramUserId}`);
-    await db.update(objects).set({ isBlocked: false }).where(eq(objects.telegramUserId, uid));
+  async unblockUser(userId: number): Promise<void> {
+    await db.update(users).set({ isBlocked: false }).where(eq(users.id, userId));
   },
 
   /** Назначить пользователя администратором */
-  async makeAdmin(telegramUserId: string, note?: string): Promise<void> {
-    await db
-      .insert(adminUsers)
-      .values({ telegramUserId, note: note ?? null })
-      .onConflictDoNothing();
+  async makeAdmin(userId: number, _note?: string): Promise<void> {
+    await db.update(users).set({ role: 'admin' }).where(eq(users.id, userId));
   },
 
   /** Снять права администратора */
-  async removeAdmin(telegramUserId: string): Promise<void> {
-    await db.delete(adminUsers).where(eq(adminUsers.telegramUserId, telegramUserId));
+  async removeAdmin(userId: number): Promise<void> {
+    await db.update(users).set({ role: 'user' }).where(eq(users.id, userId));
   },
 
   /** Проверить, является ли пользователь администратором */
-  async isAdmin(telegramUserId: string): Promise<boolean> {
+  async isAdmin(userId: number): Promise<boolean> {
     const rows = await db
-      .select({ id: adminUsers.id })
-      .from(adminUsers)
-      .where(eq(adminUsers.telegramUserId, telegramUserId))
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, userId))
       .limit(1);
-    return rows.length > 0;
+    return rows.length > 0 && rows[0].role === 'admin';
   },
 
   /** Системная статистика */
   async getStats(): Promise<AdminStats> {
     const [totalUsersRow, totalObjectsRow, totalActsRow, totalMessagesRow, processedRow, totalMaterialsRow] =
       await Promise.all([
-        db.select({ cnt: sql<number>`count(DISTINCT telegram_user_id)` }).from(objects),
+        db.select({ cnt: count() }).from(users),
         db.select({ cnt: count() }).from(objects),
         db.select({ cnt: count() }).from(acts),
         db.select({ cnt: count() }).from(messages),
@@ -2756,7 +2750,7 @@ export const adminStorage = {
   },
 
   /** Список всех администраторов */
-  async listAdmins(): Promise<AdminUser[]> {
-    return db.select().from(adminUsers).orderBy(asc(adminUsers.createdAt));
+  async listAdmins(): Promise<User[]> {
+    return db.select().from(users).where(eq(users.role, 'admin')).orderBy(asc(users.createdAt));
   },
 };

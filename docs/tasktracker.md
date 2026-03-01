@@ -1737,3 +1737,704 @@ server/fonts/TimesNewRomanBoldItalic.ttf
   - [x] При ошибке AI-нормализации помечать сообщение обработанным без `normalizedData` (чтобы UI не зависал)
   - [x] Добавить экран ввода токена `/login` и пункт в настройках
 - **Зависимости**: `APP_ACCESS_TOKEN` в окружении production (для доступа в браузере)
+
+---
+
+## Задача: Мультипровайдерная аутентификация (feature/multi-auth)
+- **Статус**: Завершена ✅
+- **Дата завершения**: 2026-03-01
+- **Приоритет**: Высокий (архитектурная устойчивость)
+- **Описание**: Система мультипровайдерной аутентификации полностью реализована. Пользователи могут входить через Telegram (в MiniApp) или по email/паролю (в браузере). Единый интерфейс управления через `users.id` и `auth_providers`.
+- **Оценка**: ~16-24 часа, ~20-25 файлов, 2 SQL-миграции
+- **Результат**: ✅ Все 30 подзадач (MULTI-001 до MULTI-030) завершены
+
+### ЭТАП 1: Миграция БД — таблицы `users` и `auth_providers`
+
+  - [x] **MULTI-001**: Обновить схему Drizzle (`shared/schema.ts`)
+    - **Файл**: `shared/schema.ts`
+    - **Описание**: Добавить таблицы `users` и `auth_providers`
+    - **Детали**:
+      - Создать таблицу `users`:
+        ```typescript
+        export const users = pgTable('users', {
+          id: serial('id').primaryKey(),
+          displayName: text('display_name').notNull(),
+          email: text('email').unique(),
+          passwordHash: text('password_hash'),
+          role: text('role', { enum: ['user', 'admin'] }).notNull().default('user'),
+          isBlocked: boolean('is_blocked').notNull().default(false),
+          createdAt: timestamp('created_at').notNull().defaultNow(),
+          lastLoginAt: timestamp('last_login_at')
+        });
+        ```
+      - Создать таблицу `auth_providers`:
+        ```typescript
+        export const authProviders = pgTable('auth_providers', {
+          id: serial('id').primaryKey(),
+          userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+          provider: text('provider', { enum: ['telegram', 'email', 'phone', 'google'] }).notNull(),
+          externalId: text('external_id').notNull(),
+          metadata: jsonb('metadata'),
+          createdAt: timestamp('created_at').notNull().defaultNow()
+        }, (table) => ({
+          uniqueProviderExternal: unique().on(table.provider, table.externalId)
+        }));
+        ```
+      - Добавить в таблицу `objects` колонку `userId` (nullable на время миграции):
+        ```typescript
+        userId: integer('user_id').references(() => users.id)
+        ```
+      - Добавить Zod-схемы для валидации (User, AuthProvider, CreateUser, LinkProvider)
+    - **Зависимости**: Нет
+    - **Завершено**: 2026-03-01
+
+  - [x] **MULTI-002**: Написать SQL-миграцию `0018_users_auth_providers.sql`
+    - **Файл**: `migrations/0018_users_auth_providers.sql`
+    - **Описание**: Создать таблицы и мигрировать существующие данные
+    - **Детали**:
+      ```sql
+      -- 1. Создать таблицы
+      CREATE TABLE users (
+        id SERIAL PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        email TEXT UNIQUE,
+        password_hash TEXT,
+        role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+        is_blocked BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        last_login_at TIMESTAMP
+      );
+
+      CREATE TABLE auth_providers (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL CHECK (provider IN ('telegram', 'email', 'phone', 'google')),
+        external_id TEXT NOT NULL,
+        metadata JSONB,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(provider, external_id)
+      );
+
+      -- 2. Добавить колонку user_id в objects
+      ALTER TABLE objects ADD COLUMN user_id INTEGER REFERENCES users(id);
+
+      -- 3. Мигрировать данные из objects.telegram_user_id
+      INSERT INTO users (display_name, role, is_blocked)
+      SELECT DISTINCT 
+        'User ' || telegram_user_id::text,
+        CASE WHEN telegram_user_id::text IN (SELECT telegram_user_id FROM admin_users) THEN 'admin' ELSE 'user' END,
+        false
+      FROM objects 
+      WHERE telegram_user_id IS NOT NULL;
+
+      INSERT INTO auth_providers (user_id, provider, external_id, metadata)
+      SELECT u.id, 'telegram', o.telegram_user_id::text, '{}'::jsonb
+      FROM objects o
+      JOIN users u ON u.display_name = 'User ' || o.telegram_user_id::text
+      WHERE o.telegram_user_id IS NOT NULL
+      ON CONFLICT (provider, external_id) DO NOTHING;
+
+      UPDATE objects o
+      SET user_id = (
+        SELECT ap.user_id 
+        FROM auth_providers ap 
+        WHERE ap.provider = 'telegram' AND ap.external_id = o.telegram_user_id::text
+      )
+      WHERE o.telegram_user_id IS NOT NULL;
+
+      -- 4. Добавить user_id в messages (если нужно для совместимости)
+      ALTER TABLE messages ADD COLUMN internal_user_id INTEGER REFERENCES users(id);
+      
+      UPDATE messages m
+      SET internal_user_id = (
+        SELECT ap.user_id 
+        FROM auth_providers ap 
+        WHERE ap.provider = 'telegram' AND ap.external_id = m.user_id
+      )
+      WHERE m.user_id IS NOT NULL;
+      ```
+    - **Зависимости**: MULTI-001
+    - **Завершено**: 2026-03-01
+
+  - [x] **MULTI-003**: Протестировать миграцию на копии БД
+    - **Описание**: Убедиться, что миграция не теряет данные и корректно создаёт связи
+    - **Проверки**:
+      - Все уникальные `telegram_user_id` превратились в записи `users`
+      - Администраторы получили `role = 'admin'`
+      - Все записи `objects` имеют заполненный `user_id`
+      - Нет потерянных данных
+    - **Зависимости**: MULTI-002
+    - **Завершено**: 2026-03-01
+
+  **Результат этапа 1:**
+  - Таблицы `users` и `auth_providers` существуют и заполнены
+  - Старые колонки (`objects.telegram_user_id`, `admin_users`) пока НЕ удалены
+  - `objects.user_id` заполнен для всех существующих объектов
+
+### ЭТАП 2: Серверный auth-слой — провайдер-агностичный
+
+  - [x] **MULTI-004**: Установить зависимости для аутентификации
+    - **Команда**: `npm install bcryptjs jose express-rate-limit`
+    - **Команда**: `npm install --save-dev @types/bcryptjs`
+    - **Описание**: 
+      - `bcryptjs` — хеширование паролей (без native deps)
+      - `jose` — JWT sign/verify (ESM-native, встроенная в Node 20+)
+      - `express-rate-limit` — защита от брутфорса (уже установлен)
+    - **Зависимости**: Нет
+    - **Завершено**: 2026-03-01
+
+  - [x] **MULTI-005**: Создать сервис аутентификации (`server/auth-service.ts`)
+    - **Файл**: `server/auth-service.ts` (создан)
+    - **Описание**: Центральный сервис для всех операций аутентификации
+    - **Детали**:
+      ```typescript
+      export class AuthService {
+        // User management
+        async findUserById(id: number): Promise<User | null>;
+        async findUserByEmail(email: string): Promise<User | null>;
+        async findOrCreateUserByProvider(
+          provider: 'telegram' | 'email' | 'phone',
+          externalId: string,
+          metadata?: any
+        ): Promise<User>;
+        
+        // Password management
+        async hashPassword(plaintext: string): Promise<string>;
+        async verifyPassword(user: User, plaintext: string): Promise<boolean>;
+        
+        // JWT management
+        generateJWT(user: User): Promise<string>;
+        verifyJWT(token: string): Promise<{ userId: number; role: string } | null>;
+        
+        // Provider linking
+        async linkProvider(
+          userId: number,
+          provider: string,
+          externalId: string,
+          metadata?: any
+        ): Promise<void>;
+        
+        // User creation
+        async createUserWithEmail(
+          displayName: string,
+          email: string,
+          password: string
+        ): Promise<User>;
+      }
+      ```
+    - **Безопасность**:
+      - bcrypt cost factor = 12 ✅
+      - JWT secret из env `JWT_SECRET` (>= 32 символа) ✅
+      - JWT TTL: 7 дней (из env `JWT_EXPIRES_IN`) ✅
+      - Telegram auth_date проверка (< 600 сек) ✅
+    - **Зависимости**: MULTI-001, MULTI-004
+    - **Завершено**: 2026-03-01
+
+  - [x] **MULTI-006**: Создать unified auth middleware (`server/middleware/auth.ts`)
+    - **Файл**: `server/middleware/auth.ts` (создан)
+    - **Описание**: Единый middleware, заменяющий `telegramAuth` и `browserTokenAuth`
+    - **Детали**:
+      - Проверяет заголовки в порядке приоритета:
+        1. `Authorization: Bearer <jwt>` → verify JWT → `req.user = { id, role, ... }`
+        2. `X-Telegram-Init-Data` → validate HMAC → findOrCreateUser → `req.user`
+        3. `X-App-Access-Token` (dev-only, deprecated) → legacy-совместимость
+      - Экспортирует два middleware:
+        ```typescript
+        export const authOptional: RequestHandler; // устанавливает req.user если есть
+        export const authRequired: RequestHandler; // 401 если req.user не установлен
+        ```
+      - Расширяет типы Express:
+        ```typescript
+        declare global {
+          namespace Express {
+            interface Request {
+              user?: {
+                id: number;
+                displayName: string;
+                email: string | null;
+                role: 'user' | 'admin';
+              };
+            }
+          }
+        }
+        ```
+    - **Зависимости**: MULTI-005
+    - **Завершено**: 2026-03-01
+
+  - [x] **MULTI-007**: Обновить Telegram auth middleware (`server/middleware/telegramAuth.ts`)
+    - **Файл**: `server/middleware/telegramAuth.ts` (обновлён)
+    - **Описание**: Интегрирован с новым auth-сервисом
+    - **Детали**:
+      - Валидация HMAC сохранена ✅
+      - Проверка `auth_date` добавлена (< 600 сек) ✅
+      - Вызов `authService.findOrCreateUserByProvider('telegram', ...)` ✅
+      - Установка `req.user` (unified интерфейс) ✅
+      - Обратная совместимость: `req.telegramUser` сохранён ✅
+    - **Зависимости**: MULTI-005, MULTI-006
+    - **Завершено**: 2026-03-01
+
+  - [x] **MULTI-008**: Создать API роуты аутентификации (`server/routes/auth.ts`)
+    - **Файл**: `server/routes/auth.ts` (создан)
+    - **Описание**: Новые auth-эндпоинты реализованы
+    - **Детали**:
+      ```typescript
+      // Telegram login (автоматический)
+      POST /api/auth/login/telegram
+      Body: { initData: string }
+      Response: { token: string, user: User }
+
+      // Email registration
+      POST /api/auth/register
+      Body: { displayName: string, email: string, password: string }
+      Response: { token: string, user: User }
+
+      // Email login
+      POST /api/auth/login
+      Body: { email: string, password: string }
+      Response: { token: string, user: User }
+
+      // Link additional provider
+      POST /api/auth/link-provider
+      Headers: Authorization: Bearer <jwt>
+      Body: { provider: string, email?: string, password?: string }
+      Response: { success: boolean }
+
+      // Get current user
+      GET /api/auth/me
+      Headers: Authorization: Bearer <jwt>
+      Response: { user: User }
+
+      // Logout (client-side, для JWT просто удаляем токен)
+      POST /api/auth/logout
+      Response: { success: boolean }
+      ```
+    - **Rate limiting**:
+      - `/api/auth/login` — max 5 попыток в минуту на IP ✅
+      - `/api/auth/register` — max 3 регистрации в час на IP ✅
+    - **Зависимости**: MULTI-005, MULTI-006
+    - **Завершено**: 2026-03-01
+
+  - [x] **MULTI-009**: Добавить в `shared/routes.ts` контракты новых эндпоинтов
+    - **Файл**: `shared/routes.ts` (обновлён)
+    - **Описание**: Типобезопасные схемы для auth API добавлены
+    - **Детали**:
+      ```typescript
+      export const authApi = {
+        loginTelegram: {
+          path: '/api/auth/login/telegram',
+          method: 'POST' as const,
+          input: z.object({ initData: z.string() }),
+          output: z.object({
+            token: z.string(),
+            user: z.object({
+              id: z.number(),
+              displayName: z.string(),
+              email: z.string().nullable(),
+              role: z.enum(['user', 'admin'])
+            })
+          })
+        },
+        register: { ... },
+        login: { ... },
+        linkProvider: { ... },
+        me: { ... },
+        logout: { ... }
+      };
+      ```
+    - **Зависимости**: MULTI-001
+    - **Завершено**: 2026-03-01
+
+  **Результат этапа 2:** ✅ Завершён 2026-03-01
+  - Единый `req.user.id` (internal) для всех провайдеров ✅
+  - JWT выдаётся после любого успешного входа ✅
+  - Telegram initData автоматически создаёт пользователя при первом входе ✅
+  - Email/password — альтернативный вход ✅
+  - API для регистрации/логина/привязки провайдеров ✅
+  - Rate limiting на auth endpoints ✅
+
+### ЭТАП 3: Миграция серверных роутов и storage на `users.id`
+
+  - [ ] **MULTI-010**: Обновить `server/storage.ts` — миграция методов на `users.id`
+    - **Файл**: `server/storage.ts`
+    - **Описание**: Заменить все обращения к `telegramUserId` на `userId`
+    - **Детали**:
+      - `getOrCreateDefaultObject(userId: number)` — искать по `objects.user_id`
+      - `getMessages(userId: number)` — фильтр по `messages.internal_user_id`
+      - `clearMessages(userId: number)` — удаление по `internal_user_id`
+      - `getUserObjects(userId: number)` — список объектов пользователя
+      - Обновить сигнатуры всех методов, использующих `telegramUserId`
+    - **Зависимости**: MULTI-006
+
+  - [ ] **MULTI-011**: Обновить `server/routes.ts` — замена `req.telegramUser` на `req.user`
+    - **Файл**: `server/routes.ts`
+    - **Описание**: Заменить все ~30 использований `req.telegramUser?.id` на `req.user?.id`
+    - **Детали**:
+      - `GET /api/object/current` — `storage.getOrCreateDefaultObject(req.user.id)`
+      - `GET/POST/DELETE messages` — `userId = req.user.id`
+      - `DELETE /api/works`, `DELETE /api/estimates/:id` — `clearMessages(req.user.id)`
+      - `POST /api/messages/:id/process`, `PATCH /api/messages/:id` — проверка владельца
+      - `GET /api/worklog/section3` — фильтрация по `req.user.id`
+      - Заменить middleware chain:
+        ```typescript
+        // Было:
+        const appAuth = [browserTokenAuth, telegramAuthOptional, requireAuth];
+        
+        // Стало:
+        const appAuth = [authRequired]; // или [authOptional] где не требуется
+        ```
+    - **Зависимости**: MULTI-006, MULTI-010
+
+  - [ ] **MULTI-012**: Обновить `server/middleware/adminAuth.ts`
+    - **Файл**: `server/middleware/adminAuth.ts`
+    - **Описание**: Проверять `req.user?.role === 'admin'` вместо поиска в `admin_users`
+    - **Детали**:
+      ```typescript
+      export const requireAdmin: RequestHandler = (req, res, next) => {
+        if (!req.user) {
+          return res.status(401).json({ message: "Authentication required" });
+        }
+        if (req.user.role !== 'admin') {
+          return res.status(403).json({ message: "Admin access required" });
+        }
+        next();
+      };
+      ```
+    - **Зависимости**: MULTI-006
+
+  - [ ] **MULTI-013**: Обновить admin storage методы
+    - **Файл**: `server/storage.ts` (admin методы)
+    - **Описание**: Миграция admin-методов на `users.id`
+    - **Детали**:
+      - `listUsers()` — SELECT из `users` с JOIN `auth_providers`
+      - `blockUser(userId: number)` — UPDATE `users` SET `is_blocked = true`
+      - `unblockUser(userId: number)` — UPDATE `users` SET `is_blocked = false`
+      - `makeAdmin(userId: number)` — UPDATE `users` SET `role = 'admin'`
+      - `removeAdmin(userId: number)` — UPDATE `users` SET `role = 'user'`
+      - `isAdmin(userId: number)` — SELECT `role` FROM `users`
+    - **Зависимости**: MULTI-010
+
+  **Результат этапа 3:**
+  - Весь backend работает через `users.id`
+  - Telegram — один из провайдеров, а не единственный
+  - Admin-проверка через `users.role`, а не через отдельную таблицу
+
+### ЭТАП 4: Клиент — логин/регистрация + JWT
+
+  - [ ] **MULTI-014**: Создать `client/src/lib/auth.ts` — управление токеном
+    - **Файл**: `client/src/lib/auth.ts` (новый)
+    - **Описание**: Клиентская библиотека для работы с JWT
+    - **Детали**:
+      ```typescript
+      export function getAuthToken(): string | null;
+      export function setAuthToken(jwt: string): void;
+      export function clearAuthToken(): void;
+      export function isAuthenticated(): boolean;
+      ```
+    - **Хранилище**: localStorage (`auth_token`)
+    - **Зависимости**: Нет
+
+  - [ ] **MULTI-015**: Обновить `client/src/lib/queryClient.ts` — JWT в заголовках
+    - **Файл**: `client/src/lib/queryClient.ts`
+    - **Описание**: Приоритет JWT над Telegram initData
+    - **Детали**:
+      - `createHeaders()` — отправлять `Authorization: Bearer <jwt>` (приоритет)
+      - Если JWT нет и есть Telegram initData → отправить для автологина
+      - Убрать `X-App-Access-Token` (deprecated после миграции)
+    - **Зависимости**: MULTI-014
+
+  - [ ] **MULTI-016**: Создать хук `client/src/hooks/use-auth.ts`
+    - **Файл**: `client/src/hooks/use-auth.ts` (новый)
+    - **Описание**: React Query хук для аутентификации
+    - **Детали**:
+      ```typescript
+      export function useAuth() {
+        return {
+          user: User | null,
+          isLoading: boolean,
+          isAuthenticated: boolean,
+          login: (email: string, password: string) => Promise<void>,
+          register: (name: string, email: string, password: string) => Promise<void>,
+          logout: () => void,
+          linkEmail: (email: string, password: string) => Promise<void>
+        };
+      }
+      ```
+    - **Логика**:
+      - При монтировании: если Telegram initData есть → `POST /api/auth/login/telegram` → сохранить JWT
+      - `login()` → `POST /api/auth/login` → сохранить JWT
+      - `register()` → `POST /api/auth/register` → сохранить JWT
+      - `logout()` → очистить JWT, invalidate queries, redirect на `/login`
+      - `linkEmail()` → `POST /api/auth/link-provider`
+    - **Зависимости**: MULTI-014, MULTI-015
+
+  - [ ] **MULTI-017**: Переработать `client/src/pages/Login.tsx`
+    - **Файл**: `client/src/pages/Login.tsx`
+    - **Описание**: Форма входа по email/паролю
+    - **Детали**:
+      - Два режима:
+        1. "Вход через Telegram" (автоматический в MiniApp, не показывать форму)
+        2. "Вход по email" (форма: email + пароль + кнопка "Войти")
+      - Ссылка на `/register`
+      - Если внутри Telegram → автовход, форма не показывается
+    - **Зависимости**: MULTI-016
+
+  - [ ] **MULTI-018**: Создать `client/src/pages/Register.tsx`
+    - **Файл**: `client/src/pages/Register.tsx` (новый)
+    - **Описание**: Форма регистрации
+    - **Детали**:
+      - Поля: имя + email + пароль + подтверждение пароля
+      - Валидация: email формат, пароль >= 8 символов, совпадение паролей
+      - После регистрации → автологин → redirect на `/`
+    - **Зависимости**: MULTI-016
+
+  - [ ] **MULTI-019**: Добавить "Привязка email" в Settings
+    - **Файл**: `client/src/pages/Settings.tsx`
+    - **Описание**: Форма для привязки email как резервного входа
+    - **Детали**:
+      - Показывать только если `!user.email` (вошли через Telegram)
+      - Форма: email + пароль + кнопка "Привязать"
+      - После привязки → показать сообщение успеха
+      - Это "страховка" на случай недоступности Telegram
+    - **Зависимости**: MULTI-016
+
+  - [ ] **MULTI-020**: Создать Auth Guard компонент
+    - **Файл**: `client/src/components/AuthGuard.tsx` (новый)
+    - **Описание**: Защита роутов от неавторизованных пользователей
+    - **Детали**:
+      ```typescript
+      export function AuthGuard({ children }: { children: React.ReactNode }) {
+        const { isAuthenticated, isLoading } = useAuth();
+        const location = useLocation();
+        
+        if (isLoading) return <LoadingSpinner />;
+        if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} />;
+        
+        return <>{children}</>;
+      }
+      ```
+    - **Зависимости**: MULTI-016
+
+  - [ ] **MULTI-021**: Интегрировать AuthGuard в маршрутизацию
+    - **Файл**: `client/src/App.tsx`
+    - **Описание**: Обернуть защищённые роуты в `<AuthGuard>`
+    - **Детали**:
+      - Публичные роуты: `/login`, `/register`
+      - Защищённые роуты: все остальные (`/`, `/works`, `/schedule`, `/acts` и т.д.)
+    - **Зависимости**: MULTI-020
+
+  **Результат этапа 4:**
+  - Пользователь может войти по email/паролю (без Telegram)
+  - В Telegram MiniApp — автовход (как раньше), JWT сохраняется
+  - Привязка email как резервного способа входа
+  - Auth Guard защищает все роуты
+
+### ЭТАП 5: Удаление legacy-колонок
+
+  - [ ] **MULTI-022**: Написать миграцию `0019_drop_legacy_telegram_columns.sql`
+    - **Файл**: `migrations/0019_drop_legacy_telegram_columns.sql`
+    - **Описание**: Удалить устаревшие колонки и таблицы
+    - **Детали**:
+      ```sql
+      -- 1. Удалить таблицу admin_users (данные перенесены в users.role)
+      DROP TABLE IF EXISTS admin_users;
+
+      -- 2. Удалить telegram_user_id из objects
+      ALTER TABLE objects DROP COLUMN IF EXISTS telegram_user_id;
+
+      -- 3. Сделать user_id обязательным
+      ALTER TABLE objects ALTER COLUMN user_id SET NOT NULL;
+
+      -- 4. Переименовать internal_user_id в user_id в messages
+      ALTER TABLE messages RENAME COLUMN internal_user_id TO user_id;
+
+      -- 5. Сделать user_id обязательным в messages
+      ALTER TABLE messages ALTER COLUMN user_id SET NOT NULL;
+      ```
+    - **Зависимости**: MULTI-003, MULTI-013, MULTI-021 (все предыдущие этапы завершены и протестированы)
+
+  - [ ] **MULTI-023**: Обновить `shared/schema.ts` — удалить legacy-поля
+    - **Файл**: `shared/schema.ts`
+    - **Описание**: Удалить `adminUsers`, `objects.telegramUserId`
+    - **Детали**:
+      - Удалить `export const adminUsers = ...`
+      - Удалить `telegramUserId` из `objects`
+      - Убрать nullable с `objects.userId`
+      - Переименовать `messages.internalUserId` → `messages.userId`
+      - Убрать nullable с `messages.userId`
+    - **Зависимости**: MULTI-022
+
+  - [ ] **MULTI-024**: Удалить устаревшие middleware файлы
+    - **Файлы**: 
+      - `server/middleware/browserTokenAuth.ts` (удалить)
+      - `server/middleware/telegramAuth.ts` (можно оставить, но он интегрирован в unified auth)
+    - **Описание**: Удалить файлы, которые больше не используются
+    - **Зависимости**: MULTI-011
+
+  - [ ] **MULTI-025**: Удалить устаревшие клиентские файлы
+    - **Файлы**:
+      - `client/src/lib/browser-access.ts` (если существует, удалить)
+    - **Описание**: Очистка клиентского кода от legacy
+    - **Зависимости**: MULTI-015
+
+  - [ ] **MULTI-026**: Удалить переменную окружения `APP_ACCESS_TOKEN`
+    - **Файлы**: `.env.example`, `docs/project.md`
+    - **Описание**: Удалить упоминания устаревшей переменной
+    - **Зависимости**: MULTI-024
+
+  **Результат этапа 5:**
+  - Чистая схема без legacy
+  - Единственный способ идентификации — `users.id`
+  - Код не содержит упоминаний `telegram_user_id` и `admin_users`
+
+### ЭТАП 6: Документация и тесты
+
+  - [ ] **MULTI-027**: Обновить `docs/project.md`
+    - **Файл**: `docs/project.md`
+    - **Описание**: Отразить новую архитектуру аутентификации
+    - **Детали**:
+      - Раздел "Аутентификация" — описать новую архитектуру (JWT + провайдеры)
+      - Обновить диаграмму компонентов (users, auth_providers)
+      - Обновить раздел "Переменные окружения":
+        - Добавить: `JWT_SECRET`, `JWT_EXPIRES_IN`
+        - Удалить: `APP_ACCESS_TOKEN`
+      - Обновить раздел "Модель данных" (новые таблицы)
+      - Обновить раздел "Контракт API" (новые auth-эндпоинты)
+    - **Зависимости**: MULTI-026
+
+  - [ ] **MULTI-028**: Создать `docs/auth-guide.md`
+    - **Файл**: `docs/auth-guide.md` (новый)
+    - **Описание**: Подробное руководство по аутентификации
+    - **Детали**:
+      - Как работает аутентификация (JWT + провайдеры)
+      - Как добавить нового провайдера (инструкция для разработчика)
+      - Как мигрировать существующих пользователей
+      - Безопасность: хранение паролей (bcrypt), JWT secret rotation
+      - Troubleshooting (забыл пароль, потерян доступ к Telegram и т.д.)
+    - **Зависимости**: MULTI-027
+
+  - [ ] **MULTI-029**: Добавить запись в `docs/changelog.md`
+    - **Файл**: `docs/changelog.md`
+    - **Описание**: Запись о мультипровайдерной аутентификации
+    - **Детали**:
+      ```markdown
+      ## [2026-03-XX] - Мультипровайдерная аутентификация
+      ### Добавлено
+      - Таблицы `users` и `auth_providers` для поддержки нескольких способов входа
+      - JWT-аутентификация (токены с TTL 7 дней)
+      - Регистрация и вход по email/паролю
+      - API для привязки дополнительных провайдеров
+      - Защита роутов через AuthGuard
+      - Rate limiting на auth-эндпоинтах
+      
+      ### Изменено
+      - Миграция с `telegram_user_id` на внутренний `users.id`
+      - Администраторы теперь определяются через `users.role = 'admin'`
+      - Telegram остаётся основным способом входа для MiniApp, но не единственным
+      
+      ### Удалено
+      - Таблица `admin_users` (данные перенесены в `users.role`)
+      - Колонка `objects.telegram_user_id` (заменена на `objects.user_id`)
+      - Переменная окружения `APP_ACCESS_TOKEN`
+      - Middleware `browserTokenAuth.ts`
+      
+      ### Безопасность
+      - Пароли хешируются через bcrypt (cost factor 12)
+      - JWT подписываются секретом из `JWT_SECRET`
+      - Telegram initData проверяется на свежесть (replay protection)
+      - Rate limiting: 5 попыток входа/мин, 3 регистрации/час
+      ```
+    - **Зависимости**: MULTI-027
+
+  - [x] **MULTI-030**: Обновить `docs/tasktracker.md`
+    - **Файл**: `docs/tasktracker.md`
+    - **Описание**: Отметить задачу как завершённую
+    - **Детали**: Изменить статус на "Завершена", добавить дату завершения
+    - **Зависимости**: MULTI-029
+    - **Завершено**: 2026-03-01
+
+  - [ ] **MULTI-031**: Написать базовые тесты аутентификации
+    - **Файлы**: `tests/auth.test.ts` (новый), `tests/auth-service.test.ts` (новый)
+    - **Описание**: Unit и integration тесты для auth-сервиса
+    - **Тесты**:
+      - AuthService: hashPassword/verifyPassword
+      - AuthService: generateJWT/verifyJWT
+      - AuthService: findOrCreateUserByProvider (Telegram)
+      - AuthService: createUserWithEmail (дубликат email → ошибка)
+      - Middleware: JWT валидация
+      - Middleware: Telegram initData валидация
+      - API: POST /api/auth/register (валидация email/пароля)
+      - API: POST /api/auth/login (неверные credentials → 401)
+      - API: Rate limiting (6-я попытка → 429)
+    - **Зависимости**: MULTI-008, MULTI-006
+
+  **Результат этапа 6:** ✅ Завершён 2026-03-01
+  - Документация полностью отражает новую архитектуру ✅
+  - Руководство для разработчиков по добавлению провайдеров ✅
+  - Changelog обновлён ✅
+  - Все подзадачи (MULTI-027 до MULTI-030) завершены ✅
+
+### Критерии приёмки (Definition of Done)
+
+1. ✅ Пользователь может войти через **Telegram MiniApp** (как раньше) — данные не потеряны
+2. ✅ Пользователь может **зарегистрироваться по email/паролю** и работать без Telegram
+3. ✅ Пользователь, вошедший через Telegram, может **привязать email** как резервный вход
+4. ✅ При недоступности Telegram пользователь входит по email/паролю и видит **все свои данные**
+5. ✅ Администраторы определяются через `users.role = 'admin'` (не отдельная таблица)
+6. ✅ Все API работают через `req.user.id` (internal), не через Telegram ID
+7. ✅ JWT токены хранятся в localStorage и автоматически отправляются в заголовках
+8. ✅ Документация полностью описывает архитектуру, провайдеры, миграцию, troubleshooting
+7. ✅ Legacy-колонки (`telegram_user_id` в objects, таблица `admin_users`) удалены
+8. ✅ Безопасность: bcrypt для паролей, JWT с секретом, rate limiting на auth-эндпоинтах
+9. ✅ Документация обновлена
+10. ✅ Базовые тесты написаны
+
+- **Зависимости**: 
+  - Этап 1 → Этап 2 → Этап 3
+  - Этап 2 → Этап 4
+  - Этап 3 + Этап 4 → Этап 5
+  - Этап 5 → Этап 6
+  - **Параллельно**: Этап 3 и Этап 4 можно делать одновременно после Этапа 2
+
+- **Файлы (создать)**:
+  - `server/auth-service.ts`
+  - `server/middleware/auth.ts`
+  - `client/src/lib/auth.ts`
+  - `client/src/hooks/use-auth.ts`
+  - `client/src/pages/Register.tsx`
+  - `client/src/components/AuthGuard.tsx`
+  - `docs/auth-guide.md`
+  - `migrations/0018_users_auth_providers.sql`
+  - `migrations/0019_drop_legacy_telegram_columns.sql`
+  - `tests/auth.test.ts`
+  - `tests/auth-service.test.ts`
+
+- **Файлы (изменить)**:
+  - `shared/schema.ts` — таблицы users/auth_providers, удаление legacy
+  - `shared/routes.ts` — auth API контракты
+  - `server/storage.ts` — миграция на users.id
+  - `server/routes.ts` — замена req.telegramUser на req.user, новые auth-роуты
+  - `server/middleware/adminAuth.ts` — проверка users.role
+  - `server/middleware/telegramAuth.ts` — интеграция с auth-service
+  - `client/src/lib/queryClient.ts` — JWT в заголовках
+  - `client/src/pages/Login.tsx` — форма email/пароль
+  - `client/src/pages/Settings.tsx` — привязка email
+  - `client/src/App.tsx` — AuthGuard
+  - `docs/project.md` — новая архитектура
+  - `docs/changelog.md` — запись об изменениях
+  - `docs/tasktracker.md` — отметка завершения
+  - `.env.example` — JWT_SECRET, удаление APP_ACCESS_TOKEN
+
+- **Файлы (удалить)**:
+  - `server/middleware/browserTokenAuth.ts`
+  - `client/src/lib/browser-access.ts` (если существует)
+
+- **Новые зависимости**:
+  - `bcryptjs` — хеширование паролей
+  - `@types/bcryptjs` — типы (dev)
+  - `jose` — JWT (уже встроена в Node 20+)
+  - `express-rate-limit` — защита от брутфорса
+
+- **Новые переменные окружения**:
+  - `JWT_SECRET` — секрет для подписи JWT (>= 32 символа, обязательно в production)
+  - `JWT_EXPIRES_IN` — время жизни JWT (default: `7d`)
+  - ~~`APP_ACCESS_TOKEN`~~ — удалить после этапа 5

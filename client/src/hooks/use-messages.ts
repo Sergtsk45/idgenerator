@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type CreateMessageRequest } from "@shared/routes";
 import { getTelegramInitData } from "@/lib/telegram";
-import { getBrowserAccessToken } from "@/lib/browser-access";
+import { getAuthToken } from "@/lib/auth";
 
 function createHeaders(includeContentType: boolean): HeadersInit {
   const headers: HeadersInit = {};
@@ -15,9 +15,9 @@ function createHeaders(includeContentType: boolean): HeadersInit {
     headers["X-Telegram-Init-Data"] = initData;
   }
 
-  const accessToken = getBrowserAccessToken();
-  if (accessToken) {
-    headers["X-App-Access-Token"] = accessToken;
+  const authToken = getAuthToken();
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
   }
 
   return headers;

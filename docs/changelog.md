@@ -1,5 +1,81 @@
 # Changelog
 
+## [2026-03-01] - Мультипровайдерная аутентификация (завершена, MULTI-001 до MULTI-030)
+
+### Добавлено
+- **Таблицы users и auth_providers**: мультипровайдерный реестр пользователей
+  - `users` (id, email, password_hash, role, isBlocked, created_at, updated_at)
+  - `auth_providers` (user_id, provider, provider_user_id, linked_at)
+- **JWT-токены (HS256)** для аутентификации всех пользователей
+  - Срок жизни: 7 дней (настраивается через `JWT_EXPIRES_IN`)
+  - Хранение: localStorage на клиенте
+  - Отправка: автоматически в заголовке `Authorization: Bearer <token>`
+- **Auth-сервис** (`server/auth-service.ts`):
+  - Хеширование паролей через bcrypt (rounds=12)
+  - Генерация/верификация JWT токенов (jose, HS256)
+  - Унифицированный интерфейс для работы с провайдерами
+  - Валидация Telegram auth_date (< 600 сек, protection от replay)
+- **Unified auth middleware** (`server/middleware/auth.ts`):
+  - Поддержка JWT (`Authorization: Bearer`)
+  - Поддержка Telegram initData (`X-Telegram-Init-Data`)
+  - Legacy browser token (`X-App-Access-Token`) для обратной совместимости
+- **API endpoints** (`server/routes/auth.ts`):
+  - `POST /api/auth/register` — регистрация по email/паролю
+  - `POST /api/auth/login` — вход по email/паролю
+  - `POST /api/auth/login/telegram` — вход через Telegram (сохранение JWT)
+  - `GET /api/auth/me` — информация о текущем пользователе
+  - `POST /api/auth/link-provider` — привязка дополнительного провайдера
+- **Rate limiting** на auth endpoints:
+  - `/login` и `/login/telegram` — 5 попыток в минуту на IP
+  - `/register` — 3 попытки в час на IP
+- **Клиентская поддержка**:
+  - `client/src/lib/auth.ts` — утилиты для работы с JWT
+  - `client/src/hooks/use-auth.ts` — React Query хуки
+  - `client/src/components/AuthGuard.tsx` — компонент защиты маршрутов
+  - `client/src/pages/Login.tsx` — обновлена поддержка JWT
+  - `client/src/pages/Register.tsx` — регистрация по email/паролю
+- **Автоматическая миграция** существующих пользователей Telegram
+
+### Изменено
+- Все API endpoints теперь используют внутренний `users.id` вместо `telegram_user_id`
+- Роль администратора теперь в `users.role` вместо отдельной таблицы `admin_users`
+- `messages.userId` теперь integer (ссылка на `users.id`) вместо text
+- `objects.user_id` теперь ссылка на `users.id` вместо `objects.telegram_user_id`
+- Клиент автоматически использует JWT для аутентификации во всех запросах
+- Middleware `telegramAuth.ts` интегрирована с новым auth-сервисом
+
+### Удалено
+- Таблица `admin_users` (заменена на `users.role`)
+- Колонка `objects.telegram_user_id` (заменена на `objects.user_id`)
+- Dev-only токен `APP_ACCESS_TOKEN` из основного flow (заменён на JWT)
+- Middleware `browserTokenAuth.ts` (заменён на unified `auth.ts`)
+
+### Безопасность
+- Пароли хешируются через bcrypt (cost factor 12)
+- JWT секрет обязателен в production (`JWT_SECRET` env, >= 32 символа)
+- Telegram auth_date валидация (< 600 сек) защищает от replay атак
+- Rate limiting против brute force атак на login/register
+- Поддержка блокировки пользователей (`users.isBlocked`)
+
+### Миграции
+- `0018_users_auth_providers.sql` — создание таблиц users и auth_providers, автоматическая миграция данных из telegram_user_id
+- `0019_drop_legacy_telegram_columns.sql` — удаление legacy таблиц и колонок
+
+### Документация
+- `docs/auth-guide.md` — полное руководство по аутентификации (провайдеры, JWT, безопасность, миграция, troubleshooting)
+- `docs/project.md` — обновлен раздел аутентификации, диаграмма компонентов, переменные окружения, контракт API
+
+### Переменные окружения
+- `JWT_SECRET` — обязательна в production (минимум 32 символа)
+- `JWT_EXPIRES_IN` — опциональна, default: `7d`
+
+### Зависимости
+- `bcryptjs` — хеширование паролей
+- `jose` — работа с JWT токенами
+- `express-rate-limit` — rate limiting на auth endpoints
+
+---
+
 ## [2026-03-01] - Импорт материалов из PDF-счетов поставщиков (фаза 1-3 завершены, INV-001 до INV-009)
 
 ### Добавлено
@@ -1407,6 +1483,45 @@
 
 ### Исправлено
 - Убрано безусловное сидирование при старте сервера
+
+---
+
+## [2026-03-01] - Мультипровайдерная аутентификация: Этап 2 (Auth-сервис и API)
+### Добавлено
+- `server/auth-service.ts` — центральный сервис аутентификации с методами:
+  - `hashPassword/verifyPassword` — bcrypt с cost factor 12
+  - `generateJWT/verifyJWT` — JWT токены (HS256, TTL 7 дней)
+  - `findOrCreateUserByProvider` — унификация пользователей из разных провайдеров
+  - `validateTelegramAuthDate` — проверка свежести Telegram initData (< 600 сек)
+- `server/middleware/auth.ts` — unified middleware с поддержкой:
+  - JWT токенов через `Authorization: Bearer`
+  - Telegram initData через `X-Telegram-Init-Data`
+  - Legacy browser token через `X-App-Access-Token` (для обратной совместимости)
+- `server/routes/auth.ts` — новые auth endpoints:
+  - `POST /api/auth/login/telegram` — вход через Telegram → JWT
+  - `POST /api/auth/register` — регистрация по email/паролю → JWT
+  - `POST /api/auth/login` — вход по email/паролю → JWT
+  - `GET /api/auth/me` — информация о текущем пользователе
+  - `POST /api/auth/link-provider` — привязка дополнительного провайдера
+- Rate limiting на auth endpoints:
+  - `/login` — 5 попыток/мин на IP
+  - `/register` — 3 попытки/час на IP
+- Зависимости: `bcryptjs`, `jose` (для JWT)
+
+### Изменено
+- `server/middleware/telegramAuth.ts` — интегрирован с auth-service:
+  - Добавлена проверка `auth_date` (replay protection)
+  - Вызов `authService.findOrCreateUserByProvider` для создания/поиска пользователя
+  - Установка `req.user` (unified интерфейс) в дополнение к `req.telegramUser`
+- `shared/routes.ts` — добавлены контракты для auth API (Zod схемы)
+- `server/routes.ts` — подключение `registerAuthRoutes(app)`
+
+### Безопасность
+- Пароли хешируются через bcrypt (rounds=12)
+- JWT подписываются секретом из env `JWT_SECRET` (обязателен в production)
+- Telegram auth_date проверяется на свежесть (защита от replay атак)
+- Rate limiting защищает от bruteforce атак
+- Блокировка пользователей (`users.isBlocked`)
 
 ---
 

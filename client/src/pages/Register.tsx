@@ -1,7 +1,7 @@
 /**
- * @file: Login.tsx
- * @description: Страница входа в систему (email/пароль или Telegram автологин)
- * @dependencies: Header, BottomNav, use-auth, use-toast, wouter, useTelegram
+ * @file: Register.tsx
+ * @description: Страница регистрации нового пользователя
+ * @dependencies: Header, BottomNav, use-auth, use-toast, wouter
  * @created: 2026-03-01
  */
 
@@ -14,49 +14,26 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguageStore } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
-import { useTelegram } from "@/hooks/useTelegram";
 import { Loader2 } from "lucide-react";
 
-export default function Login() {
+export default function Register() {
   const { language } = useLanguageStore();
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const { login, isLoading, isAuthenticated } = useAuth();
-  const { isInTelegram, initData } = useTelegram();
+  const { register, isLoading, isAuthenticated } = useAuth();
 
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Редирект после успешной аутентификации
+  // Редирект после успешной регистрации
   useEffect(() => {
     if (isAuthenticated) {
-      const params = new URLSearchParams(window.location.search);
-      const redirect = params.get('redirect') || '/';
-      navigate(redirect);
+      navigate('/');
     }
   }, [isAuthenticated, navigate]);
-
-  // Автологин через Telegram (показываем загрузку)
-  if (isInTelegram && initData && !isAuthenticated) {
-    return (
-      <div className="flex flex-col min-h-screen bg-muted/30">
-        <Header 
-          title={language === "ru" ? "Вход" : "Login"} 
-          showBack={false} 
-          showSearch={false} 
-        />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-[15px] text-muted-foreground">
-              {language === "ru" ? "Вход через Telegram..." : "Logging in via Telegram..."}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,7 +43,24 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Валидация
+    // Валидация имени
+    if (!displayName.trim()) {
+      toast({
+        title: language === "ru" ? "Введите имя" : "Enter name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (displayName.trim().length < 2) {
+      toast({
+        title: language === "ru" ? "Имя должно содержать минимум 2 символа" : "Name must be at least 2 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Валидация email
     if (!email.trim()) {
       toast({
         title: language === "ru" ? "Введите email" : "Enter email",
@@ -83,6 +77,7 @@ export default function Login() {
       return;
     }
 
+    // Валидация пароля
     if (!password) {
       toast({
         title: language === "ru" ? "Введите пароль" : "Enter password",
@@ -99,16 +94,26 @@ export default function Login() {
       return;
     }
 
+    // Валидация подтверждения пароля
+    if (password !== confirmPassword) {
+      toast({
+        title: language === "ru" ? "Пароли не совпадают" : "Passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await login(email.trim(), password);
+      await register(displayName.trim(), email.trim(), password);
       toast({
-        title: language === "ru" ? "Вход выполнен" : "Logged in successfully",
+        title: language === "ru" ? "Регистрация успешна" : "Registration successful",
+        description: language === "ru" ? "Добро пожаловать!" : "Welcome!",
       });
     } catch (error) {
       toast({
-        title: language === "ru" ? "Ошибка входа" : "Login failed",
-        description: error instanceof Error ? error.message : language === "ru" ? "Неверный email или пароль" : "Invalid email or password",
+        title: language === "ru" ? "Ошибка регистрации" : "Registration failed",
+        description: error instanceof Error ? error.message : language === "ru" ? "Попробуйте другой email" : "Try another email",
         variant: "destructive",
       });
     } finally {
@@ -116,27 +121,42 @@ export default function Login() {
     }
   };
 
-  const title = language === "ru" ? "Вход" : "Login";
+  const title = language === "ru" ? "Регистрация" : "Sign up";
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/30">
-      <Header title={title} showBack={false} showSearch={false} />
+      <Header title={title} showBack showSearch={false} />
 
       <div className="flex-1 pb-24 flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-6">
             <div className="text-center space-y-2">
               <h2 className="text-[24px] font-bold">
-                {language === "ru" ? "Добро пожаловать" : "Welcome"}
+                {language === "ru" ? "Создать аккаунт" : "Create account"}
               </h2>
               <p className="text-[13px] text-muted-foreground">
                 {language === "ru" 
-                  ? "Войдите в систему для продолжения" 
-                  : "Sign in to continue"}
+                  ? "Заполните данные для регистрации" 
+                  : "Fill in the details to register"}
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="displayName" className="text-[12px] font-medium">
+                  {language === "ru" ? "Имя" : "Name"}
+                </label>
+                <Input
+                  id="displayName"
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder={language === "ru" ? "Ваше имя" : "Your name"}
+                  disabled={isSubmitting || isLoading}
+                  autoComplete="name"
+                />
+              </div>
+
               <div className="space-y-2">
                 <label htmlFor="email" className="text-[12px] font-medium">
                   Email
@@ -163,7 +183,22 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={language === "ru" ? "Минимум 8 символов" : "Minimum 8 characters"}
                   disabled={isSubmitting || isLoading}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="confirmPassword" className="text-[12px] font-medium">
+                  {language === "ru" ? "Подтверждение пароля" : "Confirm password"}
+                </label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder={language === "ru" ? "Повторите пароль" : "Repeat password"}
+                  disabled={isSubmitting || isLoading}
+                  autoComplete="new-password"
                 />
               </div>
 
@@ -175,20 +210,20 @@ export default function Login() {
                 {isSubmitting || isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {language === "ru" ? "Вход..." : "Logging in..."}
+                    {language === "ru" ? "Регистрация..." : "Signing up..."}
                   </>
                 ) : (
-                  language === "ru" ? "Войти" : "Sign in"
+                  language === "ru" ? "Зарегистрироваться" : "Sign up"
                 )}
               </Button>
             </form>
 
             <div className="text-center">
               <p className="text-[13px] text-muted-foreground">
-                {language === "ru" ? "Нет аккаунта? " : "Don't have an account? "}
-                <Link href="/register">
+                {language === "ru" ? "Уже есть аккаунт? " : "Already have an account? "}
+                <Link href="/login">
                   <a className="text-primary font-medium hover:underline">
-                    {language === "ru" ? "Зарегистрироваться" : "Sign up"}
+                    {language === "ru" ? "Войти" : "Sign in"}
                   </a>
                 </Link>
               </p>
@@ -201,4 +236,3 @@ export default function Login() {
     </div>
   );
 }
-

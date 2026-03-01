@@ -24,7 +24,8 @@ import { Link } from "wouter";
 import { X, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getBrowserAccessToken } from "@/lib/browser-access";
+import { getAuthToken } from "@/lib/auth";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Home() {
   const { language } = useLanguageStore();
@@ -42,9 +43,10 @@ export default function Home() {
   const { user: telegramUser, isInTelegram } = useTelegram();
   const { data: works = [] } = useWorks();
   const clearMessages = useClearMessages();
+  const { user: authUser } = useAuth();
 
   const currentUser = telegramUser?.id ? String(telegramUser.id) : "dev_user";
-  const browserToken = getBrowserAccessToken();
+  const authToken = getAuthToken();
 
   const isAuthError =
     isMessagesError &&
@@ -53,8 +55,8 @@ export default function Home() {
       messagesError.message,
     );
 
-  const needsBrowserToken = !isInTelegram && !browserToken;
-  const hasInvalidBrowserToken = !isInTelegram && !!browserToken && isAuthError;
+  const needsAuth = !isInTelegram && !authToken && !authUser;
+  const hasInvalidAuth = !isInTelegram && (!!authToken || !!authUser) && isAuthError;
 
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
 
@@ -63,8 +65,8 @@ export default function Home() {
   );
 
   const showOnboarding =
-    !needsBrowserToken &&
-    !hasInvalidBrowserToken &&
+    !needsAuth &&
+    !hasInvalidAuth &&
     !onboardingDismissed &&
     messages.length === 0 &&
     works.length === 0 &&
@@ -130,34 +132,34 @@ export default function Home() {
       <Header title={t.title} subtitle={objectSubtitle} showAvatar />
 
       {/* Browser access banner (outside Telegram) */}
-      {!isInTelegram && (needsBrowserToken || hasInvalidBrowserToken) && (
+      {!isInTelegram && (needsAuth || hasInvalidAuth) && (
         <div className="px-4 pt-3">
           <div className="max-w-md mx-auto">
-            <Alert variant={hasInvalidBrowserToken ? "destructive" : "default"}>
+            <Alert variant={hasInvalidAuth ? "destructive" : "default"}>
               <KeyRound className="h-4 w-4" />
               <AlertTitle>
                 {language === "ru"
-                  ? hasInvalidBrowserToken
+                  ? hasInvalidAuth
                     ? "Неверный токен"
-                    : "Нужен токен"
-                  : hasInvalidBrowserToken
+                    : "Требуется вход"
+                  : hasInvalidAuth
                     ? "Invalid token"
-                    : "Access token required"}
+                    : "Authentication required"}
               </AlertTitle>
               <AlertDescription>
                 <p>
                   {language === "ru"
-                    ? hasInvalidBrowserToken
-                      ? "Текущий access-token не подходит. Обновите токен, чтобы приложение работало в браузере."
-                      : "Чтобы работать в браузере (вне Telegram), задайте access-token."
-                    : hasInvalidBrowserToken
-                      ? "Your current access token is not valid. Update it to use the app in browser."
-                      : "To use the app in browser (outside Telegram), set an access token."}
+                    ? hasInvalidAuth
+                      ? "Текущий токен недействителен. Войдите снова, чтобы продолжить работу."
+                      : "Чтобы работать в браузере (вне Telegram), войдите в систему."
+                    : hasInvalidAuth
+                      ? "Your current authentication is invalid. Please log in again."
+                      : "To use the app in browser (outside Telegram), please log in."}
                 </p>
                 <div className="mt-3">
                   <Link href="/login">
-                    <Button size="sm" variant={hasInvalidBrowserToken ? "secondary" : "default"}>
-                      {language === "ru" ? "Перейти к входу" : "Go to login"}
+                    <Button size="sm" variant={hasInvalidAuth ? "secondary" : "default"}>
+                      {language === "ru" ? "Войти" : "Log in"}
                     </Button>
                   </Link>
                 </div>
@@ -263,19 +265,19 @@ export default function Home() {
             <div className="flex justify-center items-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
             </div>
-          ) : !isInTelegram && (needsBrowserToken || hasInvalidBrowserToken) ? (
+          ) : !isInTelegram && (needsAuth || hasInvalidAuth) ? (
             <div className="text-center py-20 opacity-70">
               <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <KeyRound className="h-8 w-8 text-muted-foreground" />
               </div>
               <h3 className="font-semibold text-lg">
                 {language === "ru"
-                  ? hasInvalidBrowserToken
-                    ? "Нужен корректный токен"
-                    : "Нужен токен"
-                  : hasInvalidBrowserToken
-                    ? "Valid token required"
-                    : "Token required"}
+                  ? hasInvalidAuth
+                    ? "Требуется повторный вход"
+                    : "Требуется вход"
+                  : hasInvalidAuth
+                    ? "Re-authentication required"
+                    : "Authentication required"}
               </h3>
               <p className="text-sm text-muted-foreground mt-2">
                 {language === "ru"

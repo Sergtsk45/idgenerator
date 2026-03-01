@@ -19,7 +19,8 @@ import * as path from "path";
 import { telegramAuthMiddleware } from "./middleware/telegramAuth";
 import { requireAdmin } from "./middleware/adminAuth";
 import { adminStorage } from "./storage";
-import { browserTokenAuthMiddleware } from "./middleware/browserTokenAuth";
+import { registerAuthRoutes } from "./routes/auth";
+import { authMiddleware } from "./middleware/auth";
 
 function addDaysISO(dateStr: string, days: number): string {
   // Expect YYYY-MM-DD. Work in UTC to avoid timezone shifts.
@@ -124,27 +125,22 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Auth Middleware:
-  // - Telegram (initData) when available
-  // - Browser access-token when running outside Telegram
-  const telegramAuthOptional = telegramAuthMiddleware({ required: false });
-  const browserTokenAuth = browserTokenAuthMiddleware();
-  const requireAuth = (req: any, res: any, next: any) => {
-    if (req.telegramUser?.id) return next();
-    return res.status(401).json({ error: "Authentication required" });
-  };
-  const appAuth = [browserTokenAuth, telegramAuthOptional, requireAuth] as const;
+  // Register auth routes (login, register, JWT)
+  registerAuthRoutes(app);
+  
+  // Auth Middleware (new unified approach)
+  const appAuth = [authMiddleware({ required: true })] as const;
   
   // Object (MVP: single current object)
   app.get(api.object.current.path, ...appAuth, async (req, res) => {
-    const obj = await storage.getOrCreateDefaultObject(req.telegramUser?.id);
+    const obj = await storage.getOrCreateDefaultObject(req.user!.id);
     return res.status(200).json(obj);
   });
 
-  app.patch(api.object.patchCurrent.path, async (req, res) => {
+  app.patch(api.object.patchCurrent.path, ...appAuth, async (req, res) => {
     try {
       const patch = api.object.patchCurrent.input.parse(req.body);
-      const obj = await storage.getOrCreateDefaultObject();
+      const obj = await storage.getOrCreateDefaultObject(req.user!.id);
       const updated = await storage.updateObject(obj.id, patch);
       return res.status(200).json(updated);
     } catch (err) {
@@ -156,9 +152,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.object.getSourceData.path, async (_req, res) => {
+  app.get(api.object.getSourceData.path, ...appAuth, async (req, res) => {
     try {
-      const obj = await storage.getOrCreateDefaultObject();
+      const obj = await storage.getOrCreateDefaultObject(req.user!.id);
       const data = await storage.getObjectSourceData(obj.id);
       return res.status(200).json(data);
     } catch (err) {
@@ -170,10 +166,10 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.object.putSourceData.path, async (req, res) => {
+  app.put(api.object.putSourceData.path, ...appAuth, async (req, res) => {
     try {
       const input = api.object.putSourceData.input.parse(req.body);
-      const obj = await storage.getOrCreateDefaultObject();
+      const obj = await storage.getOrCreateDefaultObject(req.user!.id);
       const saved = await storage.saveObjectSourceData(obj.id, input);
       return res.status(200).json(saved);
     } catch (err) {
@@ -667,8 +663,7 @@ export async function registerRoutes(
     try {
       const ok = await storage.deleteWorkCollection(id, { resetScheduleIfInUse: resetSchedule });
       if (!ok) return res.status(404).json({ message: "Not found" });
-      const userId = req.telegramUser?.id ? String(req.telegramUser.id) : undefined;
-      await storage.clearMessages(userId);
+      await storage.clearMessages(req.user!.id);
       return res.status(204).send();
     } catch (err) {
       if (err instanceof Error && err.message === "WORK_COLLECTION_IN_USE_BY_SCHEDULE") {
@@ -729,8 +724,7 @@ export async function registerRoutes(
     try {
       const ok = await storage.deleteEstimate(id, { resetScheduleIfInUse: resetSchedule });
       if (!ok) return res.status(404).json({ message: "Not found" });
-      const userId = req.telegramUser?.id ? String(req.telegramUser.id) : undefined;
-      await storage.clearMessages(userId);
+      await storage.clearMessages(req.user!.id);
       return res.status(204).send();
     } catch (err) {
       if (err instanceof Error && err.message === "ESTIMATE_IN_USE_BY_SCHEDULE") {
@@ -787,9 +781,8 @@ export async function registerRoutes(
 
     try {
       console.log("Clearing all works from database...");
-      const userId = req.telegramUser?.id ? String(req.telegramUser.id) : undefined;
       await storage.clearWorks({ resetScheduleIfInUse: resetSchedule });
-      await storage.clearMessages(userId);
+      await storage.clearMessages(req.user!.id);
       console.log("Works and messages cleared successfully");
       return res.status(204).send();
     } catch (err) {
@@ -819,37 +812,27 @@ export async function registerRoutes(
 
   // Messages
   app.delete(api.messages.list.path, ...appAuth, async (req, res) => {
-    const userId = req.telegramUser?.id
-      ? String(req.telegramUser.id)
-      : undefined;
-    await storage.clearMessages(userId);
+    await storage.clearMessages(req.user!.id);
     return res.status(204).send();
   });
 
   app.get(api.messages.list.path, ...appAuth, async (req, res) => {
-    const userId = req.telegramUser?.id
-      ? String(req.telegramUser.id)
-      : undefined;
-    const messages = await storage.getMessages(userId);
+    const messages = await storage.getMessages(req.user!.id);
     res.json(messages);
   });
 
   app.post(api.messages.create.path, ...appAuth, async (req, res) => {
     try {
       const input = api.messages.create.input.parse(req.body);
-      // В prod — берём userId из валидированного telegramUser, в dev — из тела запроса
-      const userId = req.telegramUser?.id
-        ? String(req.telegramUser.id)
-        : input.userId;
 
       // Резолвим текущий объект пользователя для привязки сообщения
-      const currentObj = await storage.getOrCreateDefaultObject(req.telegramUser?.id);
+      const currentObj = await storage.getOrCreateDefaultObject(req.user!.id);
 
       const message = await storage.createMessage({
-        userId,
         objectId: currentObj.id,
         messageRaw: input.messageRaw,
-      });
+        userId: req.user!.id,
+      } as any);
 
       // Trigger normalization in background (or await if fast enough)
       // For MVP, we'll await it to show immediate result
@@ -888,8 +871,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Message not found" });
       }
 
-      // Проверка владельца (только в prod с валидированным пользователем)
-      if (req.telegramUser?.id && message.userId !== String(req.telegramUser.id)) {
+      // Проверка владельца
+      if (message.userId !== req.user!.id) {
         return res.status(403).json({ message: "Forbidden" });
       }
 
@@ -919,15 +902,13 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid message id" });
       }
 
-      // Проверка владельца (только в prod с валидированным пользователем)
-      if (req.telegramUser?.id) {
-        const existing = await storage.getMessage(id);
-        if (!existing) {
-          return res.status(404).json({ message: "Message not found" });
-        }
-        if (existing.userId !== String(req.telegramUser.id)) {
-          return res.status(403).json({ message: "Forbidden" });
-        }
+      // Проверка владельца
+      const existing = await storage.getMessage(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+      if (existing.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
 
       const input = api.messages.patch.input.parse(req.body);
@@ -948,13 +929,10 @@ export async function registerRoutes(
   app.get(api.worklog.section3.path, ...appAuth, async (req, res) => {
     try {
       const showVolumes = req.query.showVolumes === "1";
-      const userId = req.telegramUser?.id
-        ? String(req.telegramUser.id)
-        : undefined;
 
       // Load messages and acts in parallel
       const [allMessages, allActs] = await Promise.all([
-        storage.getMessages(userId),
+        storage.getMessages(req.user!.id),
         storage.getActs(),
       ]);
 
@@ -1160,7 +1138,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.schedules.generateActs.path, async (req, res) => {
+  app.post(api.schedules.generateActs.path, ...appAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isFinite(id)) {
@@ -1366,7 +1344,7 @@ export async function registerRoutes(
           projectDrawingsAgg: projectDrawingsAgg || null,
           normativeRefsAgg: normativeRefsAgg || null,
           executiveSchemesAgg: executiveSchemesAgg.length > 0 ? executiveSchemesAgg : null,
-        });
+        }, req.user!.id);
 
         if (result.created) created++;
         else updated++;
@@ -1578,7 +1556,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch(api.scheduleTasks.patch.path, async (req, res) => {
+  app.patch(api.scheduleTasks.patch.path, ...appAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isFinite(id)) {
@@ -1681,7 +1659,7 @@ export async function registerRoutes(
             projectDrawingsAgg: (act as any).projectDrawingsAgg ?? null,
             normativeRefsAgg: (act as any).normativeRefsAgg ?? null,
             executiveSchemesAgg: (act as any).executiveSchemesAgg ?? null,
-          });
+          }, req.user!.id);
         }
       }
 
@@ -1824,7 +1802,7 @@ export async function registerRoutes(
   });
 
   // Schedule (estimate source): quality document statuses for estimate subrows (aux positions)
-  app.get(api.estimatePositionLinks.statuses.path, async (req, res) => {
+  app.get(api.estimatePositionLinks.statuses.path, ...appAuth, async (req, res) => {
     try {
       const scheduleId = Number(req.params.id);
       if (!Number.isFinite(scheduleId) || scheduleId <= 0) {
@@ -1840,7 +1818,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: 'Schedule source type must be "estimate"' });
       }
 
-      const obj = await storage.getOrCreateDefaultObject();
+      const obj = await storage.getOrCreateDefaultObject(req.user!.id);
       const statuses = await storage.getEstimateSubrowStatuses({
         objectId: obj.id,
         estimateId: Number(schedule.estimateId),
@@ -1854,10 +1832,10 @@ export async function registerRoutes(
   });
 
   // Upsert estimate subrow ↔ project material link
-  app.post(api.estimatePositionLinks.upsert.path, async (req, res) => {
+  app.post(api.estimatePositionLinks.upsert.path, ...appAuth, async (req, res) => {
     try {
       const input = api.estimatePositionLinks.upsert.input.parse(req.body);
-      const obj = await storage.getOrCreateDefaultObject();
+      const obj = await storage.getOrCreateDefaultObject(req.user!.id);
 
       const saved = await storage.upsertEstimatePositionMaterialLink(obj.id, {
         estimateId: input.estimateId,
@@ -1878,13 +1856,13 @@ export async function registerRoutes(
   });
 
   // Delete estimate subrow ↔ project material link
-  app.delete(api.estimatePositionLinks.delete.path, async (req, res) => {
+  app.delete(api.estimatePositionLinks.delete.path, ...appAuth, async (req, res) => {
     const estimatePositionId = Number(req.params.estimatePositionId);
     if (!Number.isFinite(estimatePositionId) || estimatePositionId <= 0) {
       return res.status(400).json({ message: "Invalid estimatePositionId" });
     }
     try {
-      const obj = await storage.getOrCreateDefaultObject();
+      const obj = await storage.getOrCreateDefaultObject(req.user!.id);
       const ok = await storage.deleteEstimatePositionMaterialLink(obj.id, estimatePositionId);
       if (!ok) return res.status(404).json({ message: "Not found" });
       return res.status(204).send();
@@ -1926,7 +1904,7 @@ export async function registerRoutes(
   });
 
   // Generate PDF for act
-  app.post("/api/acts/:id/export", async (req, res) => {
+  app.post("/api/acts/:id/export", ...appAuth, async (req, res) => {
     try {
       const actId = Number(req.params.id);
       const act = await storage.getAct(actId);
@@ -1937,7 +1915,7 @@ export async function registerRoutes(
       const { templateIds, formData } = req.body ?? {};
 
       // Resolve object-scoped source data (MVP: single current object)
-      const objectId = (act as any).objectId ?? (await storage.getOrCreateDefaultObject()).id;
+      const objectId = (act as any).objectId ?? (await storage.getOrCreateDefaultObject(req.user!.id)).id;
       const sourceData = await storage.getObjectSourceData(Number(objectId));
       const objectActData = buildActDataFromSourceData(sourceData);
       const dbP3MaterialsText = await buildP3MaterialsText(actId);
@@ -2201,7 +2179,7 @@ export async function registerRoutes(
   // ADMIN API — protected by requireAdmin
   // ========================================
 
-  const adminAuth = [browserTokenAuth, telegramAuthOptional, requireAdmin] as const;
+  const adminAuth = [authMiddleware({ required: true }), requireAdmin] as const;
 
   // GET /api/admin/users — список всех пользователей
   app.get("/api/admin/users", ...adminAuth, async (_req, res) => {
@@ -2214,10 +2192,14 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/admin/users/:telegramUserId/block
-  app.post("/api/admin/users/:telegramUserId/block", ...adminAuth, async (req, res) => {
+  // POST /api/admin/users/:userId/block
+  app.post("/api/admin/users/:userId/block", ...adminAuth, async (req, res) => {
     try {
-      await adminStorage.blockUser(req.params.telegramUserId);
+      const userId = Number(req.params.userId);
+      if (!Number.isFinite(userId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+      await adminStorage.blockUser(userId);
       res.json({ success: true });
     } catch (err) {
       console.error("[Admin] blockUser error:", err);
@@ -2225,10 +2207,14 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/admin/users/:telegramUserId/unblock
-  app.post("/api/admin/users/:telegramUserId/unblock", ...adminAuth, async (req, res) => {
+  // POST /api/admin/users/:userId/unblock
+  app.post("/api/admin/users/:userId/unblock", ...adminAuth, async (req, res) => {
     try {
-      await adminStorage.unblockUser(req.params.telegramUserId);
+      const userId = Number(req.params.userId);
+      if (!Number.isFinite(userId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+      await adminStorage.unblockUser(userId);
       res.json({ success: true });
     } catch (err) {
       console.error("[Admin] unblockUser error:", err);
@@ -2236,11 +2222,15 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/admin/users/:telegramUserId/make-admin
-  app.post("/api/admin/users/:telegramUserId/make-admin", ...adminAuth, async (req, res) => {
+  // POST /api/admin/users/:userId/make-admin
+  app.post("/api/admin/users/:userId/make-admin", ...adminAuth, async (req, res) => {
     try {
+      const userId = Number(req.params.userId);
+      if (!Number.isFinite(userId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
       const note = typeof req.body?.note === "string" ? req.body.note : undefined;
-      await adminStorage.makeAdmin(req.params.telegramUserId, note);
+      await adminStorage.makeAdmin(userId, note);
       res.json({ success: true });
     } catch (err) {
       console.error("[Admin] makeAdmin error:", err);
@@ -2248,10 +2238,14 @@ export async function registerRoutes(
     }
   });
 
-  // DELETE /api/admin/users/:telegramUserId/admin
-  app.delete("/api/admin/users/:telegramUserId/admin", ...adminAuth, async (req, res) => {
+  // DELETE /api/admin/users/:userId/admin
+  app.delete("/api/admin/users/:userId/admin", ...adminAuth, async (req, res) => {
     try {
-      await adminStorage.removeAdmin(req.params.telegramUserId);
+      const userId = Number(req.params.userId);
+      if (!Number.isFinite(userId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+      await adminStorage.removeAdmin(userId);
       res.json({ success: true });
     } catch (err) {
       console.error("[Admin] removeAdmin error:", err);

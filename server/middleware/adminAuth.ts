@@ -1,28 +1,24 @@
 /**
  * @file: adminAuth.ts
  * @description: Middleware для проверки прав администратора
- * @dependencies: telegramAuth.ts, db.ts, shared/schema.ts
+ * @dependencies: auth.ts
  * @created: 2026-02-23
+ * @updated: 2026-03-01
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { eq } from 'drizzle-orm';
-import { db } from '../db';
-import { adminUsers } from '@shared/schema';
 
 /**
  * Middleware requireAdmin — проверяет, является ли текущий пользователь администратором.
  *
- * Должен вызываться ПОСЛЕ telegramAuth middleware.
+ * Должен вызываться ПОСЛЕ authMiddleware.
  *
- * В production:
- *   - Требует валидный req.telegramUser (установленный telegramAuth)
- *   - Проверяет telegram_user_id в таблице admin_users
- *   - Возвращает 403 если не admin
+ * Проверяет req.user?.role === 'admin'
+ * Возвращает 403 если не admin
  *
  * В development (NODE_ENV !== 'production'):
- *   - Дополнительно принимает заголовок X-Admin-Override: true (без БД-проверки)
- *   - Позволяет тестировать admin-панель без Telegram
+ *   - Дополнительно принимает заголовок X-Admin-Override: true (без проверки)
+ *   - Позволяет тестировать admin-панель без аутентификации
  */
 export async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   const isDev = process.env.NODE_ENV === 'development';
@@ -34,28 +30,11 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     return;
   }
 
-  // Нет telegramUser — нет доступа
-  const telegramUserId = req.telegramUser?.id;
-  if (!telegramUserId) {
-    res.status(401).json({ error: 'Telegram authentication required' });
+  // Проверяем, что пользователь аутентифицирован и является админом
+  if (!req.user || req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
     return;
   }
 
-  try {
-    const adminRecord = await db
-      .select({ id: adminUsers.id })
-      .from(adminUsers)
-      .where(eq(adminUsers.telegramUserId, String(telegramUserId)))
-      .limit(1);
-
-    if (adminRecord.length === 0) {
-      res.status(403).json({ error: 'Admin access required' });
-      return;
-    }
-
-    next();
-  } catch (err) {
-    console.error('[AdminAuth] DB error checking admin status:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  next();
 }
