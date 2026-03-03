@@ -115,7 +115,7 @@ export default function Schedule() {
     }
 
     const taskSplitInfo = new Map<number, { position: number; total: number }>();
-    for (const [splitGroupId, siblings] of groupedBySplitId.entries()) {
+    groupedBySplitId.forEach((siblings) => {
       const sorted = siblings.sort((a, b) => {
         const indexA = a.splitIndex ?? 0;
         const indexB = b.splitIndex ?? 0;
@@ -124,7 +124,7 @@ export default function Schedule() {
       sorted.forEach((task, idx) => {
         taskSplitInfo.set(task.id, { position: idx + 1, total: sorted.length });
       });
-    }
+    });
 
     return taskSplitInfo;
   }, [tasks]);

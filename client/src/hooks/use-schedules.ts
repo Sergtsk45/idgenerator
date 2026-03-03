@@ -8,16 +8,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import type { schedules, scheduleTasks } from "@shared/schema";
+
+type Schedule = typeof schedules.$inferSelect & { tasks: typeof scheduleTasks.$inferSelect[] };
+type ScheduleBase = typeof schedules.$inferSelect;
+type SourceInfo = {
+  sourceType: 'works' | 'estimate';
+  estimateId: number | null;
+  estimateName: string | null;
+  tasksCount: number;
+  affectedActNumbers: number[];
+};
 
 export function useDefaultSchedule() {
-  return useQuery({
+  return useQuery<ScheduleBase>({
     queryKey: [api.schedules.default.path],
     queryFn: getQueryFn({ on401: "throw" }),
   });
 }
 
 export function useSchedule(id: number | null | undefined) {
-  return useQuery({
+  return useQuery<Schedule>({
     queryKey: [buildUrl(api.schedules.get.path, { id: id ?? 0 })],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!id,
@@ -101,7 +112,7 @@ export function useGenerateActsFromSchedule(scheduleId: number | null | undefine
 }
 
 export function useScheduleSourceInfo(scheduleId: number | null | undefined) {
-  return useQuery({
+  return useQuery<SourceInfo>({
     queryKey: [buildUrl(api.schedules.sourceInfo.path, { id: scheduleId ?? 0 })],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!scheduleId,
