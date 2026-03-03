@@ -23,12 +23,16 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children, title }: AdminLayoutProps) {
   const [location] = useLocation();
+  
+  // Если мы на главной странице админки, возвращаемся в настройки
+  // Иначе возвращаемся на главную админки
+  const backUrl = location === "/admin" ? "/settings" : "/admin";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top bar */}
       <header className="border-b bg-card px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <a href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+        <a href={backUrl} className="text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="h-5 w-5" />
         </a>
         <Shield className="h-5 w-5 text-primary" />
