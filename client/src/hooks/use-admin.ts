@@ -21,6 +21,9 @@ export interface AdminUserRow {
   objectsCount: number;
   actsCount: number;
   messagesCount: number;
+  tariff: 'basic' | 'standard' | 'premium';
+  subscriptionEndsAt: string | null;
+  trialUsed: boolean;
 }
 
 export interface AdminStats {
@@ -237,6 +240,38 @@ export function useAdminImportMaterials() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "materials-catalog"] });
+    },
+  });
+}
+
+// ── Tariff management ──────────────────────────────────────────────────────────
+
+export function useChangeTariff() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      tariff,
+      subscriptionEndsAt,
+    }: {
+      userId: number;
+      tariff: 'basic' | 'standard' | 'premium';
+      subscriptionEndsAt?: string;
+    }) => {
+      const res = await apiRequest(
+        'PATCH',
+        `/api/admin/users/${userId}/tariff`,
+        { tariff, subscriptionEndsAt }
+      );
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: 'Failed to change tariff' }));
+        throw new Error(error.message || 'Failed to change tariff');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
     },
   });
 }

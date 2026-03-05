@@ -130,6 +130,9 @@ const userResponseSchema = z.object({
   displayName: z.string(),
   email: z.string().nullable(),
   role: z.string(),
+  tariff: z.enum(['basic', 'standard', 'premium']),
+  subscriptionEndsAt: z.string().datetime().nullable(),
+  trialUsed: z.boolean(),
 });
 
 const authResponseSchema = z.object({
@@ -195,6 +198,47 @@ export const api = {
         400: z.object({ error: z.string(), details: z.array(z.any()).optional() }),
         401: z.object({ error: z.string() }),
         409: z.object({ error: z.string() }),
+      },
+    },
+  },
+  tariff: {
+    status: {
+      method: 'GET' as const,
+      path: '/api/tariff/status',
+      responses: {
+        200: z.object({
+          tariff: z.enum(['basic', 'standard', 'premium']),
+          effectiveTariff: z.enum(['basic', 'standard', 'premium']),
+          subscriptionEndsAt: z.string().datetime().nullable(),
+          trialUsed: z.boolean(),
+          quotas: z.object({
+            objects: z.object({
+              limit: z.number(),
+              used: z.number(),
+            }),
+            invoiceImports: z.object({
+              limit: z.number(),
+              used: z.number(),
+            }),
+          }),
+        }),
+        401: z.object({ error: z.string() }),
+      },
+    },
+  },
+  admin: {
+    changeTariff: {
+      method: 'PATCH' as const,
+      path: '/api/admin/users/:id/tariff',
+      input: z.object({
+        tariff: z.enum(['basic', 'standard', 'premium']),
+        subscriptionEndsAt: z.string().datetime().optional(),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: z.object({ message: z.string() }),
+        403: z.object({ error: z.string() }),
+        404: z.object({ message: z.string() }),
       },
     },
   },

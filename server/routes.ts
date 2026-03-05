@@ -21,6 +21,11 @@ import { requireAdmin } from "./middleware/adminAuth";
 import { adminStorage } from "./storage";
 import { registerAuthRoutes } from "./routes/auth";
 import { authMiddleware } from "./middleware/auth";
+import { requireFeature } from "./middleware/tariff";
+import { db } from "./db";
+import { users, objects } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
+import { getQuota } from "@shared/tariff-features";
 
 function addDaysISO(dateStr: string, days: number): string {
   // Expect YYYY-MM-DD. Work in UTC to avoid timezone shifts.
@@ -141,6 +146,45 @@ export async function registerRoutes(
   
   // Auth Middleware (new unified approach)
   const appAuth = [authMiddleware({ required: true })] as const;
+  
+  // Tariff status
+  app.get(api.tariff.status.path, ...appAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+
+      // Подсчет объектов пользователя
+      const objectsCount = await db
+        .select({ count: sql`count(*)::int` })
+        .from(objects)
+        .where(eq(objects.userId, user.id));
+
+      // Подсчет импортов за текущий месяц (заглушка - 0, реализация позже)
+      const invoiceImportsUsed = 0;
+
+      const objectsLimit = getQuota(user.tariff, 'objects');
+      const invoiceImportsLimit = getQuota(user.tariff, 'invoiceImports');
+
+      return res.status(200).json({
+        tariff: user.tariff,
+        effectiveTariff: user.tariff,
+        subscriptionEndsAt: user.subscriptionEndsAt?.toISOString() || null,
+        trialUsed: user.trialUsed,
+        quotas: {
+          objects: {
+            limit: objectsLimit,
+            used: Number(objectsCount[0]?.count || 0),
+          },
+          invoiceImports: {
+            limit: invoiceImportsLimit,
+            used: invoiceImportsUsed,
+          },
+        },
+      });
+    } catch (err) {
+      console.error('Get tariff status failed:', err);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
   
   // Object (MVP: single current object)
   app.get(api.object.current.path, ...appAuth, async (req, res) => {
@@ -319,6 +363,8 @@ export async function registerRoutes(
   app.post(
     api.projectMaterials.parseInvoice.path,
     invoiceParseRateLimiter,
+    ...appAuth,
+    requireFeature('INVOICE_IMPORT'),
     (req, res, next) => {
       invoiceUpload.single('file')(req, res, (err) => {
         if (err) {
@@ -1720,7 +1766,7 @@ export async function registerRoutes(
   });
 
   // SPLIT-015: Split schedule task into two tasks
-  app.post(api.scheduleTasks.split.path, ...appAuth, async (req, res) => {
+  app.post(api.scheduleTasks.split.path, ...appAuth, requireFeature('SPLIT_TASK'), async (req, res) => {
     try {
       const taskId = Number(req.params.id);
       if (!Number.isFinite(taskId) || taskId <= 0) {
@@ -2583,6 +2629,53 @@ export async function registerRoutes(
     } catch (err) {
       console.error("[Admin] listAdmins error:", err);
       res.status(500).json({ error: "Failed to fetch admins" });
+    }
+  });
+
+  // PATCH /api/admin/users/:id/tariff — изменение тарифа пользователя
+  app.patch("/api/admin/users/:id/tariff", ...adminAuth, async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      if (!Number.isFinite(userId) || userId <= 0) {
+        return res.status(400).json({ message: "Invalid user id" });
+      }
+
+      const input = api.admin.changeTariff.input.parse(req.body);
+
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (existingUser.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updateData: any = {
+        tariff: input.tariff,
+      };
+
+      if (input.subscriptionEndsAt !== undefined) {
+        updateData.subscriptionEndsAt = input.subscriptionEndsAt
+          ? new Date(input.subscriptionEndsAt)
+          : null;
+      }
+
+      await db
+        .update(users)
+        .set(updateData)
+        .where(eq(users.id, userId));
+
+      return res.status(200).json({ 
+        message: "Tariff updated successfully" 
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("[Admin] changeTariff error:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
     }
   });
 

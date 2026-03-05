@@ -17,6 +17,15 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// === TARIFF TYPES ===
+export const TARIFFS = {
+  BASIC: 'basic',
+  STANDARD: 'standard',
+  PREMIUM: 'premium',
+} as const;
+
+export type TariffType = (typeof TARIFFS)[keyof typeof TARIFFS];
+
 // === TABLE DEFINITIONS ===
 
 // Users (Internal user registry)
@@ -29,6 +38,9 @@ export const users = pgTable("users", {
   isBlocked: boolean("is_blocked").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   lastLoginAt: timestamp("last_login_at"),
+  tariff: text('tariff').$type<TariffType>().notNull().default(TARIFFS.BASIC),
+  subscriptionEndsAt: timestamp('subscription_ends_at'),
+  trialUsed: boolean('trial_used').notNull().default(false),
 }, (t) => ({
   emailIdx: index("users_email_idx").on(t.email),
   roleCheck: check("users_role_check", sql`role IN ('user', 'admin')`),

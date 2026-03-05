@@ -18,6 +18,8 @@ import { MaterialCard, type ProjectMaterialListItem } from "@/components/materia
 import { MaterialWizard } from "@/components/materials/MaterialWizard";
 import { InvoiceImportButton } from "@/components/materials/InvoiceImportButton";
 import { InvoicePreviewDialog } from "@/components/materials/InvoicePreviewDialog";
+import { TariffGuard } from "@/components/TariffGuard";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { useLanguageStore } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -180,7 +182,14 @@ export default function SourceMaterials() {
       {/* FAB */}
       <div className="fixed bottom-20 right-4 z-40 flex items-center gap-3">
         {filter === "local" && Number.isFinite(objectId) && (
-          <InvoiceImportButton objectId={objectId as number} onParsed={handleInvoiceParsed} />
+          <TariffGuard 
+            feature="INVOICE_IMPORT"
+            fallback={
+              <UpgradePrompt feature="INVOICE_IMPORT" className="max-w-sm" />
+            }
+          >
+            <InvoiceImportButton objectId={objectId as number} onParsed={handleInvoiceParsed} />
+          </TariffGuard>
         )}
         <Button
           size="icon"

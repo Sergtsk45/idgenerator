@@ -9,6 +9,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { BottomNav } from "@/components/BottomNav";
 import { Header } from "@/components/Header";
+import { TariffGuard } from "@/components/TariffGuard";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1176,15 +1178,30 @@ export default function Schedule() {
                                       <ChevronRight className="h-3.5 w-3.5" />
                                     </Button>
                                     {task.durationDays > 1 && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 text-muted-foreground/60"
-                                        onClick={() => openSplitDialog(task)}
-                                        aria-label={language === "ru" ? "Разделить задачу" : "Split task"}
+                                      <TariffGuard 
+                                        feature="SPLIT_TASK"
+                                        fallback={
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-muted-foreground/60 opacity-50"
+                                            disabled
+                                            aria-label={language === "ru" ? "Разделить задачу (требуется Стандарт)" : "Split task (Standard required)"}
+                                          >
+                                            <Scissors className="h-3.5 w-3.5" />
+                                          </Button>
+                                        }
                                       >
-                                        <Scissors className="h-3.5 w-3.5" />
-                                      </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 text-muted-foreground/60"
+                                          onClick={() => openSplitDialog(task)}
+                                          aria-label={language === "ru" ? "Разделить задачу" : "Split task"}
+                                        >
+                                          <Scissors className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </TariffGuard>
                                     )}
                                     <Button
                                       variant="ghost"

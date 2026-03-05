@@ -10,6 +10,8 @@ import { authService } from '../auth-service';
 import { db } from '../db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { getEffectiveTariff } from '@shared/tariff-features';
+import type { TariffType } from '@shared/schema';
 
 declare global {
   namespace Express {
@@ -19,6 +21,9 @@ declare global {
         displayName: string;
         email: string | null;
         role: string;
+        tariff: TariffType;
+        subscriptionEndsAt: Date | null;
+        trialUsed: boolean;
       };
     }
   }
@@ -100,6 +105,12 @@ export function authMiddleware(options?: { required?: boolean }) {
         displayName: user.displayName,
         email: user.email,
         role: user.role,
+        tariff: getEffectiveTariff(
+          user.tariff as TariffType,
+          user.subscriptionEndsAt
+        ),
+        subscriptionEndsAt: user.subscriptionEndsAt,
+        trialUsed: user.trialUsed,
       };
 
       if (authMethod === 'jwt') {

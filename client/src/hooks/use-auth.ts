@@ -17,6 +17,9 @@ interface User {
   displayName: string;
   email: string | null;
   role: string;
+  tariff: 'basic' | 'standard' | 'premium';
+  subscriptionEndsAt: string | null;
+  trialUsed: boolean;
 }
 
 interface UseAuthReturn {

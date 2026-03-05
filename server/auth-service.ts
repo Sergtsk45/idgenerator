@@ -131,6 +131,9 @@ export class AuthService {
 
     const displayName = this.generateDisplayName(provider, externalId, metadata);
 
+    // Автоматическая активация Trial для новых пользователей (14 дней)
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
     const [newUser] = await db
       .insert(users)
       .values({
@@ -139,6 +142,9 @@ export class AuthService {
         passwordHash: null,
         role: 'user',
         isBlocked: false,
+        tariff: 'standard',
+        subscriptionEndsAt: trialEndsAt,
+        trialUsed: true,
       })
       .returning();
 

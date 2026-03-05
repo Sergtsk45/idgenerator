@@ -45,12 +45,19 @@ export function registerAuthRoutes(app: Express) {
 
         const jwt = await authService.generateJWT(req.user.id, req.user.role);
 
+        // Получаем полные данные пользователя для возврата tariff полей
+        const userDetails = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
+        const user = userDetails[0];
+
         return res.status(200).json({
           user: {
-            id: req.user.id,
-            displayName: req.user.displayName,
-            email: req.user.email,
-            role: req.user.role,
+            id: user.id,
+            displayName: user.displayName,
+            email: user.email,
+            role: user.role,
+            tariff: user.tariff,
+            subscriptionEndsAt: user.subscriptionEndsAt?.toISOString() || null,
+            trialUsed: user.trialUsed,
           },
           token: jwt,
         });
@@ -87,6 +94,9 @@ export function registerAuthRoutes(app: Express) {
 
       const passwordHash = await authService.hashPassword(password);
 
+      // Автоматическая активация Trial для новых пользователей (14 дней)
+      const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
       const [newUser] = await db
         .insert(users)
         .values({
@@ -95,6 +105,9 @@ export function registerAuthRoutes(app: Express) {
           passwordHash,
           role: 'user',
           isBlocked: false,
+          tariff: 'standard',
+          subscriptionEndsAt: trialEndsAt,
+          trialUsed: true,
         })
         .returning();
 
@@ -108,6 +121,9 @@ export function registerAuthRoutes(app: Express) {
           displayName: newUser.displayName,
           email: newUser.email,
           role: newUser.role,
+          tariff: newUser.tariff,
+          subscriptionEndsAt: newUser.subscriptionEndsAt?.toISOString() || null,
+          trialUsed: newUser.trialUsed,
         },
         token: jwt,
       });
@@ -165,12 +181,19 @@ export function registerAuthRoutes(app: Express) {
 
       const jwt = await authService.generateJWT(user.id, user.role);
 
+      // Получаем полные данные пользователя для возврата tariff полей
+      const fullUserData = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+      const userData = fullUserData[0];
+
       return res.status(200).json({
         user: {
-          id: user.id,
-          displayName: user.displayName,
-          email: user.email,
-          role: user.role,
+          id: userData.id,
+          displayName: userData.displayName,
+          email: userData.email,
+          role: userData.role,
+          tariff: userData.tariff,
+          subscriptionEndsAt: userData.subscriptionEndsAt?.toISOString() || null,
+          trialUsed: userData.trialUsed,
         },
         token: jwt,
       });
@@ -187,11 +210,23 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
+      // Получаем полные данные пользователя для возврата tariff полей
+      const userDetails = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
+      
+      if (userDetails.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = userDetails[0];
+
       return res.status(200).json({
-        id: req.user.id,
-        displayName: req.user.displayName,
-        email: req.user.email,
-        role: req.user.role,
+        id: user.id,
+        displayName: user.displayName,
+        email: user.email,
+        role: user.role,
+        tariff: user.tariff,
+        subscriptionEndsAt: user.subscriptionEndsAt?.toISOString() || null,
+        trialUsed: user.trialUsed,
       });
     } catch (error) {
       console.error('[Auth] Get current user failed:', error);

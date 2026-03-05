@@ -9,6 +9,11 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { authService } from '../auth-service';
+import { db } from '../db';
+import { users } from '@shared/schema';
+import { eq } from 'drizzle-orm';
+import { getEffectiveTariff } from '@shared/tariff-features';
+import type { TariffType } from '@shared/schema';
 
 /**
  * Данные пользователя Telegram, извлечённые из initData
@@ -32,12 +37,6 @@ declare global {
     interface Request {
       telegramUser?: TelegramUser;
       telegramInitData?: Record<string, string>;
-      user?: {
-        id: number;
-        displayName: string;
-        email: string | null;
-        role: string;
-      };
     }
   }
 }
@@ -233,11 +232,28 @@ export function telegramAuthMiddleware(options: { required?: boolean } = { requi
         telegramUser as unknown as Record<string, unknown>
       );
 
+      // Получаем полные данные пользователя включая tariff поля
+      const userRecord = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+      
+      if (userRecord.length === 0) {
+        console.error('[TelegramAuth] User not found after creation:', user.id);
+        res.status(500).json({ error: 'Failed to load user data' });
+        return;
+      }
+
+      const fullUser = userRecord[0];
+
       req.user = {
-        id: user.id,
-        displayName: user.displayName,
-        email: user.email,
-        role: user.role,
+        id: fullUser.id,
+        displayName: fullUser.displayName,
+        email: fullUser.email,
+        role: fullUser.role,
+        tariff: getEffectiveTariff(
+          fullUser.tariff as TariffType,
+          fullUser.subscriptionEndsAt
+        ),
+        subscriptionEndsAt: fullUser.subscriptionEndsAt,
+        trialUsed: fullUser.trialUsed,
       };
     } catch (error) {
       console.error('[TelegramAuth] Failed to find/create user:', error);

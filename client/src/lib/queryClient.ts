@@ -99,6 +99,22 @@ export const queryClient = new QueryClient({
     },
     mutations: {
       retry: false,
+      onError: (error: any) => {
+        // Обработка ошибки TARIFF_REQUIRED
+        if (
+          error?.status === 403 &&
+          error?.body?.error === 'TARIFF_REQUIRED'
+        ) {
+          // Показываем toast с информацией о требуемом тарифе
+          import('@/hooks/use-toast').then(({ toast }) => {
+            toast({
+              variant: 'destructive',
+              title: 'Требуется обновление тарифа',
+              description: error.body.message || 'Для этой функции требуется более высокий тариф',
+            });
+          });
+        }
+      },
     },
   },
 });

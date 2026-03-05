@@ -196,7 +196,7 @@ flowchart LR
 
 ## Модель данных (текущее состояние)
 Основные таблицы:
-- `users`: реестр пользователей системы (id, email, password_hash, role, isBlocked, created_at, updated_at)
+- `users`: реестр пользователей системы (id, email, password_hash, role, isBlocked, created_at, updated_at, **tariff, subscription_ends_at, trial_used**)
 - `auth_providers`: привязки провайдеров (id, user_id, provider, provider_user_id, linked_at)
 - `objects`: объект строительства (MVP: один «текущий объект» на пользователя), используется как якорь для исходных данных плейсхолдеров. Связь с пользователем через `users.id`.
 - `object_parties`: стороны объекта (заказчик/подрядчик/проектировщик) с реквизитами (минимум — `fullName`, дополнительно — ИНН/КПП/ОГРН, юр.адрес, телефон, email, реквизиты СРО). Эти данные используются при экспорте АОСР в PDF (если не переопределены через `formData`).
@@ -229,6 +229,34 @@ flowchart LR
 - `estimate_position_material_links`: привязка подстроки сметы (`estimate_positions`, вспомогательные строки) к материалу проекта (`project_materials`) для вычисления статуса документов качества в графике работ.
 - `admin_users`: таблица администраторов системы (привязка `telegramUserId` и статус блокировки).
 
+### Тарифная система
+
+Система поддерживает три тарифа: **Базовый** (бесплатный), **Стандарт**, **Премиум**.
+
+**Таблица users - новые поля:**
+- `tariff` (TEXT NOT NULL DEFAULT 'basic') — текущий тариф пользователя
+- `subscription_ends_at` (TIMESTAMP NULL) — дата окончания подписки
+- `trial_used` (BOOLEAN NOT NULL DEFAULT false) — флаг использования Trial-периода
+
+**Лимиты по тарифам:**
+| Функция | Базовый | Стандарт | Премиум |
+|---------|---------|----------|---------|
+| Объекты строительства | 1 | 5 | безлимит |
+| Split Task (захватки) | ❌ | ✅ | ✅ |
+| Импорт PDF-счетов | ❌ | 20/мес | безлимит |
+| Все остальное | ✅ | ✅ | ✅ |
+
+**Trial-период:**
+- 14 дней тарифа "Стандарт" для новых пользователей
+- Автоматически активируется при регистрации
+- Флаг `trial_used` предотвращает повторную активацию
+
+**Архитектура:**
+- **Реестр фич** (`shared/tariff-features.ts`) — единое место определения "что на каком тарифе"
+- **Backend защита** — middleware `requireFeature()` проверяет доступ на API уровне (403 если нет доступа)
+- **Frontend защита** — компонент `<TariffGuard>` скрывает/блокирует UI элементы
+- **Эффективный тариф** — функция `getEffectiveTariff()` автоматически понижает до Basic при истечении подписки
+
 Дополнительно (задел под AI-чат):
 - `conversations` и chat-`messages` (см. `shared/schema.ts` + `server/replit_integrations/chat/*`).
 
@@ -242,6 +270,7 @@ flowchart LR
   - `POST /api/auth/login/telegram` — вход через Telegram (request: { initData }, response: { user, token })
   - `GET /api/auth/me` — информация о текущем пользователе (требует JWT)
   - `POST /api/auth/link-provider` — привязка дополнительного провайдера к аккаунту (требует JWT)
+  - **Примечание**: Все auth responses теперь включают поля: `tariff`, `subscriptionEndsAt`, `trialUsed`
 - **Object (MVP current)**: `GET /api/object/current`, `PATCH /api/object/current`, `GET /api/object/current/source-data`, `PUT /api/object/current/source-data`
 - **Materials Catalog**: `GET /api/materials-catalog`, `POST /api/materials-catalog`, `POST /api/admin/materials-catalog/import` (массовый импорт из Excel, только для администраторов)
 - **Project Materials**: `GET /api/objects/:objectId/materials`, `POST /api/objects/:objectId/materials`, `GET /api/project-materials/:id`, `PATCH /api/project-materials/:id`, `POST /api/project-materials/:id/save-to-catalog`
@@ -264,6 +293,9 @@ flowchart LR
   - **Stats**: `GET /api/admin/stats`
   - **Messages Queue**: `GET /api/admin/messages/failed`, `POST /api/admin/messages/:id/reprocess`
   - **Materials Catalog**: `POST /api/admin/materials-catalog/import`, `POST /api/admin/materials-catalog`, `PATCH /api/admin/materials-catalog/:id`, `DELETE /api/admin/materials-catalog/:id`
+- **Admin Tariff Management** (новое):
+  - `PATCH /api/admin/users/:id/tariff` — изменение тарифа пользователя (только для админов)
+  - `GET /api/tariff/status` — информация о тарифе и квотах текущего пользователя
 - **Schedules**: 
   - `GET /api/schedules/default`, `POST /api/schedules`, `GET /api/schedules/:id`
   - `POST /api/schedules/:id/bootstrap-from-works` — создать задачи из ВОР

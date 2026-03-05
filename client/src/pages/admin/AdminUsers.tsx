@@ -13,6 +13,7 @@ import {
   useUnblockUser,
   useMakeAdmin,
   useRemoveAdmin,
+  useChangeTariff,
   type AdminUserRow,
 } from "@/hooks/use-admin";
 import { Badge } from "@/components/ui/badge";
@@ -29,9 +30,33 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, ShieldCheck, Ban, UserCheck } from "lucide-react";
+import { Search, ShieldCheck, Ban, UserCheck, CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 type Filter = "all" | "blocked" | "admins";
 
@@ -41,6 +66,12 @@ function UserCard({ user }: { user: AdminUserRow }) {
   const unblockUser = useUnblockUser();
   const makeAdmin = useMakeAdmin();
   const removeAdmin = useRemoveAdmin();
+  const changeTariff = useChangeTariff();
+  const [tariffDialogOpen, setTariffDialogOpen] = useState(false);
+  const [selectedTariff, setSelectedTariff] = useState<string>(user.tariff || 'basic');
+  const [subscriptionDate, setSubscriptionDate] = useState<Date | undefined>(
+    user.subscriptionEndsAt ? new Date(user.subscriptionEndsAt) : undefined
+  );
 
   const handleBlock = async () => {
     try {
@@ -78,11 +109,59 @@ function UserCard({ user }: { user: AdminUserRow }) {
     }
   };
 
+  const handleChangeTariff = async () => {
+    try {
+      await changeTariff.mutateAsync({
+        userId: user.telegramUserId as any,
+        tariff: selectedTariff as any,
+        subscriptionEndsAt: subscriptionDate?.toISOString(),
+      });
+      toast({ title: "Тариф обновлён" });
+      setTariffDialogOpen(false);
+    } catch (err) {
+      toast({ 
+        title: "Ошибка обновления тарифа", 
+        description: String(err), 
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleActivateTrial = async () => {
+    try {
+      const trialEndDate = new Date();
+      trialEndDate.setDate(trialEndDate.getDate() + 14);
+      
+      await changeTariff.mutateAsync({
+        userId: user.telegramUserId as any,
+        tariff: 'standard',
+        subscriptionEndsAt: trialEndDate.toISOString(),
+      });
+      
+      toast({ title: "Trial активирован (14 дней)" });
+    } catch (err) {
+      toast({ 
+        title: "Ошибка активации Trial", 
+        description: String(err), 
+        variant: "destructive" 
+      });
+    }
+  };
+
   return (
     <div className="border rounded-xl p-4 bg-card flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-sm font-medium truncate">{user.telegramUserId}</span>
+          <Badge variant={
+            user.tariff === 'premium' ? 'default' : 
+            user.tariff === 'standard' ? 'secondary' : 
+            'outline'
+          }>
+            {user.tariff === 'premium' ? 'Премиум' : 
+             user.tariff === 'standard' ? 'Стандарт' : 
+             'Базовый'}
+          </Badge>
           {user.isAdmin && (
             <Badge variant="default" className="text-[10px] px-1.5 py-0">
               <ShieldCheck className="h-3 w-3 mr-0.5" /> ADMIN
@@ -173,7 +252,93 @@ function UserCard({ user }: { user: AdminUserRow }) {
             Admin
           </Button>
         )}
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setTariffDialogOpen(true)}
+        >
+          Тариф
+        </Button>
+
+        {!user.trialUsed && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleActivateTrial}
+            disabled={changeTariff.isPending}
+          >
+            Активировать Trial
+          </Button>
+        )}
+        {user.trialUsed && (
+          <span className="text-xs text-muted-foreground">
+            Trial использован
+          </span>
+        )}
       </div>
+
+      <Dialog open={tariffDialogOpen} onOpenChange={setTariffDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Управление тарифом</DialogTitle>
+            <DialogDescription>
+              Изменение тарифа пользователя {user.telegramUserId}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium">Тариф</label>
+              <Select value={selectedTariff} onValueChange={setSelectedTariff}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="basic">Базовый</SelectItem>
+                  <SelectItem value="standard">Стандарт</SelectItem>
+                  <SelectItem value="premium">Премиум</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Подписка до</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !subscriptionDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {subscriptionDate ? format(subscriptionDate, "PPP", { locale: ru }) : "Выберите дату"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={subscriptionDate}
+                    onSelect={setSubscriptionDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTariffDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleChangeTariff} disabled={changeTariff.isPending}>
+              {changeTariff.isPending ? "Сохранение..." : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
