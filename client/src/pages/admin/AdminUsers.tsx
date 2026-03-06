@@ -149,40 +149,43 @@ function UserCard({ user }: { user: AdminUserRow }) {
   };
 
   return (
-    <div className="border rounded-xl p-4 bg-card flex flex-col sm:flex-row sm:items-center gap-3">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono text-sm font-medium truncate">{user.telegramUserId}</span>
-          <Badge variant={
-            user.tariff === 'premium' ? 'default' : 
-            user.tariff === 'standard' ? 'secondary' : 
-            'outline'
-          }>
-            {user.tariff === 'premium' ? 'Премиум' : 
-             user.tariff === 'standard' ? 'Стандарт' : 
-             'Базовый'}
-          </Badge>
-          {user.isAdmin && (
-            <Badge variant="default" className="text-[10px] px-1.5 py-0">
-              <ShieldCheck className="h-3 w-3 mr-0.5" /> ADMIN
-            </Badge>
+    <div className="border rounded-xl p-4 bg-card space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-sm font-medium truncate">{user.telegramUserId}</span>
+            {user.isAdmin && (
+              <Badge variant="default" className="text-[10px] px-1.5 py-0">
+                <ShieldCheck className="h-3 w-3 mr-0.5" /> ADMIN
+              </Badge>
+            )}
+            {user.isBlocked && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                <Ban className="h-3 w-3 mr-0.5" /> Заблокирован
+              </Badge>
+            )}
+          </div>
+          {user.objectTitle && (
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{user.objectTitle}</p>
           )}
-          {user.isBlocked && (
-            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-              <Ban className="h-3 w-3 mr-0.5" /> Заблокирован
-            </Badge>
-          )}
+          <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+            <span>Акты: {user.actsCount}</span>
+            <span>Сообщения: {user.messagesCount}</span>
+          </div>
         </div>
-        {user.objectTitle && (
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">{user.objectTitle}</p>
-        )}
-        <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-          <span>Акты: {user.actsCount}</span>
-          <span>Сообщения: {user.messagesCount}</span>
-        </div>
+
+        <Badge variant={
+          user.tariff === 'premium' ? 'default' : 
+          user.tariff === 'standard' ? 'secondary' : 
+          'outline'
+        } className="shrink-0">
+          {user.tariff === 'premium' ? 'Премиум' : 
+           user.tariff === 'standard' ? 'Стандарт' : 
+           'Базовый'}
+        </Badge>
       </div>
 
-      <div className="flex flex-wrap gap-2 shrink-0">
+      <div className="flex flex-wrap items-center gap-2">
         {user.isBlocked ? (
           <Button
             size="sm"
@@ -261,7 +264,7 @@ function UserCard({ user }: { user: AdminUserRow }) {
           Тариф
         </Button>
 
-        {!user.trialUsed && (
+        {!user.trialUsed ? (
           <Button
             size="sm"
             variant="outline"
@@ -270,9 +273,8 @@ function UserCard({ user }: { user: AdminUserRow }) {
           >
             Активировать Trial
           </Button>
-        )}
-        {user.trialUsed && (
-          <span className="text-xs text-muted-foreground">
+        ) : (
+          <span className="text-xs text-muted-foreground self-center">
             Trial использован
           </span>
         )}

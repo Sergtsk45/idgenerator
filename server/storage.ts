@@ -3100,6 +3100,9 @@ export interface AdminUserRow {
   objectsCount: number;
   actsCount: number;
   messagesCount: number;
+  tariff: 'basic' | 'standard' | 'premium';
+  subscriptionEndsAt: string | null;
+  trialUsed: boolean;
 }
 
 export interface AdminStats {
@@ -3123,6 +3126,9 @@ export const adminStorage = {
         email: users.email,
         role: users.role,
         isBlocked: users.isBlocked,
+        tariff: users.tariff,
+        subscriptionEndsAt: users.subscriptionEndsAt,
+        trialUsed: users.trialUsed,
         objectId: objects.id,
         objectTitle: objects.title,
       })
@@ -3164,7 +3170,7 @@ export const adminStorage = {
     for (const row of rows) {
       if (!userMap.has(row.userId)) {
         userMap.set(row.userId, {
-          telegramUserId: String(row.userId), // Теперь это internal user ID
+          telegramUserId: String(row.userId),
           objectId: row.objectId,
           objectTitle: row.objectTitle,
           isBlocked: row.isBlocked,
@@ -3172,6 +3178,9 @@ export const adminStorage = {
           objectsCount: 1,
           actsCount: actsMap.get(row.userId) ?? 0,
           messagesCount: messagesMap.get(row.userId) ?? 0,
+          tariff: (row.tariff as 'basic' | 'standard' | 'premium') ?? 'basic',
+          subscriptionEndsAt: row.subscriptionEndsAt ? row.subscriptionEndsAt.toISOString() : null,
+          trialUsed: row.trialUsed ?? false,
         });
       } else {
         const existing = userMap.get(row.userId)!;
