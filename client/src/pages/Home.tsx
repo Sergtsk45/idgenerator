@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMessages, useCreateMessage, useProcessMessage, useClearMessages } from "@/hooks/use-messages";
 import { MessageBubble } from "@/components/MessageBubble";
-import { KeyRound, Send, Mic, Loader2, Trash2 } from "lucide-react";
+import { KeyRound, Send, Mic, Loader2, Trash2, X, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguageStore, translations } from "@/lib/i18n";
@@ -21,15 +21,16 @@ import { useCurrentObject } from "@/hooks/use-source-data";
 import { useWorks } from "@/hooks/use-works";
 import { useTelegram } from "@/hooks/useTelegram";
 import { Link } from "wouter";
-import { X, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getAuthToken } from "@/lib/auth";
 import { useAuth } from "@/hooks/use-auth";
+import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 
 export default function Home() {
   const { language } = useLanguageStore();
   const t = translations[language].home;
+  const tv = translations[language].voice;
   const { data: currentObject } = useCurrentObject();
   const objectSubtitle = currentObject?.title
     ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.title}`
@@ -44,6 +45,22 @@ export default function Home() {
   const { data: works = [] } = useWorks();
   const clearMessages = useClearMessages();
   const { user: authUser } = useAuth();
+
+  const {
+    isRecording,
+    isTranscribing,
+    recordingDuration,
+    error: voiceError,
+    isSupported: isVoiceSupported,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+  } = useVoiceRecorder({
+    maxDurationMs: 60_000,
+    onTranscription: (text) => {
+      setInputValue((prev) => (prev ? `${prev} ${text}` : text));
+    },
+  });
 
   const currentUser = telegramUser?.id ? String(telegramUser.id) : "dev_user";
   const authToken = getAuthToken();
@@ -99,6 +116,17 @@ export default function Home() {
       }
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (voiceError) {
+      const errorMessage = (tv as Record<string, string>)[voiceError] ?? tv.errorServer;
+      toast({
+        title: tv.errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  }, [voiceError, tv, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -324,6 +352,15 @@ export default function Home() {
           <div className="flex items-end gap-2">
             {/* Поле ввода с микрофоном внутри */}
             <div className="relative flex-1">
+              {isRecording && (
+                <div className="absolute -top-8 left-0 right-0 flex items-center justify-center gap-2 text-xs text-red-500 z-10">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span>{Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}</span>
+                  <button type="button" onClick={cancelRecording} className="ml-2 text-muted-foreground hover:text-foreground">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
               <Textarea
                 placeholder={
                   language === "ru"
@@ -341,14 +378,28 @@ export default function Home() {
                 }}
                 rows={1}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 bottom-1 h-8 w-8 text-muted-foreground/60"
-              >
-                <Mic className="h-4 w-4" />
-              </Button>
+              {isVoiceSupported && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={`absolute right-1 bottom-1 h-8 w-8 transition-all ${
+                    isRecording
+                      ? "text-red-500 animate-pulse bg-red-50 dark:bg-red-950/30"
+                      : "text-muted-foreground/60"
+                  }`}
+                  disabled={isTranscribing}
+                  onPointerDown={(e) => { e.preventDefault(); startRecording(); }}
+                  onPointerUp={() => { if (isRecording) stopRecording(); }}
+                  onPointerLeave={() => { if (isRecording) cancelRecording(); }}
+                >
+                  {isTranscribing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
             </div>
 
             {/* Кнопка отправки — синяя круглая */}

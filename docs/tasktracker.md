@@ -2,6 +2,27 @@
 
 ---
 
+## Задача: Голосовой ввод (Voice-to-Text)
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-06
+- **Дата завершения**: 2026-03-06
+- **Описание**: Реализация голосового ввода на главной странице чата — запись голоса через MediaRecorder API, транскрипция через OpenAI Whisper, вставка текста в поле ввода
+- **Шаги выполнения**:
+  - [x] VOI-001: API контракт `api.voice.transcribe` в `shared/routes.ts`
+  - [x] VOI-002: Серверный маршрут `POST /api/voice/transcribe` (multer + Whisper)
+  - [x] VOI-003: Хук `useVoiceRecorder` (MediaRecorder, авто-стоп, cleanup)
+  - [x] VOI-004: Интеграция в `Home.tsx` (pointer events, индикатор, toast ошибок)
+  - [x] VOI-005: i18n переводы (ru/en)
+  - [x] VOI-006: Code review + Security audit + исправления
+- **Результаты**:
+  - 1 новый файл (`client/src/hooks/use-voice-recorder.ts`)
+  - 4 файла изменены (`shared/routes.ts`, `server/routes.ts`, `client/src/pages/Home.tsx`, `client/src/lib/i18n.ts`)
+  - Rate limiting, buffer cleanup, AbortController, generic errors
+- **Зависимости**: OpenAI API key (`AI_INTEGRATIONS_OPENAI_API_KEY`)
+- **Известные ограничения**: iOS Telegram WebView может не поддерживать MediaRecorder (кнопка скрывается автоматически)
+
+---
+
 ## Задача: Внедрение микросервиса invoice-extractor в проект (Вариант А — минимальные исправления)
 - **Статус**: Завершена ✅
 - **Дата начала**: 2026-03-06

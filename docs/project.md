@@ -3,7 +3,7 @@
 ## Назначение
 **TelegramJurnalRabot** — mobile-first веб-приложение (ориентировано на **Telegram MiniApp**) для автоматизации строительной документации, в частности формирования **АОСР** (Акты освидетельствования скрытых работ) на основе:
 - ведомости объёмов работ (**ВОР/ВОИР**, Bill of Quantities / BoQ), импортируемой из Excel;
-- журнала сообщений о выполненных работах (текстовые записи, потенциально — голосовые/расшифровки);
+- журнала сообщений о выполненных работах (текстовые записи и голосовой ввод с транскрипцией через OpenAI Whisper);
 - нормализации сообщений с помощью AI (OpenAI) в структурированные данные;
 - агрегации нормализованных записей в акты за выбранный период.
 
@@ -285,6 +285,7 @@ flowchart LR
 - **Works**: `GET /api/works`, `POST /api/works`
 - **Estimates (Смета/ЛСР)**: `GET /api/estimates`, `GET /api/estimates/:id`, `POST /api/estimates/import`, `DELETE /api/estimates/:id` (опц. `?resetSchedule=1` — сбросить график/акты, если смета используется как источник графика)
 - **Messages**: `GET /api/messages`, `POST /api/messages`, `PATCH /api/messages/:id`, `POST /api/messages/:id/process`
+- **Voice**: `POST /api/voice/transcribe` — загрузка аудио (FormData, поле `audio`, до 10 MB), транскрипция через OpenAI Whisper, возврат `{ text }`. Rate limit: 10 req/min.
 - **Acts**: `GET /api/acts`, `GET /api/acts/:id`, `POST /api/acts/:id/export`
   - `POST /api/acts/generate` и `POST /api/acts/create-with-templates` — **устарели** (410), создание актов только из графика работ
 - **Act Templates**: `GET /api/act-templates`

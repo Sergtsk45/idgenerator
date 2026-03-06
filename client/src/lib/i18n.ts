@@ -239,7 +239,20 @@ export const translations = {
       saveSuccessTitle: 'Saved',
       saveSuccessDesc: 'Source data updated',
       saveErrorTitle: 'Error',
-    }
+    },
+    voice: {
+      recording: 'Recording...',
+      transcribing: 'Recognizing...',
+      errorTitle: 'Voice input error',
+      errorNoMic: 'Microphone not found',
+      errorPermission: 'Microphone access denied. Allow access in browser settings.',
+      errorTooLong: 'Recording is too long',
+      errorServer: 'Speech recognition error. Try again.',
+      errorNetwork: 'No connection to server',
+      errorUnsupported: 'Voice input is not supported in this browser',
+      holdToRecord: 'Hold to record',
+      releaseToSend: 'Release to send',
+    },
   },
   ru: {
     nav: {
@@ -459,6 +472,19 @@ export const translations = {
       saveSuccessTitle: 'Сохранено',
       saveSuccessDesc: 'Исходные данные обновлены',
       saveErrorTitle: 'Ошибка',
-    }
+    },
+    voice: {
+      recording: 'Запись...',
+      transcribing: 'Распознавание...',
+      errorTitle: 'Ошибка голосового ввода',
+      errorNoMic: 'Микрофон не найден',
+      errorPermission: 'Доступ к микрофону запрещён. Разрешите доступ в настройках браузера.',
+      errorTooLong: 'Запись слишком длинная',
+      errorServer: 'Ошибка распознавания речи. Попробуйте ещё раз.',
+      errorNetwork: 'Нет соединения с сервером',
+      errorUnsupported: 'Голосовой ввод не поддерживается в этом браузере',
+      holdToRecord: 'Удерживайте для записи',
+      releaseToSend: 'Отпустите для отправки',
+    },
   }
 };
