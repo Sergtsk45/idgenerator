@@ -423,17 +423,13 @@ export async function registerRoutes(
         const data = await response.json();
         return res.status(200).json({
           items: (data.items || []).map((item: any) => ({
-            name: String(item.name || '').trim(),
+            name: String(item.name || item.description || '').trim(),
             unit: String(item.unit || '').trim(),
-            qty: item.qty ?? '',
-            price: item.price ?? '',
-            amount_w_vat: item.amount_w_vat ?? '',
-            vat_rate: item.vat_rate ?? '',
+            qty: item.qty != null ? String(item.qty).trim() : undefined,
           })).filter((item: any) => item.name.length > 0),
           invoice_number: data.invoice_number || undefined,
           invoice_date: data.invoice_date || undefined,
           supplier_name: data.supplier?.name || undefined,
-          warnings: data.warnings || [],
         });
       } catch (err: any) {
         clearTimeout(timeout);
@@ -456,8 +452,8 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Invalid objectId" });
     }
     try {
-      const { items } = api.projectMaterials.bulkCreate.input.parse(req.body);
-      const result = await storage.bulkCreateProjectMaterials(objectId, items);
+      const { items, supplierName, deliveryDate } = api.projectMaterials.bulkCreate.input.parse(req.body);
+      const result = await storage.bulkCreateProjectMaterials(objectId, items, { supplierName, deliveryDate });
       return res.status(200).json(result);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -523,6 +519,62 @@ export async function registerRoutes(
       return res.status(204).send();
     } catch (err) {
       console.error("Delete batch failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  const correctionRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: { message: "Too many correction submissions, try later" },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  app.post(api.invoiceCorrections.submit.path, correctionRateLimiter, ...appAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const input = api.invoiceCorrections.submit.input.parse(req.body);
+
+      const obj = await storage.getObject(input.objectId);
+      if (!obj || obj.userId !== userId) {
+        return res.status(400).json({ message: "Invalid objectId" });
+      }
+
+      const corrections = input.corrections.map((c) => ({
+        objectId: input.objectId,
+        userId,
+        fieldName: c.fieldName,
+        originalValue: c.originalValue,
+        correctedValue: c.correctedValue,
+        itemIndex: c.itemIndex,
+        invoiceNumber: input.invoiceNumber,
+        supplierName: input.supplierName,
+        pdfFilename: input.pdfFilename,
+      }));
+
+      const saved = await storage.saveInvoiceCorrections(corrections);
+      return res.status(200).json({ saved });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error("Save invoice corrections failed:", err);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get(api.invoiceCorrections.stats.path, ...appAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const obj = await storage.getOrCreateDefaultObject(userId);
+      const from = typeof req.query.from === "string" ? req.query.from : undefined;
+      const to = typeof req.query.to === "string" ? req.query.to : undefined;
+
+      const stats = await storage.getInvoiceCorrectionStats({ objectId: obj.id, from, to });
+      return res.status(200).json(stats);
+    } catch (err) {
+      console.error("Get invoice correction stats failed:", err);
       return res.status(500).json({ message: "Internal Server Error" });
     }
   });

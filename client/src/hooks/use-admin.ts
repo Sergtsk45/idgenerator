@@ -6,7 +6,6 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { getTelegramInitData } from "@/lib/telegram";
 import { getAuthToken } from "@/lib/auth";
 
@@ -259,15 +258,11 @@ export function useChangeTariff() {
       tariff: 'basic' | 'standard' | 'premium';
       subscriptionEndsAt?: string;
     }) => {
-      const res = await apiRequest(
+      const res = await adminMutate(
         'PATCH',
         `/api/admin/users/${userId}/tariff`,
         { tariff, subscriptionEndsAt }
       );
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: 'Failed to change tariff' }));
-        throw new Error(error.message || 'Failed to change tariff');
-      }
       return res.json();
     },
     onSuccess: () => {

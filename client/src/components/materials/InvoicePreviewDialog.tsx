@@ -18,27 +18,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, AlertCircle, Edit2 } from "lucide-react";
-import { useBulkCreateMaterials } from "@/hooks/use-materials";
+import { Loader2, CheckCircle2, Edit2 } from "lucide-react";
+import { useBulkCreateMaterials, useSubmitCorrections } from "@/hooks/use-materials";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguageStore } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { z } from "zod";
 import { api } from "@shared/routes";
 
-type ParsedInvoiceData = {
-  items: Array<{
-    name: string;
-    unit?: string;
-    qty?: number | string;
-    price?: number | string;
-    amount_w_vat?: number | string;
-    vat_rate?: string;
-  }>;
-  invoice_number?: string;
-  invoice_date?: string;
-  supplier_name?: string;
-  warnings?: string[];
-};
+type ParsedInvoiceData = z.infer<typeof api.projectMaterials.parseInvoice.responses[200]>;
 
 type Phase = "preview" | "importing" | "result";
 
@@ -47,6 +35,44 @@ interface InvoicePreviewDialogProps {
   onOpenChange: (open: boolean) => void;
   objectId: number;
   parsedData: ParsedInvoiceData | null;
+}
+
+type ParsedItem = { name: string; unit?: string; qty?: string };
+
+function computeCorrections(
+  parsedItems: ParsedItem[],
+  editedItems: Map<number, { name: string; unit: string; qty: string }>,
+  selectedItems: Set<number>
+): Array<{ itemIndex: number; fieldName: "name" | "unit" | "qty"; originalValue: string; correctedValue: string }> {
+  const corrections: Array<{ itemIndex: number; fieldName: "name" | "unit" | "qty"; originalValue: string; correctedValue: string }> = [];
+
+  for (const idx of selectedItems) {
+    const edited = editedItems.get(idx);
+    if (!edited) continue;
+
+    const original = parsedItems[idx];
+    if (!original) continue;
+
+    const fields: Array<{ key: "name" | "unit" | "qty"; orig: string }> = [
+      { key: "name", orig: original.name ?? "" },
+      { key: "unit", orig: original.unit ?? "" },
+      { key: "qty", orig: original.qty ?? "" },
+    ];
+
+    for (const { key, orig } of fields) {
+      const corrected = edited[key]?.trim() ?? "";
+      if (orig.trim() !== corrected && corrected.length > 0) {
+        corrections.push({
+          itemIndex: idx,
+          fieldName: key,
+          originalValue: orig.trim(),
+          correctedValue: corrected,
+        });
+      }
+    }
+  }
+
+  return corrections;
 }
 
 export function InvoicePreviewDialog({
@@ -58,14 +84,15 @@ export function InvoicePreviewDialog({
   const { language } = useLanguageStore();
   const { toast } = useToast();
   const bulkCreate = useBulkCreateMaterials(objectId);
+  const submitCorrections = useSubmitCorrections();
 
   const [phase, setPhase] = useState<Phase>("preview");
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
-  const [editedItems, setEditedItems] = useState<Map<number, { name: string; unit: string }>>(
+  const [editedItems, setEditedItems] = useState<Map<number, { name: string; unit: string; qty: string }>>(
     new Map()
   );
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
+  const [result, setResult] = useState<{ created: number; skipped: number; batchesCreated: number } | null>(null);
 
   const items = parsedData?.items ?? [];
 
@@ -96,10 +123,11 @@ export function InvoicePreviewDialog({
     setSelectedItems(newSet);
   };
 
-  const handleEditItem = (index: number, field: "name" | "unit", value: string) => {
+  const handleEditItem = (index: number, field: "name" | "unit" | "qty", value: string) => {
     const current = editedItems.get(index) ?? {
       name: items[index].name,
       unit: items[index].unit ?? "",
+      qty: items[index].qty ?? "",
     };
     setEditedItems(new Map(editedItems.set(index, { ...current, [field]: value })));
   };
@@ -109,6 +137,7 @@ export function InvoicePreviewDialog({
     return {
       name: edited?.name ?? items[index].name,
       unit: edited?.unit ?? items[index].unit ?? "",
+      qty: edited?.qty ?? items[index].qty ?? "",
     };
   };
 
@@ -123,13 +152,29 @@ export function InvoicePreviewDialog({
         return {
           nameOverride: data.name.trim(),
           baseUnitOverride: data.unit.trim() || undefined,
+          qty: data.qty.trim() || undefined,
         };
       })
       .filter((item) => item.nameOverride.length > 0);
 
     try {
-      const res = await bulkCreate.mutateAsync(itemsToCreate);
-      setResult({ created: res.created, skipped: res.skipped });
+      const res = await bulkCreate.mutateAsync({
+        items: itemsToCreate,
+        supplierName: parsedData?.supplier_name,
+        deliveryDate: parsedData?.invoice_date,
+      });
+      setResult({ created: res.created, skipped: res.skipped, batchesCreated: res.batchesCreated });
+
+      const corrections = computeCorrections(items, editedItems, selectedItems);
+      if (corrections.length > 0) {
+        submitCorrections.mutate({
+          objectId,
+          invoiceNumber: parsedData?.invoice_number,
+          supplierName: parsedData?.supplier_name,
+          corrections,
+        });
+      }
+
       setPhase("result");
     } catch (err: any) {
       toast({
@@ -249,7 +294,7 @@ export function InvoicePreviewDialog({
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                             <div className="flex items-center gap-1">
                               <span>{language === "ru" ? "Ед." : "Unit"}:</span>
                               <Input
@@ -259,16 +304,15 @@ export function InvoicePreviewDialog({
                                 className="h-6 w-16 px-1 text-xs"
                               />
                             </div>
-                            {item.qty != null && (
-                              <div>
-                                {language === "ru" ? "Кол-во" : "Qty"}: {item.qty}
-                              </div>
-                            )}
-                            {item.price != null && (
-                              <div>
-                                {language === "ru" ? "Цена" : "Price"}: {item.price}
-                              </div>
-                            )}
+                            <div className="flex items-center gap-1">
+                              <span>{language === "ru" ? "Кол-во" : "Qty"}:</span>
+                              <Input
+                                value={data.qty}
+                                onChange={(e) => handleEditItem(idx, "qty", e.target.value)}
+                                placeholder="-"
+                                className="h-6 w-20 px-1 text-xs"
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -277,24 +321,6 @@ export function InvoicePreviewDialog({
                 })}
               </div>
             </ScrollArea>
-
-            {parsedData.warnings && parsedData.warnings.length > 0 && (
-              <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-900/40">
-                <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500 shrink-0 mt-0.5" />
-                <div className="flex-1 text-xs">
-                  <div className="font-medium mb-1">
-                    {language === "ru" ? "Предупреждения" : "Warnings"} ({parsedData.warnings.length}):
-                  </div>
-                  <ul className="space-y-1">
-                    {parsedData.warnings.map((w, i) => (
-                      <li key={i} className="text-muted-foreground">
-                        • {w}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
 
             <DialogFooter className="gap-2 pt-2">
               <Button variant="outline" onClick={handleClose}>
@@ -335,6 +361,12 @@ export function InvoicePreviewDialog({
                     <Badge variant="secondary">
                       {language === "ru" ? "Пропущено дубликатов" : "Skipped duplicates"}:{" "}
                       {result.skipped}
+                    </Badge>
+                  )}
+                  {result.batchesCreated > 0 && (
+                    <Badge variant="outline">
+                      {language === "ru" ? "Партий создано" : "Batches created"}:{" "}
+                      {result.batchesCreated}
                     </Badge>
                   )}
                 </div>

@@ -6,7 +6,10 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { api, buildUrl, type InsertMaterialBatch, type InsertProjectMaterial } from "@shared/routes";
+import { getAuthToken } from "@/lib/auth";
+import { getTelegramInitData } from "@/lib/telegram";
 
 export function useMaterialsCatalogSearch(query?: string) {
   const q = String(query ?? "");
@@ -192,8 +195,19 @@ export function useParseInvoice(objectId: number) {
       const url = buildUrl(api.projectMaterials.parseInvoice.path, { objectId });
       const formData = new FormData();
       formData.append("file", file);
+      const headers: Record<string, string> = {};
+      const jwtToken = getAuthToken();
+      if (jwtToken) {
+        headers["Authorization"] = `Bearer ${jwtToken}`;
+      } else {
+        const initData = getTelegramInitData();
+        if (initData) {
+          headers["X-Telegram-Init-Data"] = initData;
+        }
+      }
       const res = await fetch(url, {
         method: api.projectMaterials.parseInvoice.method,
+        headers,
         body: formData,
         credentials: "include",
       });
@@ -206,15 +220,48 @@ export function useParseInvoice(objectId: number) {
   });
 }
 
+export function useSubmitCorrections() {
+  return useMutation({
+    mutationFn: async (data: z.infer<typeof api.invoiceCorrections.submit.input>) => {
+      const url = api.invoiceCorrections.submit.path;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const jwtToken = getAuthToken();
+      if (jwtToken) {
+        headers["Authorization"] = `Bearer ${jwtToken}`;
+      } else {
+        const initData = getTelegramInitData();
+        if (initData) {
+          headers["X-Telegram-Init-Data"] = initData;
+        }
+      }
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error(`Corrections submit failed: ${res.status}`);
+      }
+      return res.json();
+    },
+    onError: (err) => {
+      console.warn("Failed to submit invoice corrections (non-critical):", err);
+    },
+  });
+}
+
+type BulkCreateInput = z.infer<typeof api.projectMaterials.bulkCreate.input>;
+
 export function useBulkCreateMaterials(objectId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (items: Array<{ nameOverride: string; baseUnitOverride?: string }>) => {
+    mutationFn: async (input: BulkCreateInput) => {
       const url = buildUrl(api.projectMaterials.bulkCreate.path, { objectId });
       const res = await fetch(url, {
         method: api.projectMaterials.bulkCreate.method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify(input),
         credentials: "include",
       });
       if (!res.ok) {

@@ -28,6 +28,7 @@ import {
   schedules,
   scheduleTasks,
   taskMaterials,
+  invoiceParseCorrections,
   users,
   type User,
   type InsertWork,
@@ -154,8 +155,9 @@ export interface IStorage {
   saveProjectMaterialToCatalog(id: number): Promise<MaterialCatalog>;
   bulkCreateProjectMaterials(
     objectId: number,
-    items: Array<{ nameOverride: string; baseUnitOverride?: string }>
-  ): Promise<{ created: number; skipped: number; materials: ProjectMaterial[] }>;
+    items: Array<{ nameOverride: string; baseUnitOverride?: string; qty?: string }>,
+    batchMeta?: { supplierName?: string; deliveryDate?: string }
+  ): Promise<{ created: number; skipped: number; batchesCreated: number; materials: ProjectMaterial[] }>;
 
   // Material Batches
   createBatch(projectMaterialId: number, data: Omit<InsertMaterialBatch, "objectId" | "projectMaterialId">): Promise<MaterialBatch>;
@@ -409,6 +411,36 @@ export interface IStorage {
       }
     >
   >;
+
+  // Invoice Parse Corrections (Feedback Loop)
+  saveInvoiceCorrections(
+    corrections: Array<{
+      objectId: number;
+      userId: number;
+      fieldName: string;
+      originalValue: string;
+      correctedValue: string;
+      itemIndex: number;
+      invoiceNumber?: string;
+      supplierName?: string;
+      pdfFilename?: string;
+    }>
+  ): Promise<number>;
+
+  getInvoiceCorrectionStats(filters?: {
+    objectId?: number;
+    from?: string;
+    to?: string;
+  }): Promise<{
+    totalCorrections: number;
+    byField: Array<{ fieldName: string; count: number }>;
+    topPatterns: Array<{
+      fieldName: string;
+      originalValue: string;
+      correctedValue: string;
+      count: number;
+    }>;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -838,10 +870,11 @@ export class DatabaseStorage implements IStorage {
 
   async bulkCreateProjectMaterials(
     objectId: number,
-    items: Array<{ nameOverride: string; baseUnitOverride?: string }>
-  ): Promise<{ created: number; skipped: number; materials: ProjectMaterial[] }> {
+    items: Array<{ nameOverride: string; baseUnitOverride?: string; qty?: string }>,
+    batchMeta?: { supplierName?: string; deliveryDate?: string }
+  ): Promise<{ created: number; skipped: number; batchesCreated: number; materials: ProjectMaterial[] }> {
     if (items.length === 0) {
-      return { created: 0, skipped: 0, materials: [] };
+      return { created: 0, skipped: 0, batchesCreated: 0, materials: [] };
     }
 
     const existingMaterials = await db
@@ -855,7 +888,9 @@ export class DatabaseStorage implements IStorage {
 
     const seen = new Set<string>();
     const toCreate: Array<{ nameOverride: string; baseUnitOverride: string | null }> = [];
+    const qtyByIndex = new Map<number, string>();
     let skipped = 0;
+    let createIdx = 0;
 
     for (const item of items) {
       const key = item.nameOverride.trim().toLowerCase();
@@ -864,6 +899,10 @@ export class DatabaseStorage implements IStorage {
         continue;
       }
       seen.add(key);
+      if (item.qty) {
+        qtyByIndex.set(createIdx, item.qty);
+      }
+      createIdx++;
       toCreate.push({
         nameOverride: item.nameOverride.trim(),
         baseUnitOverride: item.baseUnitOverride?.trim() || null,
@@ -871,22 +910,51 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (toCreate.length === 0) {
-      return { created: 0, skipped, materials: [] };
+      return { created: 0, skipped, batchesCreated: 0, materials: [] };
     }
 
-    const created = await db
-      .insert(projectMaterials)
-      .values(
-        toCreate.map((item) => ({
-          objectId,
-          nameOverride: item.nameOverride,
-          baseUnitOverride: item.baseUnitOverride,
-          paramsOverride: {},
-        })) as any
-      )
-      .returning();
+    const normalizedDate = batchMeta?.deliveryDate && /^\d{4}-\d{2}-\d{2}$/.test(batchMeta.deliveryDate)
+      ? batchMeta.deliveryDate
+      : null;
 
-    return { created: created.length, skipped, materials: created };
+    return await db.transaction(async (tx) => {
+      const created = await tx
+        .insert(projectMaterials)
+        .values(
+          toCreate.map((item) => ({
+            objectId,
+            nameOverride: item.nameOverride,
+            baseUnitOverride: item.baseUnitOverride,
+            paramsOverride: {},
+          })) as any
+        )
+        .returning();
+
+      let batchesCreated = 0;
+      const batchValues = created
+        .map((mat, idx) => {
+          const rawQty = qtyByIndex.get(idx);
+          if (!rawQty) return null;
+          const normalizedQty = rawQty.replace(',', '.');
+          if (isNaN(Number(normalizedQty)) || Number(normalizedQty) <= 0) return null;
+          return {
+            objectId,
+            projectMaterialId: mat.id,
+            quantity: normalizedQty,
+            unit: mat.baseUnitOverride || null,
+            supplierName: batchMeta?.supplierName?.slice(0, 500) || null,
+            deliveryDate: normalizedDate,
+          };
+        })
+        .filter((v): v is NonNullable<typeof v> => v != null);
+
+      if (batchValues.length > 0) {
+        await tx.insert(materialBatches).values(batchValues as any);
+        batchesCreated = batchValues.length;
+      }
+
+      return { created: created.length, skipped, batchesCreated, materials: created };
+    });
   }
 
   async createBatch(projectMaterialId: number, data: Omit<InsertMaterialBatch, "objectId" | "projectMaterialId">): Promise<MaterialBatch> {
@@ -2907,6 +2975,115 @@ export class DatabaseStorage implements IStorage {
           .where(inArray(scheduleTasks.id, siblingIds));
       }
     });
+  }
+
+  async saveInvoiceCorrections(
+    corrections: Array<{
+      objectId: number;
+      userId: number;
+      fieldName: string;
+      originalValue: string;
+      correctedValue: string;
+      itemIndex: number;
+      invoiceNumber?: string;
+      supplierName?: string;
+      pdfFilename?: string;
+    }>
+  ): Promise<number> {
+    if (corrections.length === 0) return 0;
+
+    const rows = corrections.map((c) => ({
+      objectId: c.objectId,
+      userId: c.userId,
+      fieldName: c.fieldName,
+      originalValue: c.originalValue,
+      correctedValue: c.correctedValue,
+      itemIndex: c.itemIndex,
+      invoiceNumber: c.invoiceNumber ?? null,
+      supplierName: c.supplierName ?? null,
+      pdfFilename: c.pdfFilename ?? null,
+    }));
+
+    await db.insert(invoiceParseCorrections).values(rows);
+    return rows.length;
+  }
+
+  async getInvoiceCorrectionStats(filters?: {
+    objectId?: number;
+    from?: string;
+    to?: string;
+  }): Promise<{
+    totalCorrections: number;
+    byField: Array<{ fieldName: string; count: number }>;
+    topPatterns: Array<{
+      fieldName: string;
+      originalValue: string;
+      correctedValue: string;
+      count: number;
+    }>;
+  }> {
+    const conditions = [];
+    if (filters?.objectId) {
+      conditions.push(eq(invoiceParseCorrections.objectId, filters.objectId));
+    }
+    if (filters?.from) {
+      conditions.push(
+        sql`${invoiceParseCorrections.createdAt} >= ${filters.from}::timestamp`
+      );
+    }
+    if (filters?.to) {
+      conditions.push(
+        sql`${invoiceParseCorrections.createdAt} <= ${filters.to}::timestamp`
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [totalRow] = await db
+      .select({ total: count() })
+      .from(invoiceParseCorrections)
+      .where(whereClause);
+
+    const byField = await db
+      .select({
+        fieldName: invoiceParseCorrections.fieldName,
+        count: count(),
+      })
+      .from(invoiceParseCorrections)
+      .where(whereClause)
+      .groupBy(invoiceParseCorrections.fieldName)
+      .orderBy(desc(count()));
+
+    const topPatterns = await db
+      .select({
+        fieldName: invoiceParseCorrections.fieldName,
+        originalValue: invoiceParseCorrections.originalValue,
+        correctedValue: invoiceParseCorrections.correctedValue,
+        count: count(),
+      })
+      .from(invoiceParseCorrections)
+      .where(whereClause)
+      .groupBy(
+        invoiceParseCorrections.fieldName,
+        invoiceParseCorrections.originalValue,
+        invoiceParseCorrections.correctedValue
+      )
+      .orderBy(desc(count()))
+      .limit(20);
+
+    return {
+      totalCorrections: totalRow?.total ?? 0,
+      byField: byField.map((r) => ({
+        fieldName: r.fieldName,
+        count: Number(r.count),
+      })),
+      topPatterns: topPatterns.map((r) => ({
+        fieldName: r.fieldName,
+        originalValue: r.originalValue,
+        correctedValue: r.correctedValue,
+        count: Number(r.count),
+      })),
+    };
   }
 }
 

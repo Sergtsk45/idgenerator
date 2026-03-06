@@ -1,5 +1,69 @@
 # Changelog
 
+## [2026-03-06] - Feedback Loop: сбор исправлений парсинга счетов
+
+### Добавлено
+- Таблица `invoice_parse_corrections` — хранит пользовательские исправления полей (name, unit, qty) после парсинга PDF-счетов
+- API `POST /api/invoice-corrections` — приём массива исправлений с rate limiting (30 запросов / 15 мин)
+- API `GET /api/invoice-corrections/stats` — агрегированная статистика: общее количество, группировка по полям, топ-20 частых паттернов исправлений
+- Хук `useSubmitCorrections()` — fire-and-forget отправка diff при импорте
+- Функция `computeCorrections()` — вычисление разницы между оригинальными и отредактированными данными
+- SQL-миграция `0022_invoice_parse_corrections.sql`
+
+### Безопасность
+- Проверка владельца `objectId` при submit коррекций (IDOR-защита)
+- Rate limiting на эндпоинте коррекций
+- Ограничение длины `originalValue` / `correctedValue` (max 2000 символов)
+- Zod-валидация всех входных данных, массив до 500 элементов
+
+### Архитектура
+- Fire-and-forget: отправка коррекций не блокирует UI и не влияет на процесс импорта
+- Гранулярность: одна строка = одно исправление одного поля (удобно для агрегации)
+- Индексы по `object_id`, `user_id`, `field_name`, `created_at` для эффективных запросов
+
+---
+
+## [2026-03-06] - Расширение импорта счетов: количество и партии
+
+### Добавлено
+- Поле `qty` (количество) в ответе `parseInvoice` — передаётся из микросервиса invoice-extractor
+- Отображение количества (read-only) в диалоге предпросмотра импорта из PDF-счёта
+- Автоматическое создание `material_batches` при импорте: qty, unit, supplierName, deliveryDate
+- Badge "Партий создано" на экране результата импорта
+- Поля `supplierName` и `deliveryDate` в API `bulkCreate` — общие мета-данные счёта
+
+### Изменено
+- `shared/routes.ts`: расширены Zod-схемы parseInvoice response и bulkCreate input/response
+- `server/storage.ts`: `bulkCreateProjectMaterials` — обёрнут в транзакцию, создаёт партии для позиций с qty
+- `server/routes.ts`: пробрасывает qty из микросервиса, передаёт supplierName/deliveryDate в storage
+- `client/src/hooks/use-materials.ts`: `useBulkCreateMaterials` принимает объект `BulkCreateInput` вместо массива
+- `client/src/components/materials/InvoicePreviewDialog.tsx`: показывает qty, передаёт batch-данные
+
+### Безопасность
+- Нормализация qty (запятая→точка, проверка числового значения) и deliveryDate (YYYY-MM-DD) на backend
+- Ограничение длины supplierName (500 символов), qty (50 символов), deliveryDate (50 символов)
+
+---
+
+## [2026-03-06] - Внедрение микросервиса invoice-extractor
+### Добавлено
+- Docker-образ invoice-extractor: исправлен Dockerfile (CMD, EXPOSE 5000, ENV PYTHONPATH=/app/backend)
+- docker-compose.yml: добавлен PORT=5000 в environment; healthcheck переведён с curl на urllib.request
+
+### Изменено
+- API invoice-extractor (shared/routes.ts): из ответа parseInvoice удалены поля qty, price, amount_w_vat, vat_rate — теперь возвращаются только name и unit
+- server/routes.ts: маппинг ответа микросервиса упрощён; добавлен fallback item.description для Vision-режима
+- InvoicePreviewDialog.tsx: тип ParsedInvoiceData выведен из Zod-схемы (z.infer), убрано отображение qty/price из UI
+
+### Исправлено
+- use-materials.ts: хук useParseInvoice не передавал JWT/Telegram auth headers при загрузке PDF — запрос отклонялся с 401 Unauthorized
+
+### Удалено
+- services/invoice-extractor/component.js (Web Component для Shell App — не используется в проекте)
+- services/invoice-extractor/manifest.json (манифест Shell App — не используется в проекте)
+
+---
+
 ## [2026-03-06] - Внедрение тарифной системы
 
 ### Добавлено

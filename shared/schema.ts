@@ -708,6 +708,39 @@ export const estimatePositionMaterialLinks = pgTable(
 );
 
 
+// === Invoice Parse Corrections (Feedback Loop) ===
+
+export const invoiceParseCorrections = pgTable(
+  "invoice_parse_corrections",
+  {
+    id: serial("id").primaryKey(),
+    objectId: integer("object_id")
+      .notNull()
+      .references(() => objects.id),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    fieldName: text("field_name").notNull(),
+    originalValue: text("original_value").notNull(),
+    correctedValue: text("corrected_value").notNull(),
+    itemIndex: integer("item_index").notNull(),
+    invoiceNumber: text("invoice_number"),
+    supplierName: text("supplier_name"),
+    pdfFilename: text("pdf_filename"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    objectIdIdx: index("ipc_object_id_idx").on(t.objectId),
+    userIdIdx: index("ipc_user_id_idx").on(t.userId),
+    fieldNameIdx: index("ipc_field_name_idx").on(t.fieldName),
+    createdAtIdx: index("ipc_created_at_idx").on(t.createdAt),
+    fieldNameCheck: check(
+      "ipc_field_name_check",
+      sql`field_name IN ('name', 'unit', 'qty')`
+    ),
+  })
+);
+
 // === SCHEMAS ===
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, lastLoginAt: true });
@@ -738,6 +771,10 @@ export const insertTaskMaterialSchema = createInsertSchema(taskMaterials).omit({
 export const insertEstimatePositionMaterialLinkSchema = createInsertSchema(estimatePositionMaterialLinks).omit({
   createdAt: true,
   updatedAt: true,
+});
+export const insertInvoiceParseCorrectionSchema = createInsertSchema(invoiceParseCorrections).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Zod schema for ActWorkItem (explicit source validation)
@@ -835,6 +872,8 @@ export type InsertTaskMaterial = z.infer<typeof insertTaskMaterialSchema>;
 export type EstimatePositionMaterialLink = typeof estimatePositionMaterialLinks.$inferSelect;
 export type InsertEstimatePositionMaterialLink = z.infer<typeof insertEstimatePositionMaterialLinkSchema>;
 
+export type InvoiceParseCorrection = typeof invoiceParseCorrections.$inferSelect;
+export type InsertInvoiceParseCorrection = z.infer<typeof insertInvoiceParseCorrectionSchema>;
 
 // Request/Response Types
 export type CreateMessageRequest = {

@@ -427,18 +427,14 @@ export const api = {
       input: z.object({}),
       responses: {
         200: z.object({
-          items: z.array(z.object({
-            name: z.string(),
-            unit: z.string().optional().default(""),
-            qty: z.union([z.number(), z.string()]).optional(),
-            price: z.union([z.number(), z.string()]).optional(),
-            amount_w_vat: z.union([z.number(), z.string()]).optional(),
-            vat_rate: z.string().optional(),
-          })),
+      items: z.array(z.object({
+        name: z.string(),
+        unit: z.string().optional().default(""),
+        qty: z.string().optional(),
+      })),
           invoice_number: z.string().optional(),
           invoice_date: z.string().optional(),
           supplier_name: z.string().optional(),
-          warnings: z.array(z.string()).optional(),
         }),
         400: z.object({ message: z.string() }),
         502: z.object({ message: z.string() }),
@@ -451,12 +447,16 @@ export const api = {
         items: z.array(z.object({
           nameOverride: z.string().trim().min(1),
           baseUnitOverride: z.string().trim().optional(),
+          qty: z.string().max(50).optional(),
         })).min(1).max(500),
+        supplierName: z.string().max(500).optional(),
+        deliveryDate: z.string().max(50).optional(),
       }),
       responses: {
         200: z.object({
           created: z.number().int().nonnegative(),
           skipped: z.number().int().nonnegative(),
+          batchesCreated: z.number().int().nonnegative(),
           materials: z.array(z.custom<typeof projectMaterials.$inferSelect>()),
         }),
         400: z.object({ message: z.string() }),
@@ -1263,6 +1263,58 @@ export const api = {
         204: z.any(),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
+      },
+    },
+  },
+  invoiceCorrections: {
+    submit: {
+      method: "POST" as const,
+      path: "/api/invoice-corrections",
+      input: z.object({
+        objectId: z.number().int().positive(),
+        invoiceNumber: z.string().max(200).optional(),
+        supplierName: z.string().max(500).optional(),
+        pdfFilename: z.string().max(500).optional(),
+        corrections: z
+          .array(
+            z.object({
+              itemIndex: z.number().int().min(0),
+              fieldName: z.enum(["name", "unit", "qty"]),
+              originalValue: z.string().max(2000),
+              correctedValue: z.string().max(2000),
+            })
+          )
+          .min(1)
+          .max(500),
+      }),
+      responses: {
+        200: z.object({ saved: z.number().int().nonnegative() }),
+        400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+      },
+    },
+    stats: {
+      method: "GET" as const,
+      path: "/api/invoice-corrections/stats",
+      responses: {
+        200: z.object({
+          totalCorrections: z.number().int().nonnegative(),
+          byField: z.array(
+            z.object({
+              fieldName: z.string(),
+              count: z.number().int().nonnegative(),
+            })
+          ),
+          topPatterns: z.array(
+            z.object({
+              fieldName: z.string(),
+              originalValue: z.string(),
+              correctedValue: z.string(),
+              count: z.number().int().nonnegative(),
+            })
+          ),
+        }),
+        401: z.object({ error: z.string() }),
       },
     },
   },
