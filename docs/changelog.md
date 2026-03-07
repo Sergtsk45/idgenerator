@@ -2,10 +2,14 @@
 
 ## [2026-03-07] - Исправление импорта PDF счетов
 
+### Добавлено
+- `docs/deploy-guide.md` — руководство по деплою с памяткой для администратора сервера (критические настройки Docker Compose, порядок деплоя, проверки, частые ошибки)
+
 ### Исправлено
-- `INVOICE_EXTRACTOR_URL` в `.env` исправлен с `http://localhost:5050` на `http://localhost:5002` (реальный порт Flask-сервиса)
+- `INVOICE_EXTRACTOR_URL` в `.env` исправлен с `http://localhost:5050` на `http://localhost:5002` (реальный порт Flask-сервиса для локальной разработки)
 - `ALLOWED_EXTRACTOR_URLS` в `server/routes.ts` дополнен портом `5002` (allowlist для SSRF-защиты не содержал актуального порта)
 - Применена миграция `0024_invoice_imports.sql` — таблица `invoice_imports` не существовала в БД, что вызывало падение middleware `requireQuota` с ошибкой 500
+- На продакшен-сервере: `app/docker-compose.yml` (invoice-extractor подключён к сети `n8n_web`), `docker-compose.yml` (добавлена переменная `INVOICE_EXTRACTOR_URL=http://invoice-extractor:5000`)
 
 ## [2026-03-07] - Несколько объектов строительства (multi-object)
 
