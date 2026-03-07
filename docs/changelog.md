@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-03-07] - Исправление импорта PDF счетов
+
+### Исправлено
+- `INVOICE_EXTRACTOR_URL` в `.env` исправлен с `http://localhost:5050` на `http://localhost:5002` (реальный порт Flask-сервиса)
+- `ALLOWED_EXTRACTOR_URLS` в `server/routes.ts` дополнен портом `5002` (allowlist для SSRF-защиты не содержал актуального порта)
+- Применена миграция `0024_invoice_imports.sql` — таблица `invoice_imports` не существовала в БД, что вызывало падение middleware `requireQuota` с ошибкой 500
+
 ## [2026-03-07] - Несколько объектов строительства (multi-object)
 
 ### Добавлено

@@ -136,6 +136,7 @@ const voiceUpload = multer({
 });
 
 const ALLOWED_EXTRACTOR_URLS = [
+  'http://localhost:5002',
   'http://localhost:5050',
   'http://invoice-extractor:5000',
 ];
