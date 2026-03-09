@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type GenerateActRequest } from "@shared/routes";
+import { apiRequest } from "@/lib/queryClient";
 
 export function useActs() {
   return useQuery({
     queryKey: [api.acts.list.path],
     queryFn: async () => {
-      const res = await fetch(api.acts.list.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch acts");
+      const res = await apiRequest("GET", api.acts.list.path);
       return api.acts.list.responses[200].parse(await res.json());
     },
   });
@@ -17,8 +17,7 @@ export function useAct(id: number) {
     queryKey: [api.acts.get.path, id],
     queryFn: async () => {
       const url = buildUrl(api.acts.get.path, { id });
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch act details");
+      const res = await apiRequest("GET", url);
       return api.acts.get.responses[200].parse(await res.json());
     },
     enabled: !!id,

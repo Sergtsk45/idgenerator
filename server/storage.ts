@@ -2173,8 +2173,8 @@ export class DatabaseStorage implements IStorage {
       const [updated] = await db
         .update(acts)
         .set({
-          // Backfill objectId for legacy/older records if missing.
-          objectId: ((existing as any).objectId ?? defaultObject.id) as any,
+          // Always reassign to current object (fixes legacy records and cross-object actNumber conflicts).
+          objectId: defaultObject.id as any,
           actNumber: data.actNumber as any,
           actTemplateId: (data.actTemplateId ?? (existing as any).actTemplateId ?? null) as any,
           dateStart: (data.dateStart ?? null) as any,
