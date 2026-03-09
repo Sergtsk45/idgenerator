@@ -50,6 +50,41 @@ import { cn } from "@/lib/utils";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
 
+const SPLIT_ERROR_MESSAGES: Record<string, { ru: string; en: string }> = {
+  "Sum of split quantities exceeds original task quantity": {
+    ru: "Сумма объёмов частей превышает исходный объём задачи. Уменьшите значения.",
+    en: "Sum of split quantities exceeds the original task quantity. Please reduce the values.",
+  },
+  "Split date is out of task date range": {
+    ru: "Дата разделения выходит за пределы периода задачи.",
+    en: "Split date is outside the task date range.",
+  },
+  "Schedule task not found": {
+    ru: "Задача не найдена.",
+    en: "Schedule task not found.",
+  },
+};
+
+function parseSplitTaskError(rawMessage: string | undefined, language: string): string {
+  const fallback = language === "ru" ? "Не удалось разделить задачу" : "Failed to split task";
+  if (!rawMessage) return fallback;
+
+  const jsonMatch = rawMessage.match(/^\d+: (.+)$/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1]);
+      const serverMsg: string = parsed?.message ?? "";
+      const mapped = SPLIT_ERROR_MESSAGES[serverMsg];
+      if (mapped) return language === "ru" ? mapped.ru : mapped.en;
+      if (serverMsg) return serverMsg;
+    } catch {
+      // not JSON — fall through
+    }
+  }
+
+  return rawMessage || fallback;
+}
+
 // Helper: Generate consistent color for split task group
 function getSplitTaskColor(splitGroupId: string | null | undefined): string | null {
   if (!splitGroupId) return null;
@@ -573,7 +608,7 @@ export default function Schedule() {
       });
       closeSplitDialog();
     } catch (err: any) {
-      const errorMessage = err?.message || (language === "ru" ? "Не удалось разделить задачу" : "Failed to split task");
+      const errorMessage = parseSplitTaskError(err?.message, language);
       toast({
         title: t.errorTitle,
         description: errorMessage,
