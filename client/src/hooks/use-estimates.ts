@@ -7,6 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { createApiHeaders } from "@/lib/api-headers";
 
 export type DeleteEstimateInput = {
   id: number;
@@ -17,7 +18,7 @@ export function useEstimates() {
   return useQuery({
     queryKey: [api.estimates.list.path],
     queryFn: async () => {
-      const res = await fetch(api.estimates.list.path, { credentials: "include" });
+      const res = await fetch(api.estimates.list.path, { headers: createApiHeaders(), credentials: "include" });
       if (!res.ok) {
         throw new Error("Failed to fetch estimates");
       }
@@ -32,7 +33,7 @@ export function useEstimate(id: number | null) {
     enabled: typeof id === "number" && id > 0,
     queryFn: async () => {
       const url = buildUrl(api.estimates.get.path, { id: id as number });
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, { headers: createApiHeaders(), credentials: "include" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "Failed to fetch estimate");
@@ -51,7 +52,7 @@ export function useImportEstimate() {
 
       const res = await fetch(api.estimates.import.path, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: createApiHeaders(true),
         body,
         credentials: "include",
       });
@@ -73,7 +74,7 @@ export function useDeleteEstimate() {
     mutationFn: async (input: DeleteEstimateInput) => {
       const baseUrl = buildUrl(api.estimates.delete.path, { id: input.id });
       const url = input.resetSchedule ? `${baseUrl}?resetSchedule=1` : baseUrl;
-      const res = await fetch(url, { method: api.estimates.delete.method, credentials: "include" });
+      const res = await fetch(url, { method: api.estimates.delete.method, headers: createApiHeaders(), credentials: "include" });
       if (!res.ok && res.status !== 204) {
         const err = await res.json().catch(() => ({}));
         const message = err.message || "Failed to delete estimate";

@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type InsertWork } from "@shared/routes";
+import { createApiHeaders } from "@/lib/api-headers";
 
 export function useWorks() {
   return useQuery({
     queryKey: [api.works.list.path],
     queryFn: async () => {
-      const res = await fetch(api.works.list.path, { credentials: "include" });
+      const res = await fetch(api.works.list.path, { headers: createApiHeaders(), credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch works");
       return api.works.list.responses[200].parse(await res.json());
     },
@@ -18,7 +19,7 @@ export function useCreateWork() {
     mutationFn: async (data: InsertWork) => {
       const res = await fetch(api.works.create.path, {
         method: api.works.create.method,
-        headers: { "Content-Type": "application/json" },
+        headers: createApiHeaders(true),
         body: JSON.stringify(data),
         credentials: "include",
       });
@@ -44,7 +45,7 @@ export function useImportWorks() {
       try {
         res = await fetch(api.works.import.path, {
           method: api.works.import.method,
-          headers: { "Content-Type": "application/json" },
+          headers: createApiHeaders(true),
           body: JSON.stringify(data),
           credentials: "include",
         });
@@ -81,7 +82,7 @@ export function useClearWorks() {
     mutationFn: async (input?: ClearWorksInput) => {
       const baseUrl = api.works.delete.path;
       const url = input?.resetSchedule ? `${baseUrl}?resetSchedule=1` : baseUrl;
-      const res = await fetch(url, { method: api.works.delete.method, credentials: "include" });
+      const res = await fetch(url, { method: api.works.delete.method, headers: createApiHeaders(), credentials: "include" });
       if (!res.ok && res.status !== 204) {
         const err = await res.json().catch(() => ({}));
         const message = err.message || "Failed to clear works";

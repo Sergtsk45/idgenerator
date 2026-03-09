@@ -7,6 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { createApiHeaders } from "@/lib/api-headers";
 
 export type DeleteWorkCollectionInput = {
   id: number;
@@ -17,7 +18,7 @@ export function useWorkCollections() {
   return useQuery({
     queryKey: [api.workCollections.list.path],
     queryFn: async () => {
-      const res = await fetch(api.workCollections.list.path, { credentials: "include" });
+      const res = await fetch(api.workCollections.list.path, { headers: createApiHeaders(), credentials: "include" });
       if (!res.ok) {
         throw new Error("Failed to fetch work collections");
       }
@@ -32,7 +33,7 @@ export function useWorkCollection(id: number | null) {
     enabled: typeof id === "number" && id > 0,
     queryFn: async () => {
       const url = buildUrl(api.workCollections.get.path, { id: id as number });
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, { headers: createApiHeaders(), credentials: "include" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "Failed to fetch work collection");
@@ -51,7 +52,7 @@ export function useImportWorkCollection() {
 
       const res = await fetch(api.workCollections.import.path, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: createApiHeaders(true),
         body,
         credentials: "include",
       });
@@ -73,7 +74,7 @@ export function useDeleteWorkCollection() {
     mutationFn: async (input: DeleteWorkCollectionInput) => {
       const baseUrl = buildUrl(api.workCollections.delete.path, { id: input.id });
       const url = input.resetSchedule ? `${baseUrl}?resetSchedule=1` : baseUrl;
-      const res = await fetch(url, { method: api.workCollections.delete.method, credentials: "include" });
+      const res = await fetch(url, { method: api.workCollections.delete.method, headers: createApiHeaders(), credentials: "include" });
       if (!res.ok && res.status !== 204) {
         const err = await res.json().catch(() => ({}));
         const message = err.message || "Failed to delete work collection";
