@@ -16,7 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, Edit2 } from "lucide-react";
 import { useBulkCreateMaterials, useSubmitCorrections } from "@/hooks/use-materials";
@@ -201,7 +200,7 @@ export function InvoicePreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-xl">
             {phase === "result"
@@ -230,9 +229,9 @@ export function InvoicePreviewDialog({
         </DialogHeader>
 
         {phase === "preview" && (
-          <>
+          <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
             {items.length > 0 && (
-              <div className="flex items-center gap-2 py-2 border-b">
+              <div className="shrink-0 flex items-center gap-2 py-2 border-b">
                 <Checkbox
                   id="select-all"
                   checked={allSelected}
@@ -248,7 +247,7 @@ export function InvoicePreviewDialog({
               </div>
             )}
 
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="min-h-0 flex-1 overflow-y-auto -mx-6 px-6">
               <div className="space-y-3 py-2">
                 {items.map((item, idx) => {
                   const isSelected = selectedItems.has(idx);
@@ -320,9 +319,9 @@ export function InvoicePreviewDialog({
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
 
-            <DialogFooter className="gap-2 pt-2">
+            <DialogFooter className="shrink-0 gap-2 pt-2">
               <Button variant="outline" onClick={handleClose}>
                 {language === "ru" ? "Отмена" : "Cancel"}
               </Button>
@@ -333,7 +332,7 @@ export function InvoicePreviewDialog({
                 {language === "ru" ? "Импортировать" : "Import"} ({selectedCount})
               </Button>
             </DialogFooter>
-          </>
+          </div>
         )}
 
         {phase === "importing" && (
