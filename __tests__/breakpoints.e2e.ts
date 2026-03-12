@@ -68,4 +68,21 @@ test.describe('Breakpoint Shell Transitions', () => {
     await expect(chatPanel).toBeVisible();
   });
 });
+
+// Sprint 3 – Works page tablet adaptation
+// test('works sidebar visible on tablet (lg+)', async ({ page }) => {
+//   await page.goto('/works');
+//   await expect(page.locator('[data-testid="works-sidebar"]')).toBeVisible();
+// });
+// test('works sticky first column frozen', async ({ page }) => {
+//   await page.goto('/works');
+//   // check first th has position sticky
+// });
+// test('works import preview dialog shown before upload', async ({ page }) => {
+//   // stub file upload and check dialog appears
+// });
+// test('works export button triggers download', async ({ page }) => {
+//   await page.goto('/works');
+//   await expect(page.locator('[data-testid="btn-export-works"]')).toBeVisible();
+// });
 */
