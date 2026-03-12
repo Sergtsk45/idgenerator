@@ -256,8 +256,13 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* lg+ two-column layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Main chat column */}
+        <div className="flex flex-1 flex-col min-w-0 overflow-hidden relative" data-testid="home-chat-column">
+
       <ScrollArea ref={scrollRef} className="flex-1 px-4 py-6 mb-36 md:mb-32 lg:mb-28">
-        <div className="max-w-md mx-auto min-h-[calc(100vh-12rem)] flex flex-col justify-end">
+        <div className="mx-auto w-full max-w-3xl min-h-[calc(100vh-12rem)] flex flex-col justify-end">
           {showOnboarding && (
             <div className="bg-card border rounded-2xl p-4 mb-6 relative shadow-sm">
               <button
@@ -353,8 +358,8 @@ export default function Home() {
       </ScrollArea>
 
       {/* Панель ввода */}
-      <div className="fixed bottom-16 left-0 right-0 border-t border-border/40 bg-background px-4 pt-3 pb-3 md:bottom-0 lg:left-72">
-        <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-2">
+      <div className="fixed bottom-16 left-0 right-0 border-t border-border/40 bg-background px-4 md:px-6 lg:px-8 pt-3 pb-3 md:bottom-0">
+        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-2">
           <div className="flex items-end gap-2">
             {/* Поле ввода с микрофоном внутри */}
             <div className="relative flex-1">
@@ -389,7 +394,7 @@ export default function Home() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className={`absolute right-1 bottom-1 h-8 w-8 transition-all ${
+                  className={`absolute right-1 bottom-1 h-8 w-8 md:h-9 md:w-9 transition-all ${
                     isRecording
                       ? "text-red-500 animate-pulse bg-red-50 dark:bg-red-950/30"
                       : "text-muted-foreground/60"
@@ -433,6 +438,24 @@ export default function Home() {
           </p>
         </form>
       </div>
+
+        </div>{/* end Main chat column */}
+
+        {/* Right panel — recent entries (lg+) */}
+        <aside className="hidden lg:flex lg:w-80 xl:w-96 flex-col border-l border-border/40 bg-muted/20 p-4 shrink-0 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+            {language === "ru" ? "Последние записи" : "Recent entries"}
+          </h3>
+          {sortedMessages.slice(-10).reverse().map((msg) => (
+            <div key={msg.id} className="mb-2 p-2 rounded-lg bg-card border border-border/40 text-xs">
+              <p className="text-muted-foreground truncate">{msg.messageRaw}</p>
+            </div>
+          ))}
+          {sortedMessages.length === 0 && (
+            <p className="text-xs text-muted-foreground">{t.noMessages}</p>
+          )}
+        </aside>
+      </div>{/* end lg+ two-column layout */}
 
     </ResponsiveShell>
   );

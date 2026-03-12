@@ -45,5 +45,27 @@ test.describe('Breakpoint Shell Transitions', () => {
     const hamburger = page.locator('[aria-label="Открыть меню"]');
     await expect(hamburger).toBeHidden();
   });
+
+  test('Login page shows two-column layout on tablet', async ({ page }) => {
+    await page.goto('/login');
+    await page.setViewportSize(BREAKPOINTS.tablet);
+    // Info panel visible on lg+
+    const infoPanel = page.locator('[data-testid="auth-info-panel"]');
+    await expect(infoPanel).toBeVisible();
+  });
+
+  test('Login page shows single column on mobile', async ({ page }) => {
+    await page.goto('/login');
+    await page.setViewportSize(BREAKPOINTS.mobile);
+    const infoPanel = page.locator('[data-testid="auth-info-panel"]');
+    await expect(infoPanel).toBeHidden();
+  });
+
+  test('Home chat area expands on tablet', async ({ page }) => {
+    await page.goto('/');
+    await page.setViewportSize(BREAKPOINTS.tablet);
+    const chatPanel = page.locator('[data-testid="home-chat-column"]');
+    await expect(chatPanel).toBeVisible();
+  });
 });
 */
