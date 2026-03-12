@@ -1,5 +1,38 @@
 # Changelog
 
+## [2026-03-10] - Финальная нормализация экранных ТЗ 02-04 для tablet UI
+
+### Изменено
+- `docs/TZfrontend/02-auth-home-worklog.md` — выровнены требования по плотности WorkLog и touch area: визуальная высота строк может быть компактной, но интерактивные зоны обязаны сохранять `44x44px+`; добавлен единый блок `Design System & Touch Targets`; убраны противоречивые формулировки про offline-очередь в пользу network error/retry сценариев.
+- `docs/TZfrontend/03-works-estimates.md` — добавлен единый блок `Design System & Touch Targets` для таблиц, аккордеонов, bulk actions и import-flow; в acceptance criteria зафиксированы обязательные проверки `44x44px+` и отсутствие hardcoded visual values.
+- `docs/TZfrontend/04-schedule-acts.md` — добавлен единый блок `Design System & Touch Targets` для Gantt toolbar, modal actions, export controls и form triggers; в acceptance criteria добавлены явные проверки `44x44px+` и обязательное использование design-system tokens.
+- `docs/TZfrontend/07-qa-rollout.md` — QA-документация очищена от legacy offline queue/sync требований: risk register, unit/integration/E2E scenarios, rollout checklist и release-notes template переведены на модель `network retry + state preservation`, а audit Design System расширен до проверки всех hardcoded visual values.
+- `docs/tasktracker.md` — зафиксирован отдельный финальный шаг по нормализации экранных ТЗ `02-04` и повторной консистентной проверке всего пакета `docs/TZfrontend/00-08`.
+
+## [2026-03-10] - Design System Integration в Foundation Documentation (Tablet UI)
+
+### Изменено
+- ✅ `docs/TZfrontend/README.md` — добавлена папка `design-system-12.03.2026-design-system/` в структуру документации как **обязательный DESIGN SYSTEM**; указаны ссылки на все 4 файла (style-guide, implementation-guide, CSS, JSON)
+- ✅ `docs/TZfrontend/01-foundation-platform-shell.md` — добавлен раздел **1.5 Design System Integration (Обязательное требование)** с детализацией:
+  - Список что регулируется Design System (цвета, spacing, radius, typography, touch targets, animations)
+  - Что остается отдельным инфраструктурным слоем (safe-area, Telegram tokens)
+  - Как применять Design System (CSS переменные, mapping к компонентам)
+  - Code Review rules (запрет на hardcoding, минимум 44px hit area для interactive контролов)
+- ✅ `docs/TZfrontend/00-development-plan.md` — добавлено в раздел 3 (Basic Requirements) главное требование **Design System Compliance** с пометкой ⭐; обновлен раздел 6 (Dependencies) с явным указанием Design System как обязательной зависимости; обновлены критерии DoD (раздел 8) с проверкой design-system соответствия и code review rules
+- ✅ `docs/TZfrontend/08-frontend-sprints-plan.md` — интегрирован Design System во все спринты:
+  - Добавлено напоминание в раздел 5 перед Sprint 1 про обязательность Design System
+  - Sprint 1: добавлены 2 новые задачи (1.3, 1.12) про интеграцию и review design-system tokens
+  - Sprint 2–6: обновлены все Acceptance Criteria с требованием **Design System Compliance** и указанием каких tokens использовать
+  - Sprint 6 (QA): добавлена явная audit-задача на проверку 0 hardcoded значений
+  - Обновлен Чек-лист для Tech Lead (раздел 11) с пунктом про обязательное изучение Design System и интеграцию tokens
+  - Добавлено в глоссарий (раздел 10.3) определение Design System
+
+### Зафиксировано
+- ✅ Design System `docs/TZfrontend/design-system-12.03.2026-design-system/` (style-guide, implementation-guide, CSS, JSON) является **обязательным Visual Contract** для всех компонентов tablet UI
+- ✅ **Правило accessibility**: touch targets минимум **44px** для всех interactive controls (проектный minimum; design-system может содержать 40px как нижнюю границу токенов, но размер hit area не должен быть ниже 44px)
+- ✅ **Code Review Gate**: Все PR должны быть проверены на использование design-system tokens (no hardcoded цветов/размеров/spacing)
+- ✅ Foundation документация полностью синхронизирована и готова для разработки Sprint 1+ с соблюдением Design System
+
 ## [2026-03-12] - Dev bootstrap дефолтного admin-логина
 
 ### Добавлено

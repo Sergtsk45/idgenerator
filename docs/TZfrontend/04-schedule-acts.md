@@ -677,6 +677,14 @@
 - **API**: rate limiting for generate-acts (server-side)
 - **Sensitive data**: no tokens in logs, no leaked auth headers
 
+### Design System & Touch Targets
+- Все визуальные значения экранов `Schedule`, `Task Editor`, `Split Task` и `Acts` должны браться из `docs/TZfrontend/design-system-12.03.2026-design-system/`
+- Запрещены hardcoded colors, spacing, radius, elevations, typography sizes и размеры контролов, если для них есть design tokens
+- Все интерактивные элементы обязаны иметь hit area не меньше `44x44px`: gantt toolbar buttons, zoom controls, tabs, row actions, modal actions, date pickers, checkboxes, radio buttons, export actions, dialog close buttons
+- Если отдельный visual token задаёт размер `40px`, необходимо расширить реальную интерактивную область до `44px+` через padding, wrapper или дополнительную hit zone
+- Dense gantt layouts, timeline controls и compact modal toolbars не являются исключением: уменьшать можно только визуальную часть, но не touch area
+- Для gantt interactions и modal workflows обязательны состояния `default`, `hover`, `active`, `focus-visible`, `disabled`; focus-visible должен быть явно заметен и в светлой, и в тёмной теме
+
 ---
 
 ## 6. Edge Cases, Error States, Loading States
@@ -701,7 +709,7 @@
 - Task with duration = 1 day (display correctly in Gantt)
 - Many overlapping tasks (zoom out to see all, may be crowded)
 - Task split creates 3+ parts (multiple splits on same task)
-- Orphaned materials after split (if independentMaterials = false, sync works)
+- Orphaned materials after split (if `independentMaterials = false`, material links must stay consistent with the updated task structure)
 - Circular dependencies (если есть predecessor/successor, validate no cycles)
 
 ---
@@ -800,6 +808,8 @@
 - [ ] Keyboard navigation: Tab, Enter, Escape работают
 - [ ] Touch: drag-to-scroll, modal interactions работают на touchscreen
 - [ ] WCAG 2.1 AA: color contrast, screen reader friendly
+- [ ] Все интерактивные элементы, включая gantt toolbar, modal actions и export controls, соответствуют правилу hit area `44x44px+`
+- [ ] Визуальные значения экранов берутся из Design System; hardcoded visual values в tablet UI отсутствуют
 - [ ] No console errors, no warnings (except third-party)
 
 ---

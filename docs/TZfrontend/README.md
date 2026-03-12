@@ -28,6 +28,7 @@
 | **07-qa-rollout.md** | Стратегия QA и rollout для всех экранов. Unit & E2E тесты, visual regression, accessibility, performance, security, breakpoint matrix, phased rollout. |
 | **08-frontend-sprints-plan.md** | 📋 **[ГЛАВНЫЙ ДОКУМЕНТ ДЛЯ РАЗРАБОТЧИКА]** Приоритизированный план работ по 6 спринтам (1–2 недели каждый). Roadmap, scope каждого спринта, задачи, зависимости, риски, критерии готовности. Критический путь и рекомендации по параллелизму/демо. |
 | **strateg.md** | Git-стратегия именно для этого проекта: ветка `feature/tablet-ui`, дочерние ветки по спринтам и задачам, порядок merge, правила тестового деплоя и работа с новыми экранами/кнопками по итогам тестов. |
+| **design-system-12.03.2026-design-system/** ⭐ | **[ОБЯЗАТЕЛЬНЫЙ VISUAL CONTRACT]** Design System для всех компонентов tablet UI. Содержит токены (цвета, spacing, typography, touch targets), правила реализации, CSS переменные, JSON для инструментов. |
 
 ---
 
@@ -84,28 +85,35 @@
 
 ## Обязательные исходные документы
 
-Перед началом разработки изучите:
+Перед началом разработки изучите **в следующем порядке**:
 
-1. **`/docs/project.md`**
+1. **`/docs/TZfrontend/design-system-12.03.2026-design-system/`** ⭐ **[СНАЧАЛА]**
+   - `design-system-12.03.2026-style-guide.md` — дизайн-философия, принципы, токены
+   - `design-system-12.03.2026-implementation-guide.md` — как внедрять компоненты согласно design system
+   - `design-system-12.03.2026-design-system.css` — CSS переменные и токены
+   - `design-system-12.03.2026-design-system.json` — JSON формат токенов для инструментов
+   - ⚠️ **Все компоненты tablet UI должны строго следовать этому design system** (цвета, размеры, spacing, touch targets)
+
+2. **`/docs/project.md`**
    - Архитектура приложения, мультипровайдерная аутентификация
    - Telegram MiniApp интеграция, типы для WebApp API
    - Структура репозитория
 
-2. **`/docs/frontend.md`**
+3. **`/docs/frontend.md`**
    - Технологический стек: React 18, TypeScript, Vite, Wouter, TanStack Query, Zustand
    - Компоненты shadcn/ui, управление состоянием
    - UI-паттерны и стилизация (Tailwind + CSS-переменные)
 
-3. **`/docs/telegram-buttons-guide.md`**
+4. **`/docs/telegram-buttons-guide.md`**
    - Управление MainButton и BackButton в Telegram
    - Интеграция с Telegram WebApp API
    - Примеры использования хука `useTelegramMainButton()`
 
-4. **`/docs/telegram-haptic-guide.md`**
+5. **`/docs/telegram-haptic-guide.md`**
    - Тактильная обратная связь (impact, notification, selectionChanged)
    - Использование хука `useTelegramHaptic()`
 
-5. **Файлы компонентов** (в репозитории):
+6. **Файлы компонентов** (в репозитории):
    - `/client/src/components/Header.tsx` — текущая реализация (max-w-md, fixed sticky)
    - `/client/src/components/BottomNav.tsx` — текущая реализация (fixed bottom, 5 вкладок)
    - `/client/src/pages/Schedule.tsx` — сложный экран с Ганта, диалогами, state management

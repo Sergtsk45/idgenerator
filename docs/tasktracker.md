@@ -2,6 +2,31 @@
 
 ---
 
+## Задача: Актуализация ТЗ TZfrontend под Design System и правила Touch Targets
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-10
+- **Дата завершения**: 2026-03-10
+- **Описание**: Корректировка пакета TZ (Technical Specification) для tablet UI в соответствии с дизайн-системой `docs/TZfrontend/design-system-12.03.2026-design-system` и установка проектного правила на минимальный размер touch targets (44px+) для мобильных и планшетных управляющих элементов. Design system зафиксирован как обязательный visual contract для всего фронтенда.
+- **Шаги выполнения**:
+  - [x] Обновить README в TZfrontend с ссылкой на design system
+  - [x] Актуализировать foundation docs (breakpoints, colors, typography) с reference на design system
+  - [x] Обновить screen docs (layout patterns, component usage) с дизайн-системой
+  - [x] Обновить QA docs с touch target requirements (44px+)
+  - [x] Зафиксировать design system как обязательный visual contract
+  - [x] Установить проектное правило minimum touch target 44px+ для mobile/tablet controls
+  - [x] Финально нормализовать экранные ТЗ `02-04` под единый стандарт Design System и hit area `44px+`
+  - [x] Выполнить повторную консистентную проверку пакета `docs/TZfrontend/00-08`
+- **Файлы**:
+  - [x] `docs/TZfrontend/README.md`
+  - [x] `docs/TZfrontend/01-foundation-platform-shell.md` — foundation requirements
+  - [x] `docs/TZfrontend/02-auth-home-worklog.md`, `03-works-estimates.md`, `04-schedule-acts.md`, `05-source-data-materials-documents.md`, `06-objects-settings-admin.md` — screen specs
+  - [x] `docs/TZfrontend/07-qa-rollout.md` — QA strategy
+  - [x] `docs/TZfrontend/design-system-12.03.2026-design-system/` — design system reference
+- **Результат**: Пакет TZ теперь полностью синхронизирован с design system. Design system назначен обязательным visual contract. Установлено проектное правило на минимальный touch target размер 44px+ для всех управляющих элементов на мобильных и планшетных устройствах. Экранные ТЗ `02-04` дополнительно выровнены по единому стандарту: одинаковые требования к tokens, interactive states, acceptance criteria и без противоречий по `40px`/offline-очередям.
+- **Зависимости**: Design System v1 (2026-03-12), tablet UI specification
+
+---
+
 ## Задача: Dev default admin для локальной визуальной проверки
 - **Статус**: Завершена
 - **Дата начала**: 2026-03-12

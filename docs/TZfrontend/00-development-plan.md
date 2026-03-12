@@ -52,9 +52,10 @@
 ## 3. Основные требования (High-Level)
 
 ### Архитектурные требования
+- ⭐ **Design System Compliance** — ВСЕ компоненты tablet UI должны строго соответствовать Design System (см. `design-system-12.03.2026-design-system/`). Запрет на hardcoded цвета, размеры, spacing — только design-system tokens
 - **Mobile-first approach** — мобильные стили базовые, tablet стили — расширение
 - **CSS-in-Tailwind** — использовать только responsive utilities, никаких media queries в компонентах
-- **Responsive tokens** — tailwind переменные для spacing, font-size по breakpoints
+- **Responsive tokens** — tailwind переменные для spacing, font-size по breakpoints, дополняющие design-system
 - **State isolation** — при адаптации не ломать текущую модель данных; dirty-state и переключение объекта должны обрабатываться явно
 - **Object-aware queries** — все хуки `useWorks()`, `useMessages()`, `useActs()` и связанные запросы должны корректно реагировать на смену текущего объекта
 - **Query cache invalidation** — явная инвалидация при переключении объекта
@@ -381,6 +382,7 @@
 ## 6. Dependencies
 
 ### Internal
+- **Design System** (`docs/TZfrontend/design-system-12.03.2026-design-system/`): ⭐ Обязательный visual contract для всех компонентов tablet UI
 - Backend API: no changes required (существующий API compatible)
 - Database: no changes required
 - Authentication: existing JWT + Telegram auth работает везде
@@ -391,9 +393,9 @@
 - **Tailwind CSS** (уже установлена): responsive utilities
 
 ### Team Dependencies
-- **QA**: cross-browser тестирование на tablet
-- **Design**: tablet wireframes / mockups (если нет — используем mobile-first approach)
-- **Product**: approval для tablet-specific features (sidebar, master-detail)
+- **QA**: cross-browser тестирование на tablet, проверка соответствия Design System
+- **Design**: Design System (`design-system-12.03.2026-design-system/` уже готов); tablet wireframes / mockups на основе design-system
+- **Product**: approval для tablet-specific features (sidebar, master-detail), review design-system compliance
 
 ---
 
@@ -415,9 +417,10 @@
 
 Каждая фаза считается **готовой** если:
 
+- ✅ **Design System Compliance**: Все компоненты используют design-system tokens (цвета, sizes, spacing). Нет hardcoded значений кроме Telegram theme fallback
+- ✅ **Code Review**: Reviewer проверил соответствие design-system (CSS переменные, токены, touch targets >= 44px для interactive controls)
 - ✅ Все user stories implementед
 - ✅ Acceptance criteria пройдены
-- ✅ Код reviewed (сниженный дозвол на merge)
 - ✅ Unit tests: coverage ≥ 80% для new code
 - ✅ E2E tests: все основные flows протестированы
 - ✅ Cross-browser: tested на Chrome, Safari, Firefox

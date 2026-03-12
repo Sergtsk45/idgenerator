@@ -67,6 +67,55 @@ export default {
 
 ---
 
+## 1.5 Design System Integration (Обязательное требование)
+
+**Все визуальные значения компонентов tablet UI должны браться из Design System**. Design System находится в папке `docs/TZfrontend/design-system-12.03.2026-design-system/` и содержит:
+
+### Что регулируется Design System
+
+- 🎨 **Цвета** (primary, secondary, backgrounds, borders, text) — ТОЛЬКО через design-system tokens, запрет на hardcoded цвета
+- 📐 **Размеры и Spacing** (padding, margin, gap, width, height) — ТОЛЬКО design-system tokens
+- 🔲 **Border Radius** (для карточек, кнопок, input) — design-system values
+- 📏 **Typography** (font-size, font-weight, line-height) — design-system typography tokens
+- 👆 **Touch Targets** — минимум **44px+** для всех interactive controls (проектное правило accessibility; design-system может содержать 40px как нижнюю границу токенов, но размер hit area контролов не должен быть ниже 44px)
+- ✨ **Shadows & Elevation** — design-system shadow tokens
+- ⏱️ **Animations & Transitions** — design-system timing functions
+
+### Что остается отдельным инфраструктурным слоем
+
+- Safe-area и Telegram-specific tokens (`--tg-theme-*`)
+- Platform-specific adjustments (iOS/Android viewport handling)
+- Breakpoint-based layout structure
+
+### Как применять Design System
+
+1. **В CSS/Tailwind**: используйте CSS переменные из `design-system-12.03.2026-design-system.css`
+2. **В компонентах**: все hardcoded цвета, размеры, spacing нужно заменить на design-system tokens
+3. **В Tailwind config**: может потребоваться extend tailwind с design-system values
+4. **Mapping к shell компонентам**:
+   - **Header**: background, text color, border, padding из design-system
+   - **Sidebar**: background, border color, text color, padding из design-system
+   - **Cards**: background, border, shadow, padding из design-system
+   - **Buttons**: background, text color, hover state, padding, border-radius из design-system
+   - **Forms**: input background, border, focus state, label color из design-system
+   - **Badges**: background, text, padding из design-system
+   - **Tables**: header background, row hover, border color, spacing из design-system
+
+### Code Review Rules
+
+✅ **Обязательно**:
+- Все новые компоненты должны использовать design-system tokens
+- CSS переменные должны быть определены в design-system
+- Touchable элементы: минимальный hit area **44px** по обеим осям (W × H)
+
+❌ **Запрещено**:
+- Hit area интерактивных элементов < 44px (нарушает accessibility guidelines)
+- Hardcoded цвета (кроме Telegram theme fallback с явным комментарием)
+- Hardcoded размеры spacing (только design-system tokens)
+- Hardcoded border-radius (только design-system tokens)
+
+---
+
 ## 2. Responsive Tokens & Typography
 
 ### Font Sizes (Responsive)

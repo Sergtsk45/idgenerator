@@ -425,6 +425,14 @@ interface EstimatePosition {
 - **API calls**: CSRF protection (если cookies)
 - **Large files**: timeout protection при парсинге (max 30 сек)
 
+### Design System & Touch Targets
+- Все визуальные значения экранов `Works`, `Estimates` и `Import` должны использовать tokens из `docs/TZfrontend/design-system-12.03.2026-design-system/`
+- Запрещены hardcoded colors, spacing, border radius, typography sizes, shadows и размеры таблиц/toolbar controls, если для них существует design token
+- Все интерактивные элементы обязаны иметь hit area не меньше `44x44px`: search triggers, filter buttons, row actions, bulk actions, accordion toggles, tabs, file-picker buttons, import actions, pagination controls
+- Если visual height контрола по design token составляет `40px`, необходимо расширить hit area до `44px+` через padding, wrapper или невидимую интерактивную область
+- Sticky headers, sticky columns и dense table rows не отменяют правило `44px+` для кликабельных зон; компактность таблицы решается визуально, но не за счёт уменьшения touch area
+- Обязательны состояния `default`, `hover`, `active`, `focus-visible`, `disabled` для toolbar actions, tabs, accordion items и destructive actions
+
 ---
 
 ## 6. Edge Cases, Error States, Loading States
@@ -544,6 +552,8 @@ interface EstimatePosition {
 - [ ] Responsive: 320px, 480px, 768px, 1024px тестированы
 - [ ] Keyboard: Tab, Enter, Escape навигация работает
 - [ ] WCAG 2.1 AA: color contrast, screen reader friendly
+- [ ] Все интерактивные элементы и row actions соответствуют правилу hit area `44x44px+`
+- [ ] Визуальные значения экранов берутся из Design System; hardcoded visual values в tablet UI отсутствуют
 
 ---
 

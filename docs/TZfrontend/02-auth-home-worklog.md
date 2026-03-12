@@ -80,7 +80,7 @@
 **Состояния**:
 - **Loading**: индикатор загрузки, disabled inputs
 - **Error**: toast внизу + красный border поля
-- **Offline**: alert-banner, кнопка retry
+- **Network error**: alert-banner + кнопка retry
 - **Success**: редирект на `/` или на `?redirect=...`
 
 **Tablet improvements**:
@@ -141,7 +141,7 @@
 - **Loading**: Skeleton bubbles, индикатор "Обработка..." для последнего сообщения
 - **Processing**: AI normalization indicator на сообщении (иконка загрузки, "Обработка…")
 - **Error**: Toast "Не удалось отправить", retry button в чате
-- **Offline**: Banner "Нет интернета", сообщения в очереди (очень бледные, статус pending)
+- **Network error**: Banner "Нет интернета" или "Сервер недоступен"; сообщение остаётся в composer до явного повтора отправки
 - **Message animations**: fade-in + slide-up для новых сообщений
 
 ---
@@ -177,15 +177,15 @@
 
 **Density (компактность)**:
 - Радио-button "Компактный / Средний / Просторный" 
-  - Compact: row-height 28px, font-size 12px, padding 4px
-  - Normal: row-height 40px, font-size 14px, padding 8px (default)
+  - Compact: visual row-height 28px, font-size 12px, padding 4px; interactive controls inside row must still keep hit area >= 44px
+  - Normal: visual row-height 40px, font-size 14px, padding 8px (default); row actions and clickable zones must keep hit area >= 44px
   - Spacious: row-height 56px, font-size 16px, padding 12px
 
 **States**:
 - **Empty**: "Нет записей, начните с главной (Home) или импортируйте данные (Works)"
 - **Loading**: Skeleton rows (10–20 в зависимости от viewport)
 - **Error**: Alert + retry button
-- **Offline**: Banner с кешированными данными (если есть)
+- **Network degradation**: уже загруженные данные могут оставаться видимыми до refresh; новые запросы должны показывать понятный retry state
 
 ---
 
@@ -360,6 +360,14 @@
 - **Telegram WebApp**: все версии, которые поддерживают ES2020 и CSS Grid
 - **Fallbacks**: для функций типа MediaRecorder, requestAnimationFrame
 
+### Design System & Touch Targets
+- Все визуальные значения для tablet UI берутся только из `docs/TZfrontend/design-system-12.03.2026-design-system/` и связанных CSS variables/tokens
+- Запрещены hardcoded colors, spacing, radius, shadows, font sizes и размеры контролов, если для них есть design token
+- Все интерактивные элементы (buttons, icon buttons, tabs, chips, toolbar actions, row actions, segmented controls, inputs с trigger-элементами) обязаны иметь hit area не меньше `44x44px`
+- Если visual size элемента равен `40px` по design token, необходимо расширять hit area через padding, wrapper или прозрачную интерактивную область до `44px+`
+- Для всех interactive states обязательны состояния `default`, `hover`, `active`, `focus-visible`, `disabled`; focus state должен быть видимым и не полагаться только на изменение цвета
+- В Auth, Home и WorkLog запрещено разъезжание visual contract между Telegram и browser mode: tokens, типографика и states должны оставаться консистентными
+
 ---
 
 ## 6. Edge Cases, Error States, Loading States
@@ -405,10 +413,10 @@
 - Микрофон не доступен: "Микрофон не найден или отказано в доступе"
 - Сервер 500: "Ошибка сервера при обработке сообщения"
 
-**Offline states**:
-- Banner "Нет интернета"
-- Сообщения остаются в локальной очереди
-- При восстановлении соединения → повторная отправка
+**Network degradation states**:
+- Banner "Нет интернета" или "Сервер недоступен"
+- Несохранённый текст остаётся в composer до явной отправки пользователем
+- После восстановления соединения пользователь получает явный Retry action; автоматическая локальная очередь отправки не предполагается этим ТЗ
 
 **Voice error specifics**:
 - Recording > 1 minute: "Максимальная длина записи — 1 минута", автостоп
@@ -432,9 +440,10 @@
 - Экспорт не удался: "Не удалось создать файл. Попробуйте позже"
 - Отредактировать запись не удалось: "Ошибка сохранения. Проверьте интернет"
 
-**Offline states**:
-- Показывать cached данные (если доступны)
-- Banner "Оффлайн режим. Некоторые функции недоступны" (экспорт, edit)
+**Network degradation states**:
+- Banner "Нет интернета. Проверьте соединение и повторите запрос"
+- Уже загруженные данные могут оставаться на экране до refresh, но автономный режим и отдельная очередь синхронизации не входят в scope
+- Экспорт и редактирование при ошибке сети должны завершаться понятным error state с Retry
 
 **Density changes**:
 - При переключении Compact/Normal/Spacious → плавная re-layout (transition: height 300ms)
@@ -458,7 +467,7 @@
 - [ ] На планшете (768px) — минимум 2 видимых сообщения без скролла (если экран позволяет)
 - [ ] Message animations (fade-in) присутствуют и плавны
 - [ ] Микрофон не доступен → graceful fallback на текстовый ввод с alert
-- [ ] Offline → banner, сообщения в очереди, при online → автоматическая отправка
+- [ ] При сетевой ошибке Home показывает banner/error state, текст пользователя не теряется и повторная отправка выполняется только по явному Retry
 
 ### WorkLog page
 - [ ] Таблица отображается с сортировкой и фильтрами
@@ -473,6 +482,8 @@
 - [ ] Все экраны соответствуют WCAG 2.1 AA (keyboard nav, contrast, labels)
 - [ ] Светлая и тёмная тема работают (переключение через Telegram settings)
 - [ ] Русский и английский языки отображаются корректно
+- [ ] Все интерактивные элементы соответствуют правилу hit area `44x44px+`, даже если визуальный токен компонента меньше
+- [ ] Все цвета, spacing, radius, typography и states взяты из Design System без hardcoded значений
 - [ ] Нет console errors, warnings (исключая third-party)
 - [ ] Performance: LCP < 2.5s, FID < 100ms на throttled 4G (Lighthouse)
 - [ ] Responsive: 320px, 480px, 768px, 1024px viewports тестированы
@@ -569,7 +580,7 @@
 
 ### Known Limitations & Future Work
 1. **Не планируется** реализовать:
-   - Offline-first sync (data stays in queue, syncs on online)
+   - Автономная очередь синхронизации и auto-resume отправки без явного действия пользователя
    - Advanced text formatting (markdown, rich text editor)
    - Message reactions и threading
 

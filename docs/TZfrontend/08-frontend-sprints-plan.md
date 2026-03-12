@@ -115,6 +115,14 @@ Sprint 2 (Auth + Home)
 
 ## 5. Детали каждого спринта
 
+⭐ **ВАЖНОЕ НАПОМИНАНИЕ на все спринты**: Все компоненты должны соответствовать Design System (`design-system-12.03.2026-design-system/`). Это означает:
+- Использовать только design-system token значений для цветов, размеров, spacing
+- Запрет на hardcoded цвета/sizes/radius (исключение: fallback для Telegram theme с явным комментарием)
+- Code review обязательно проверяет design-system соответствие
+- Touch targets: минимум **44px** hit area для всех interactive controls (design-system может содержать 40px как нижнюю границу токенов, но проектный minimum = 44px)
+
+---
+
 ### 📌 SPRINT 1: Foundation Shell & Breakpoints (Дни 1–7)
 
 **Цель**: Настроить responsive архитектуру, shell компоненты, breakpoints, safe-area, Telegram integration для всех размеров экранов.
@@ -123,14 +131,18 @@ Sprint 2 (Auth + Home)
 
 - [x] **Task 1.1**: Обновить `tailwind.config.ts` (md, lg, xl, 2xl breakpoints)
 - [x] **Task 1.2**: Добавить responsive tokens в `index.css` (font-size, spacing по breakpoints)
-- [ ] **Task 1.3**: Адаптировать `Header.tsx` для lg+ (dropdown меню вместо Sheet, горизонтальная навигация)
-- [ ] **Task 1.4**: Адаптировать `BottomNav.tsx` для lg+ (переместить в top nav, горизонтальный tab bar с overflow handling)
-- [ ] **Task 1.5**: Создать responsive shell layout (sidebar на lg+ для будущих фич)
-- [x] **Task 1.6**: Оптимизировать safe-area обработку (`pb-safe`, `pt-safe` for iPad notch/safe areas)
-- [ ] **Task 1.7**: Тестировать Telegram MainButton + BackButton на всех breakpoints
-- [ ] **Task 1.8**: Тестировать browser fallback (вне Telegram MiniApp) на планшетах
-- [ ] **Task 1.9**: E2E тесты breakpoint transitions (mock window resize, Playwright)
-- [x] **Task 1.10**: Зафиксировать agreed responsive patterns в `docs/TZfrontend` или связанной frontend-документации
+- [ ] **Task 1.3**: Интегрировать Design System tokens из `design-system-12.03.2026-design-system.css` в проект
+  - Добавить design-system CSS переменные в `index.css` или отдельный файл
+  - Документировать mapping design-system values → tailwind config
+- [ ] **Task 1.4**: Адаптировать `Header.tsx` для lg+ (dropdown меню вместо Sheet, горизонтальная навигация, **используя design-system colors/spacing**)
+- [ ] **Task 1.5**: Адаптировать `BottomNav.tsx` для lg+ (переместить в top nav, горизонтальный tab bar с overflow handling, **design-system tokens**)
+- [ ] **Task 1.6**: Создать responsive shell layout (sidebar на lg+ для будущих фич, **design-system styling**)
+- [x] **Task 1.7**: Оптимизировать safe-area обработку (`pb-safe`, `pt-safe` for iPad notch/safe areas)
+- [ ] **Task 1.8**: Тестировать Telegram MainButton + BackButton на всех breakpoints
+- [ ] **Task 1.9**: Тестировать browser fallback (вне Telegram MiniApp) на планшетах
+- [ ] **Task 1.10**: E2E тесты breakpoint transitions (mock window resize, Playwright)
+- [x] **Task 1.11**: Зафиксировать agreed responsive patterns в `docs/TZfrontend` или связанной frontend-документации
+- [ ] **Task 1.12**: Код review: убедиться что shell components соответствуют Design System (цвета, размеры, spacing из tokens, no hardcoding)
 
 **Текущий прогресс (2026-03-10):**
 - Завершён foundation-подэтап: breakpoint contract, `viewport-fit=cover`, safe-area utilities, shell tokens и Telegram viewport CSS vars
@@ -151,13 +163,15 @@ Sprint 2 (Auth + Home)
 
 #### 5.1.4 Критерии готовности (DoD)
 
+- ✅ **Design System Integration**: Design System tokens загружены, shell components используют design-system цвета/sizes/spacing (no hardcoding)
+- ✅ **Code Review**: Reviewer проверил что все новые компоненты Shell используют design-system tokens (CSS переменные)
 - ✅ Breakpoints md, lg, xl, 2xl работают без регрессий на sm
 - ✅ Header + BottomNav адаптированы для lg+
 - ✅ Safe-area обработана для iPad (notch/home indicator)
 - ✅ Telegram theme CSS vars применяются корректно
 - ✅ E2E тесты на мобильном, планшете, desktop прошли
 - ✅ Performance: LCP < 2.5s на 4G (планшет)
-- ✅ Accessibility: WCAG 2.1 AA (keyboard nav, focus visible, color contrast)
+- ✅ Accessibility: WCAG 2.1 AA (keyboard nav, focus visible, color contrast ≥ 4.5:1)
 
 #### 5.1.5 Артефакты на выходе
 
@@ -214,9 +228,10 @@ Sprint 2 (Auth + Home)
 
 #### 5.2.4 Критерии готовности
 
-- ✅ Login/Register работают на планшете (mobile-first стиль, расширенный на lg+)
+- ✅ **Design System Compliance**: Все компоненты Auth, Home, Worklog используют design-system tokens (цвета, spacing, input states)
+- ✅ Login/Register работают на планшете (mobile-first стиль, расширенный на lg+, design-system styling)
 - ✅ Home чат оптимизирован (virtualization, no lag при скролле)
-- ✅ Worklog таблица адаптирована (sticky columns, horizontal scroll)
+- ✅ Worklog таблица адаптирована (sticky columns, horizontal scroll, design-system table tokens)
 - ✅ Voice recorder работает на планшете (no gesture conflicts)
 - ✅ Telegram auth проверена на iPad (live test)
 - ✅ Browser JWT flow проверен
@@ -278,10 +293,11 @@ Sprint 2 (Auth + Home)
 
 #### 5.3.4 Критерии готовности
 
-- ✅ Works таблица работает на планшете (sticky columns, horizontal scroll)
+- ✅ **Design System Compliance**: Works таблица использует design-system tokens для colors, spacing, table styles, borders
+- ✅ Works таблица работает на планшете (sticky columns, horizontal scroll, design-system styling)
 - ✅ Large files (1000+ rows) не вызывают lag (virtualization работает)
-- ✅ Excel import flow: upload → preview → confirm → import
-- ✅ Filters sidebar адаптирована для lg+ (drawer на md)
+- ✅ Excel import flow: upload → preview → confirm → import (modals используют design-system tokens)
+- ✅ Filters sidebar адаптирована для lg+ (drawer на md, design-system styling)
 - ✅ Export в Excel/CSV работает
 - ✅ Keyboard navigation в таблице (arrows, Tab, Enter)
 - ✅ No regression на мобильных
@@ -344,10 +360,11 @@ Sprint 2 (Auth + Home)
 
 #### 5.4.4 Критерии готовности
 
-- ✅ Gantt диаграмма работает на планшете landscape (горизонтальный scroll, zoom)
-- ✅ Task Editor modal адаптирован (side-by-side layout на lg+)
-- ✅ Modal stacking работает (max 3 уровня: template → materials → documents)
-- ✅ Acts список + детали две колонки на lg+
+- ✅ **Design System Compliance**: Gantt, Task Editor, Acts используют design-system tokens (colors, spacing, modal styling, button states)
+- ✅ Gantt диаграмма работает на планшете landscape (горизонтальный scroll, zoom, design-system styling)
+- ✅ Task Editor modal адаптирован (side-by-side layout на lg+, design-system modal/form tokens)
+- ✅ Modal stacking работает (max 3 уровня: template → materials → documents, design-system modal styling)
+- ✅ Acts список + детали две колонки на lg+ (design-system tokens)
 - ✅ PDF export не зависает (progress indicator работает)
 - ✅ Landscape orientation обработана (rotate events, layout stable)
 - ✅ > 500 tasks в Gantt не вызывают lag (virtualization)
@@ -412,11 +429,12 @@ Sprint 2 (Auth + Home)
 
 #### 5.5.4 Критерии готовности
 
-- ✅ Source Data grid layout работает на lg+
-- ✅ Materials master-detail layout адаптирован
-- ✅ Documents list + preview две колонки на lg+
-- ✅ Objects grid layout работает (переключение между каточками и table view)
-- ✅ Global object selector работает (bottom sheet, breadcrumb)
+- ✅ **Design System Compliance**: Source Data, Materials, Documents, Objects используют design-system tokens (grid spacing, card styling, selector colors)
+- ✅ Source Data grid layout работает на lg+ (design-system spacing/card tokens)
+- ✅ Materials master-detail layout адаптирован (design-system panel styling)
+- ✅ Documents list + preview две колонки на lg+ (design-system tokens)
+- ✅ Objects grid layout работает (переключение между карточками и table view, design-system card tokens)
+- ✅ Global object selector работает (bottom sheet, breadcrumb, design-system styling)
 - ✅ Dirty-state detection при смене объекта
 - ✅ Query cache invalidation при смене объекта работает
 - ✅ Drag-drop PDF import на планшете (или fallback)
@@ -486,10 +504,11 @@ Sprint 2 (Auth + Home)
 
 #### 5.6.4 Критерии готовности
 
+- ✅ **Design System Compliance Audit**: Все компоненты проверены на использование design-system tokens, 0 hardcoded цветов/размеров (кроме Telegram theme fallback)
 - ✅ Все экраны адаптированы и протестированы на всех breakpoints
 - ✅ Regression testing: 100% pass rate на sm, md, lg, xl, 2xl
-- ✅ Visual regression: 0 unexpected visual diffs (Chromatic/Percy)
-- ✅ Accessibility: WCAG 2.1 AA pass on all breakpoints (axe-core)
+- ✅ Visual regression: 0 unexpected visual diffs (Chromatic/Percy), соответствие design-system
+- ✅ Accessibility: WCAG 2.1 AA pass on all breakpoints (axe-core), touch targets >= 44px для interactive controls согласно design-system
 - ✅ Performance: LCP < 2.5s (mobile), < 1.5s (tablet); FID < 100ms; CLS < 0.1
 - ✅ Security audit: 0 critical/high severity issues
 - ✅ Cross-device testing: iPhone 14, iPad Air, iPad Pro, Galaxy Tab all pass
@@ -789,7 +808,7 @@ Sprint 2 (Auth + Home)
 
 - **S1–S6**: Sprint 1–6
 - **DoD**: Definition of Done
-- **E2E**: End-to-End (testes)
+- **E2E**: End-to-End (тесты)
 - **QA**: Quality Assurance
 - **UAT**: User Acceptance Testing
 - **MVP**: Minimum Viable Product (этот план = MVP)
@@ -797,20 +816,24 @@ Sprint 2 (Auth + Home)
 - **TZ**: Техническое задание (requirement document)
 - **ВОР**: Ведомость объемов работ (Works/Estimates)
 - **АОСР**: Акты освидетельствования скрытых работ (Acts)
+- **Design System**: Набор токенов, правил и компонентов для tablet UI (папка `design-system-12.03.2026-design-system/`)
 
 ---
 
 ## 11. Чек-лист для Tech Lead перед началом
 
-- [ ] Все разработчики прочитали `/docs/TZfrontend/00-development-plan.md` + `01-foundation-platform-shell.md`
-- [ ] `tailwind.config.ts` проверен и готов к обновлению breakpoints
+- [ ] ⭐ Все разработчики прочитали **Design System** (`/docs/TZfrontend/design-system-12.03.2026-design-system/`)
+- [ ] Все разработчики прочитали `/docs/TZfrontend/00-development-plan.md` + `01-foundation-platform-shell.md` (особенно раздел 1.5 про Design System Integration)
+- [ ] Design System tokens интегрированы в проект (CSS переменные загружены, tailwind config extend если нужно)
+- [ ] Code review process дополнен проверкой design-system соответствия (чек-лист в Jira/GitHub)
+- [ ] `tailwind.config.ts` проверен и готов к обновлению breakpoints + design-system tokens
 - [ ] Staging environment доступен и готов к тестированию
 - [ ] iPad / Galaxy Tab выделены для тестирования (real devices)
 - [ ] Telegram SDK версия ≥ 6.0 на боевом Telegram клиенте
 - [ ] QA инструменты готовы (Chromatic/Percy, axe-core, Lighthouse)
 - [ ] Monitoring + alerting система готовы для production
 - [ ] Phased rollout strategy согласована (feature flags, canary deployment)
-- [ ] Все stakeholders согласовали последовательность спринтов, критерии приёмки и rollout-окно
+- [ ] Все stakeholders согласовали последовательность спринтов, критерии приёмки, design-system compliance и rollout-окно
 - [ ] Backup разработчик выделен на случай blockers
 
 ---

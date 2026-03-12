@@ -60,7 +60,7 @@
 | **Performance регрессия при scroll** | Высокая | Высокое | Lighthouse, DevTools profiling |
 | **Accessibility регрессия (contrast, labels)** | Средняя | Среднее | axe-core в CI, WAVE manual |
 | **Visual differences across browsers** | Средняя | Среднее | Chromatic / Percy visual tests |
-| **Concurrency bugs (offline, sync)** | Средняя | Высокое | E2E tests for conflict scenarios |
+| **Concurrency bugs (request retry, state recovery)** | Средняя | Высокое | E2E tests for retry and conflict scenarios |
 | **Mobile fallback broken** | Низкая | Среднее | Mobile breakpoint testing |
 | **Telegram bot integration regression** | Низкая | Среднее | Bot integration E2E tests |
 | **Security: CSRF, XSS in new forms** | Низкая | Критическое | Security code review + npm audit |
@@ -97,7 +97,7 @@
 - State management (Context, Zustand mutations)
 - Utility functions (formatters, parsers, calculations)
 - Cache invalidation logic
-- Offline queue persistence
+- Retry state preservation after failed requests
 
 #### Coverage Target
 - **Critical logic:** 100% coverage
@@ -152,7 +152,7 @@ describe('mutation retry flow', () => {
 #### Scope
 - Form submission → API call → Cache update
 - Object selection → Data refetch → UI update
-- Offline → Online → Sync flow
+- Request failure → Retry → Recovery flow
 - Authentication → Admin access control
 - Multi-step workflows (import PDF → bind → save)
 
@@ -172,18 +172,19 @@ describe('Create Material Flow', () => {
   });
 });
 
-// Offline sync flow
-describe('Offline Sync', () => {
-  it('should queue mutation when offline', async () => {
+// Network error retry flow
+describe('Network Retry', () => {
+  it('should keep the form state and show retry UI when request fails', async () => {
     navigator.onLine = false;
     const { user } = setup();
     
     await user.click(screen.getByRole('button', { name: /save/i }));
-    expect(screen.getByText(/offline mode/i)).toBeInTheDocument();
+    expect(screen.getByText(/нет интернета|сервер недоступен/i)).toBeInTheDocument();
     
     navigator.onLine = true;
     dispatchEvent(new Event('online'));
     
+    await user.click(screen.getByRole('button', { name: /retry|повторить/i }));
     await waitFor(() => expect(mockApi.create).toHaveBeenCalled());
   });
 });
@@ -268,15 +269,15 @@ Scenario: Admin manages users on tablet
   Then changes persisted
   And table refreshes
 
-Scenario: Offline document upload queue
+Scenario: Document upload retry after network failure
   Given I'm on Documents screen
-  And network is offline
+  And network request fails
   When I drag PDF file to import area
   And click [Upload]
-  Then file queued
-  And shows "📤 1 file queued"
-  When network comes back online
-  Then upload resumes automatically
+  Then upload is not lost from the current form state
+  And shows "Не удалось загрузить. Повторить?"
+  When I click [Retry]
+  Then upload starts again
   And shows progress
 
 Scenario: 404 page on invalid route
@@ -327,7 +328,7 @@ Test types:
 2. ✅ Material import & binding flow
 3. ✅ Document upload & processing
 4. ✅ Object selector & context switching
-5. ✅ Offline queue & sync on reconnect
+5. ✅ Network retry & state preservation after failed requests
 6. ✅ Admin user creation & deletion
 7. ✅ 404 and access denied error pages
 8. ✅ Keyboard navigation (Tab, Enter, Escape)
@@ -522,7 +523,7 @@ Firefox:
 Samsung Internet:
 - Haptic API support
 - Deep linking
-- Offline capability
+- Network recovery UX
 ```
 
 ---
@@ -834,10 +835,52 @@ describe('Accessibility: Source Data screen', () => {
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
+
+  // Design system compliance tests
+  it('should avoid hardcoded visual values and rely on design-system tokens', () => {
+    const { container } = render(<SourceDataScreen />);
+    const elements = container.querySelectorAll('[style]');
+    
+    elements.forEach((el) => {
+      const inline = el.getAttribute('style') || '';
+      // Should NOT have hardcoded colors or fixed visual values outside approved tokens
+      expect(inline).not.toMatch(/#[0-9A-F]{6}/i);
+      expect(inline).not.toMatch(/\b(border-radius|gap|padding|margin|box-shadow|height|width):\s*\d+px\b/i);
+    });
+  });
+
+  it('should have visible focus indicators on all interactive elements', () => {
+    const { container } = render(<SourceDataScreen />);
+    const interactive = container.querySelectorAll('button, input, [role="button"], [role="link"]');
+    
+    interactive.forEach((el) => {
+      el.focus();
+      const styles = window.getComputedStyle(el);
+      // Focus visible (outline or box-shadow focus_ring)
+      const hasFocusIndicator = 
+        styles.outline !== 'none' || 
+        styles.boxShadow.includes('3px');
+      expect(hasFocusIndicator).toBe(true);
+      el.blur();
+    });
+  });
+
+  it('should meet color contrast ratio 4.5:1 for text', () => {
+    const { container } = render(<SourceDataScreen />);
+    // Use axe-core or color-contrast checker
+    const results = await axe(container, {
+      rules: {
+        'color-contrast': { enabled: true }
+      }
+    });
+    expect(results.violations.filter(v => v.id === 'color-contrast')).toEqual([]);
+  });
 });
 
 // Run in CI with coverage
 // Target: 0 violations (critical + serious)
+// Design System: no hardcoded visual values; colors/sizes/states come from tokens
+// Touch targets: All interactive elements ≥ 44px on tablet
 ```
 
 ### Manual Accessibility Testing
@@ -1057,7 +1100,7 @@ Week 2:
 - [ ] E2E tests pass on all browsers
 - [ ] Performance targets met (Lighthouse 85+)
 - [ ] Keyboard navigation tested
-- [ ] Offline scenarios tested
+- [ ] Network failure and retry scenarios tested
 - [ ] Admin access control verified
 - [ ] Error handling tested
 - [ ] Edge cases covered
@@ -1156,7 +1199,7 @@ Manual rollback if:
 
 ### Improvements
 - 📈 Search performance: <300ms (debounce)
-- 📈 Offline support: Queue mutations, auto-sync
+- 📈 Request recovery: retry UX and state preservation on network failures
 - 📈 Accessibility: WCAG 2.1 AA compliance
 - 📈 Visual regression: Chromatic tests
 
@@ -1229,12 +1272,26 @@ Manual rollback if:
 - [ ] E2E tests passing: `npm run test:e2e`
 - [ ] Visual regression checked: Chromatic
 - [ ] Performance baseline: Lighthouse report
-- [ ] Accessibility audit: axe-core report
+- [ ] Accessibility audit: axe-core report (0 violations)
 - [ ] Security: OWASP checklist passed
 - [ ] Cross-browser: Chrome, Safari, Firefox ✅
 - [ ] Cross-device: iPad, Android tablet ✅
-- [ ] Offline scenarios: Tested ✅
+- [ ] Network failure and retry scenarios: Tested ✅
 - [ ] Error handling: All edge cases tested ✅
+- [ ] **Design System Compliance:**
+  - [ ] 0 hardcoded visual values (colors, spacing, radius, shadows, control sizes) вне design-system tokens
+  - [ ] All colors/sizes from design-system tokens
+  - [ ] CSS variables used (var(--color-primary), etc.)
+  - [ ] Dark mode support verified
+- [ ] **Touch Target Audit (Tablet):**
+  - [ ] All buttons ≥ 44×44px
+  - [ ] All form inputs ≥ 44px height
+  - [ ] All icon buttons with touch padding ≥ 44px
+  - [ ] Table rows ≥ 44px for touch
+- [ ] **Interactive States:**
+  - [ ] Default, hover, active, focus, disabled for all elements
+  - [ ] Visible focus indicators (outline 2px or focus_ring)
+  - [ ] Color contrast ≥ 4.5:1 in all themes
 
 ### Deployment Level
 - [ ] Database migrations prepared (if needed)
@@ -1272,6 +1329,16 @@ Manual rollback if:
 - [ ] Test environments ready
 - [ ] CI/CD pipeline configured
 - [ ] Test automation 70%+ automated
+- [ ] **Design System Tests:**
+  - [ ] Color token audit tests written
+  - [ ] Touch target size tests added
+  - [ ] Interactive state tests added
+  - [ ] Dark mode color tests added
+- [ ] **Accessibility Tests:**
+  - [ ] axe-core integration in CI
+  - [ ] Focus indicator checks added
+  - [ ] Color contrast validation added
+  - [ ] Manual keyboard navigation tested
 
 ### Sign-off
 - [ ] Dev lead: Code quality approved
