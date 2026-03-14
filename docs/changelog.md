@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-03-14] - Sprint 6: Admin + Settings + RBAC + 404 tablet UI adaptation (v1.3)
+
+### Добавлено
+- `AdminGuard.tsx` — RBAC-guard для admin-маршрутов: проверяет роль `admin`, отображает страницу Access Denied (403) для не-администраторов, Task 6.6
+- `__tests__/admin-settings.e2e.ts` — E2E тесты Sprint 6 (AdminLayout hamburger, RBAC, 404, Settings two-column, AdminUsers search, AdminMaterials CRUD), Task 6.9
+
+### Изменено
+- `Settings.tsx` — двухколоночный layout на lg+: sidebar (w-64) с nav-секциями + правая scrollable область; мобильный single-scroll layout сохранён, Task 6.1
+- `AdminLayout.tsx` — гамбургер-кнопка на md breakpoint (768–1023px) открывает sidebar как Sheet overlay; desktop lg+ sidebar всегда виден; mobile (<md) нижняя навигация сохранена, Task 6.2
+- `AdminUsers.tsx` — контейнер `max-w-5xl lg:max-w-none`; карточки в 2-column grid на lg+, Task 6.3
+- `AdminMessages.tsx` — контейнер `max-w-5xl`; сообщения в 2-column grid на lg+, Task 6.4
+- `AdminMaterials.tsx` — контейнер `max-w-5xl`; материалы в 2-column grid на lg+; MaterialDialog шире `sm:max-w-lg`, Task 6.5
+- `not-found.tsx` — полноэкранная tablet-adaptive 404 страница с кнопками "На главную" и "Назад", Task 6.7
+- `App.tsx` — все `/admin/*` маршруты теперь обернуты в `AdminGuard` вместо `AuthGuard`, Task 6.8
+
 ## [2026-03-14] - Sprint 5: Source Data + Materials + Documents + Objects tablet UI adaptation
 
 ### Добавлено

@@ -362,7 +362,7 @@ export default function AdminUsers() {
 
   return (
     <AdminLayout title="Пользователи">
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="max-w-5xl lg:max-w-none mx-auto space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -408,9 +408,11 @@ export default function AdminUsers() {
           </div>
         )}
 
-        {filtered.map((user) => (
-          <UserCard key={user.telegramUserId} user={user} />
-        ))}
+        <div className="lg:grid lg:grid-cols-2 lg:gap-3 space-y-3 lg:space-y-0">
+          {filtered.map((user) => (
+            <UserCard key={user.telegramUserId} user={user} />
+          ))}
+        </div>
       </div>
     </AdminLayout>
   );
