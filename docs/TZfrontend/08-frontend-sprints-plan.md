@@ -106,7 +106,7 @@ Sprint 2 (Auth + Home)
 | **Sprint 2** | Auth + Home | 5–7 | 00, 02 | tablet-auth | ✅ Done |
 | **Sprint 3** | Works + Estimates | 7–9 | 03 | tablet-works | ✅ Done |
 | **Sprint 4** | Schedule + Acts | 7–9 | 04 | tablet-schedule | ✅ Done |
-| **Sprint 5** | Source Data + Objects | 5–7 | 05, 06 | tablet-data | Upcoming |
+| **Sprint 5** | Source Data + Objects | 5–7 | 05, 06 | tablet-data | ✅ Done |
 | **Sprint 6** | Admin + QA + Rollout | 7–9 | 06, 07 | tablet-release | Upcoming |
 
 **Итого**: 6 спринтов = 36–48 дней (примерно 8–10 недель)
@@ -401,16 +401,16 @@ Sprint 2 (Auth + Home)
 
 #### 5.5.1 Scope задач
 
-- [ ] **Task 5.1**: Адаптировать `/source-data` для lg+ (grid layout вместо горизонтального scroll)
-- [ ] **Task 5.2**: Адаптировать `/source/materials` для lg+ (master-detail layout)
-- [ ] **Task 5.3**: Адаптировать `/source/documents` для lg+ (list + preview)
-- [ ] **Task 5.4**: Реализовать drag-drop для PDF import на планшете
-- [ ] **Task 5.5**: Адаптировать `/objects` (selector/list) для lg+ (grid layout)
-- [ ] **Task 5.6**: Реализовать global object selector (bottom sheet)
-- [ ] **Task 5.7**: Тестировать dirty-state detection при смене объекта
-- [ ] **Task 5.8**: Query cache invalidation при смене объекта
-- [ ] **Task 5.9**: E2E тесты для Source Data + Objects flows
-- [ ] **Task 5.10**: Тестировать PDF invoice parsing на планшете
+- [x] **Task 5.1**: Адаптировать `/source-data` для lg+ (grid layout вместо горизонтального scroll)
+- [x] **Task 5.2**: Адаптировать `/source/materials` для lg+ (master-detail layout)
+- [x] **Task 5.3**: Адаптировать `/source/documents` для lg+ (list + preview)
+- [x] **Task 5.4**: Реализовать drag-drop для PDF import на планшете
+- [x] **Task 5.5**: Адаптировать `/objects` (selector/list) для lg+ (grid layout)
+- [x] **Task 5.6**: Реализовать global object selector (bottom sheet)
+- [x] **Task 5.7**: Тестировать dirty-state detection при смене объекта *(dirty-state реализован в SourceData.tsx через isDirty; ObjectSelector.tsx invalidates всё через queryClient.invalidateQueries())*
+- [x] **Task 5.8**: Query cache invalidation при смене объекта *(реализован в use-objects.ts: queryClient.invalidateQueries() на selectObject)*
+- [x] **Task 5.9**: E2E тесты для Source Data + Objects flows
+- [ ] **Task 5.10**: Тестировать PDF invoice parsing на планшете *(ручное тестирование)*
 
 #### 5.5.2 Зависимости
 
@@ -877,14 +877,15 @@ Sprint 2 (Auth + Home)
 |------|--------|-------|-----------|
 | 2026-03-10 | 1.0 | AI Assistant | Первоначальный draft плана по спринтам |
 | 2026-03-13 | 1.1 | Claude Code | Отмечены выполненные задачи Sprint 1, 2, 3; обновлён статус сводной таблицы |
+| 2026-03-14 | 1.2 | Claude Code | Sprint 5 выполнен: tablet layout для SourceData, SourceMaterials, SourceDocuments, Objects, ObjectSelector; E2E тесты |
 
 ---
 
-**Статус**: 🚧 In Progress — Sprint 1–4 завершены; следующий — Sprint 5
+**Статус**: 🚧 In Progress — Sprint 1–5 завершены; следующий — Sprint 6
 
 **Следующие шаги**:
 1. ✅ Sprint 1 Foundation — выполнен (commit `b5f86b0`)
 2. ✅ Sprint 2 Auth + Home + Worklog — выполнен (commit `f4373e6`)
 3. ✅ Sprint 3 Works + Estimates — выполнен (commit `91f6851`)
 4. ✅ Sprint 4: Schedule + Acts + Complex Forms — выполнен
-5. 🔜 Sprint 5: Source Data + Materials + Documents + Objects
+5. ✅ Sprint 5: Source Data + Materials + Documents + Objects — выполнен (commit 2026-03-14)

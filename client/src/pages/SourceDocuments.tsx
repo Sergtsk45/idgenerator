@@ -26,6 +26,7 @@ export default function SourceDocuments() {
   const [docType, setDocType] = useState<string>("__all__");
   const [scope, setScope] = useState<string>("__all__");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const docsQuery = useDocuments({
     query: search,
@@ -72,86 +73,120 @@ export default function SourceDocuments() {
   return (
     <ResponsiveShell className="min-h-screen h-[100dvh] bg-background bg-grain" title="Документы качества">
 
-      <div className="flex-1 overflow-hidden px-4 py-6 pb-24">
-        <div className="mb-3 sticky top-14 z-30 space-y-3 bg-background/95 py-2 backdrop-blur md:top-28">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Поиск по документам..."
-              className="pl-9 rounded-xl bg-secondary/50 border-transparent focus:bg-background transition-all"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
+        {/* LEFT: document list */}
+        <div className="lg:w-[420px] lg:border-r lg:border-border/50 lg:overflow-y-auto flex-col flex-1 overflow-hidden px-4 py-6 pb-24 lg:pb-6">
+          <div className="mb-3 sticky top-14 z-30 space-y-3 bg-background/95 py-2 backdrop-blur md:top-28">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Поиск по документам..."
+                className="pl-9 rounded-xl bg-secondary/50 border-transparent focus:bg-background transition-all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={docType} onValueChange={setDocType}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Тип" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Все</SelectItem>
+                  <SelectItem value="certificate">certificate</SelectItem>
+                  <SelectItem value="declaration">declaration</SelectItem>
+                  <SelectItem value="passport">passport</SelectItem>
+                  <SelectItem value="protocol">protocol</SelectItem>
+                  <SelectItem value="scheme">scheme</SelectItem>
+                  <SelectItem value="other">other</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={scope} onValueChange={setScope}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Scope" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Все</SelectItem>
+                  <SelectItem value="project">project</SelectItem>
+                  <SelectItem value="global">global</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <Select value={docType} onValueChange={setDocType}>
-              <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="Тип" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Все</SelectItem>
-                <SelectItem value="certificate">certificate</SelectItem>
-                <SelectItem value="declaration">declaration</SelectItem>
-                <SelectItem value="passport">passport</SelectItem>
-                <SelectItem value="protocol">protocol</SelectItem>
-                <SelectItem value="scheme">scheme</SelectItem>
-                <SelectItem value="other">other</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={scope} onValueChange={setScope}>
-              <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="Scope" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Все</SelectItem>
-                <SelectItem value="project">project</SelectItem>
-                <SelectItem value="global">global</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {docsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-10 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              Загрузка...
+            </div>
+          ) : (
+            <ScrollArea className="h-full">
+              <div className="space-y-3 pr-2">
+                {docs.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
+                      <FileText className="h-8 w-8 text-muted-foreground/60" />
+                    </div>
+                    <div className="mb-3">Документы не найдены</div>
+                    <Button onClick={() => setDialogOpen(true)} className="rounded-xl">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Добавить документ
+                    </Button>
+                  </div>
+                ) : (
+                  docs.map((d) => (
+                    <DocumentCard
+                      key={d.id}
+                      doc={{
+                        id: Number(d.id),
+                        docType: String(d.docType ?? ""),
+                        scope: String(d.scope ?? ""),
+                        title: d.title ?? null,
+                        docNumber: d.docNumber ?? null,
+                        docDate: d.docDate ?? null,
+                        fileUrl: d.fileUrl ?? null,
+                      }}
+                      onOpen={d.fileUrl ? () => window.open(d.fileUrl, "_blank") : undefined}
+                    />
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          )}
         </div>
 
-        {docsQuery.isLoading ? (
-          <div className="flex items-center justify-center py-10 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-            Загрузка...
-          </div>
-        ) : (
-          <ScrollArea className="h-full">
-            <div className="space-y-3 pr-2">
-              {docs.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
-                    <FileText className="h-8 w-8 text-muted-foreground/60" />
-                  </div>
-                  <div className="mb-3">Документы не найдены</div>
-                  <Button onClick={() => setDialogOpen(true)} className="rounded-xl">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Добавить документ
-                  </Button>
-                </div>
-              ) : (
-                docs.map((d) => (
-                  <DocumentCard
-                    key={d.id}
-                    doc={{
-                      id: Number(d.id),
-                      docType: String(d.docType ?? ""),
-                      scope: String(d.scope ?? ""),
-                      title: d.title ?? null,
-                      docNumber: d.docNumber ?? null,
-                      docDate: d.docDate ?? null,
-                      fileUrl: d.fileUrl ?? null,
-                    }}
-                    onOpen={d.fileUrl ? () => window.open(d.fileUrl, "_blank") : undefined}
-                  />
-                ))
-              )}
+        {/* RIGHT: import area (lg+ only) */}
+        <div className="hidden lg:flex flex-1 flex-col p-8 items-center justify-center" data-testid="documents-import-area">
+          <div
+            className={`w-full max-w-md border-2 border-dashed rounded-2xl p-12 text-center transition-colors ${
+              isDragging ? "border-primary bg-primary/5" : "border-border/50 hover:border-primary/50"
+            }`}
+            data-testid="documents-drop-zone"
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              toast({ title: "Загрузка файлов", description: "Укажите URL файла при создании документа" });
+            }}
+          >
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
+              <FileText className="h-8 w-8 text-muted-foreground/60" />
             </div>
-          </ScrollArea>
-        )}
+            <p className="text-lg font-medium mb-2">Перетащите документы сюда</p>
+            <p className="text-sm text-muted-foreground mb-6">Поддерживаются PDF, DOC, XLSX файлы</p>
+            <Button
+              onClick={() => setDialogOpen(true)}
+              className="rounded-xl"
+              data-testid="documents-drop-add-btn"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Добавить документ
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="fixed bottom-20 right-4 z-40 md:bottom-6 md:left-0 md:right-0 md:pointer-events-none lg:left-72">

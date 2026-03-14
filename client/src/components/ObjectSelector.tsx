@@ -6,9 +6,10 @@
  */
 
 import { useState } from "react";
-import { Check, ChevronRight, Loader2, Plus, Settings } from "lucide-react";
+import { Check, ChevronRight, Loader2, Plus, Search, Settings } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sheet,
@@ -38,11 +39,18 @@ export function ObjectSelector({ open, onOpenChange }: ObjectSelectorProps) {
   const selectObject = useSelectObject();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   const objects = objectsQuery.data ?? [];
   const currentId = currentObjectQuery.data?.id;
   const quotaLimit = getQuotaLimit("objects");
   const canAddMore = objects.length < quotaLimit;
+
+  const filteredObjects = objects.filter((obj) =>
+    !search ||
+    obj.title.toLowerCase().includes(search.toLowerCase()) ||
+    (obj.address && obj.address.toLowerCase().includes(search.toLowerCase()))
+  );
 
   const handleSelect = async (objectId: number) => {
     if (objectId === currentId) {
@@ -64,11 +72,22 @@ export function ObjectSelector({ open, onOpenChange }: ObjectSelectorProps) {
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
+      <Sheet open={open} onOpenChange={(v) => { if (!v) setSearch(""); onOpenChange(v); }}>
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] flex flex-col">
           <SheetHeader className="pb-2">
             <SheetTitle>Выбор объекта</SheetTitle>
           </SheetHeader>
+
+          <div className="relative pb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Поиск объекта..."
+              className="pl-9 rounded-xl"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="object-selector-search"
+            />
+          </div>
 
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
             {objectsQuery.isLoading ? (
@@ -78,7 +97,7 @@ export function ObjectSelector({ open, onOpenChange }: ObjectSelectorProps) {
               </div>
             ) : (
               <ul className="space-y-2 py-2">
-                {objects.map((obj) => {
+                {filteredObjects.map((obj) => {
                   const isActive = obj.id === currentId;
                   return (
                     <li key={obj.id}>

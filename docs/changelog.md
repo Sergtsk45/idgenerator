@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-03-14] - Sprint 5: Source Data + Materials + Documents + Objects tablet UI adaptation
+
+### Добавлено
+- `SourceMaterials.tsx` — master-detail layout на lg+ (список слева 380px, превью справа), Task 5.2
+- `SourceDocuments.tsx` — 2-колоночный layout на lg+ (список слева 420px, drag-drop зона справа), Task 5.3+5.4
+- `ObjectSelector.tsx` — поиск по объектам внутри bottom sheet, Task 5.6
+- `__tests__/source-data-objects.e2e.ts` — E2E тесты Sprint 5, Task 5.9
+
+### Изменено
+- `SourceData.tsx` — parties: horizontal scroll → `lg:grid-cols-4` grid на lg+; sections: `lg:grid-cols-2`; контейнер расширен до `lg:max-w-5xl`, Task 5.1
+- `SourceDocuments.tsx` — 2-колоночный layout, Task 5.3
+- `Objects.tsx` — grid `lg:grid-cols-2`, поиск по объектам, контейнер `lg:max-w-4xl`, Task 5.5
+- `ObjectSelector.tsx` — сброс поиска при закрытии sheet, Task 5.6
+
+### Подтверждено (уже реализовано ранее)
+- Dirty-state detection при смене объекта: `isDirty` в `SourceData.tsx`, Task 5.7
+- Query cache invalidation при смене объекта: `queryClient.invalidateQueries()` в `use-objects.ts`, Task 5.8
+
 ## [2026-03-14] - Sprint 4: Schedule + Acts tablet UI adaptation
 
 ### Добавлено

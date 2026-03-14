@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { Check, Loader2, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, Loader2, MapPin, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +56,7 @@ export function Objects() {
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
   const [editState, setEditState] = useState<EditDialogState>({
     open: false,
     objectId: 0,
@@ -66,6 +67,12 @@ export function Objects() {
 
   const objects = objectsQuery.data ?? [];
   const currentId = currentObjectQuery.data?.id;
+
+  const filteredObjects = objects.filter((obj) =>
+    !search ||
+    obj.title.toLowerCase().includes(search.toLowerCase()) ||
+    (obj.address && obj.address.toLowerCase().includes(search.toLowerCase()))
+  );
 
   const handleSelect = async (objectId: number) => {
     if (objectId === currentId) return;
@@ -139,7 +146,7 @@ export function Objects() {
     >
 
       <div className="flex-1 overflow-y-auto pb-24">
-        <div className="max-w-md mx-auto px-4 pt-4">
+        <div className="max-w-md lg:max-w-4xl mx-auto px-4 pt-4">
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-muted-foreground">
               {objects.length > 0
@@ -156,6 +163,18 @@ export function Objects() {
             </Button>
           </div>
 
+          {objects.length > 3 && (
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Поиск объекта..."
+                className="pl-9 rounded-xl"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
+
           {objectsQuery.isLoading ? (
             <div className="space-y-3">
               <Skeleton className="h-24 rounded-xl" />
@@ -167,8 +186,8 @@ export function Objects() {
               <p className="text-sm">Создайте первый объект строительства</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {objects.map((obj) => {
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" data-testid="objects-grid">
+              {filteredObjects.map((obj) => {
                 const isActive = obj.id === currentId;
                 return (
                   <Card
