@@ -2,6 +2,19 @@
 
 ---
 
+## Задача: Исправление import.meta.url в CJS-сборке (pdfGenerator)
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-14
+- **Дата завершения**: 2026-03-14
+- **Описание**: В `server/pdfGenerator.ts` использовался `import.meta.url`, который недоступен в CJS-билде сервера. Prod работал только благодаря старому `dist/`; при `--force-recreate` или пересборке сервер упал бы.
+- **Шаги выполнения**:
+  - [x] Заменить `createRequire(import.meta.url)` на `createRequire(__filename)` в `server/pdfGenerator.ts`
+  - [x] Проверить отсутствие других `import.meta.url` в файле
+  - [x] Зафиксировать в `docs/changelog.md`
+- **Зависимости**: нет
+
+---
+
 ## Задача: Актуализация ТЗ TZfrontend под Design System и правила Touch Targets
 - **Статус**: Завершена
 - **Дата начала**: 2026-03-10
