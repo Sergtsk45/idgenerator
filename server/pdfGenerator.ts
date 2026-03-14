@@ -5,7 +5,7 @@ import { createRequire } from "module";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
 import { storage } from "./storage";
 
-const require = createRequire(import.meta.url);
+const require = createRequire(__filename);
 const PdfPrinter = require("pdfmake/js/Printer.js").default;
 
 const fontsDir = path.join(process.cwd(), "server/fonts");
