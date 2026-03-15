@@ -1,7 +1,7 @@
 services:
   invoice-extractor:
     build:
-      context: ./services/invoice-extractor
+      context: .
       dockerfile: Dockerfile
     ports:
       - "5050:5000"
@@ -20,3 +20,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - n8n_web
+
+networks:
+  n8n_web:
+    external: true
