@@ -22,6 +22,7 @@ import { registerAuthRoutes } from "./routes/auth";
 import { registerAdminRoutes } from "./routes/admin";
 import { registerMessageRoutes } from "./routes/messages";
 import { registerWorksRoutes } from "./routes/works";
+import { registerEstimateRoutes } from "./routes/estimates";
 import { authMiddleware } from "./middleware/auth";
 import { requireFeature, requireQuota } from "./middleware/tariff";
 import { db } from "./db";
@@ -1826,76 +1827,8 @@ export async function registerRoutes(
     }
   });
 
-  // Schedule (estimate source): quality document statuses for estimate subrows (aux positions)
-  app.get(api.estimatePositionLinks.statuses.path, ...appAuth, async (req, res) => {
-    try {
-      const scheduleId = Number(req.params.id);
-      if (!Number.isFinite(scheduleId) || scheduleId <= 0) {
-        return res.status(400).json({ message: "Invalid schedule id" });
-      }
-
-      const schedule = await storage.getScheduleWithTasks(scheduleId);
-      if (!schedule) {
-        return res.status(404).json({ message: "Schedule not found" });
-      }
-
-      if (schedule.sourceType !== "estimate" || !schedule.estimateId) {
-        return res.status(400).json({ message: 'Schedule source type must be "estimate"' });
-      }
-
-      const obj = await storage.getCurrentObject(req.user!.id);
-      const statuses = await storage.getEstimateSubrowStatuses({
-        objectId: obj.id,
-        estimateId: Number(schedule.estimateId),
-      });
-
-      return res.status(200).json({ byEstimatePositionId: statuses });
-    } catch (err) {
-      console.error("Get estimate subrow statuses failed:", err);
-      return res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  // Upsert estimate subrow ↔ project material link
-  app.post(api.estimatePositionLinks.upsert.path, ...appAuth, async (req, res) => {
-    try {
-      const input = api.estimatePositionLinks.upsert.input.parse(req.body);
-      const obj = await storage.getCurrentObject(req.user!.id);
-
-      const saved = await storage.upsertEstimatePositionMaterialLink(obj.id, {
-        estimateId: input.estimateId,
-        estimatePositionId: input.estimatePositionId,
-        projectMaterialId: input.projectMaterialId,
-        batchId: (input as any).batchId ?? null,
-        source: "manual",
-      } as any);
-
-      return res.status(200).json(saved);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
-      }
-      console.error("Upsert estimate position link failed:", err);
-      return res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  // Delete estimate subrow ↔ project material link
-  app.delete(api.estimatePositionLinks.delete.path, ...appAuth, async (req, res) => {
-    const estimatePositionId = Number(req.params.estimatePositionId);
-    if (!Number.isFinite(estimatePositionId) || estimatePositionId <= 0) {
-      return res.status(400).json({ message: "Invalid estimatePositionId" });
-    }
-    try {
-      const obj = await storage.getCurrentObject(req.user!.id);
-      const ok = await storage.deleteEstimatePositionMaterialLink(obj.id, estimatePositionId);
-      if (!ok) return res.status(404).json({ message: "Not found" });
-      return res.status(204).send();
-    } catch (err) {
-      console.error("Delete estimate position link failed:", err);
-      return res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
+  // Estimate routes — extracted to server/routes/estimates.ts
+  registerEstimateRoutes(app);
 
   // Act Templates
   app.get("/api/act-templates", async (_req, res) => {

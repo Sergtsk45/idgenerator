@@ -104,15 +104,15 @@
 - **Риск**: сохранить текущее поведение без “тихого” изменения авторизации/guard-логики.
 
 ## Задача 1.4: `server/routes/estimates.ts` (25-40 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести estimates:
+  - [x] Перенести estimates:
     - list/get/import/delete
-  - [ ] Перенести estimate-position-links:
+  - [x] Перенести estimate-position-links:
     - statuses/upsert/delete
-  - [ ] Экспортировать `registerEstimateRoutes(app)` (или `registerEstimatesRoutes`)
-  - [ ] Подключить модуль
-  - [ ] `npm run check`
+  - [x] Экспортировать `registerEstimateRoutes(app)` (или `registerEstimatesRoutes`)
+  - [x] Подключить модуль
+  - [x] `npm run check`
 - **Риск**: `statuses` endpoint привязан к schedule context (`scheduleId`).
 
 ## Задача 1.5: `server/routes/materials.ts` (35-60 мин)
