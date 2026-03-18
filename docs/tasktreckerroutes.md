@@ -116,9 +116,9 @@
 - **Риск**: `statuses` endpoint привязан к schedule context (`scheduleId`).
 
 ## Задача 1.5: `server/routes/materials.ts` (35-60 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести блок materials/documents:
+  - [x] Перенести блок materials/documents:
     - materials-catalog search/create
     - project-materials list/create/get/patch/save-to-catalog
     - material-batches create/patch/delete
@@ -126,11 +126,11 @@
     - document-bindings create/patch/delete
     - parse-invoice, bulk-create-materials
     - invoice-corrections submit/stats
-  - [ ] Перенести `invoiceUpload`, `invoiceParseRateLimiter`, `ALLOWED_EXTRACTOR_URLS` и валидатор URL
-  - [ ] Сохранить `requireFeature('INVOICE_IMPORT')` + `requireQuota(...)`
-  - [ ] Экспортировать `registerMaterialsRoutes(app)`
-  - [ ] Подключить модуль
-  - [ ] `npm run check`
+  - [x] Перенести `invoiceUpload`, `invoiceParseRateLimiter`, `ALLOWED_EXTRACTOR_URLS` и валидатор URL
+  - [x] Сохранить `requireFeature('INVOICE_IMPORT')` + `requireQuota(...)`
+  - [x] Экспортировать `registerMaterialsRoutes(app)`
+  - [x] Подключить модуль
+  - [x] `npm run check`
 - **Риск**: multipart + лимитеры + blob cleanup в одном endpoint.
 
 ## Задача 1.6: `server/routes/acts.ts` (30-50 мин)
