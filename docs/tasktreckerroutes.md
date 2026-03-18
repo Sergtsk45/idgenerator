@@ -64,19 +64,19 @@
 ## Фаза 1: Поэтапный вынос модулей (один модуль = один коммит)
 
 ## Задача 1.1: `server/routes/admin.ts` (20-35 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести все `"/api/admin/*"` endpoints:
+  - [x] Перенести все `"/api/admin/*"` endpoints:
     - users list/block/unblock/make-admin/remove-admin
     - tariff change
     - stats
     - admins list
     - failed messages + reprocess
     - materials-catalog CRUD + import
-  - [ ] Импортировать auth/admin middleware из `_common.ts`
-  - [ ] Экспортировать `registerAdminRoutes(app)`
-  - [ ] Подключить модуль из `server/routes.ts`
-  - [ ] `npm run check`
+  - [x] Импортировать auth/admin middleware из `_common.ts`
+  - [x] Экспортировать `registerAdminRoutes(app)`
+  - [x] Подключить модуль из `server/routes.ts`
+  - [x] `npm run check`
 - **Риск**: разные HTTP методы (`POST` vs `PATCH` vs `DELETE`) на похожих путях.
 
 ## Задача 1.2: `server/routes/messages.ts` (20-35 мин)
