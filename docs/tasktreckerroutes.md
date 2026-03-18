@@ -8,7 +8,7 @@
 
 ## Baseline
 - [x] `npm run check` перед стартом миграции — **OK** (TypeScript без ошибок)
-- [ ] Зафиксировать baseline-коммит/тег перед переносом модулей
+- [x] Зафиксировать baseline-коммит/тег перед переносом модулей
 
 ---
 
@@ -43,11 +43,11 @@
 ## План выполнения
 
 ## Фаза 0: Подготовка (30-45 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Описание**: подготовить shared-механику и безопасный каркас для поэтапного переноса.
 - **Шаги**:
-  - [ ] Создать `server/routes/_common.ts`
-  - [ ] Вынести и экспортировать:
+  - [x] Создать `server/routes/_common.ts`
+  - [x] Вынести и экспортировать:
     - `storage` (из `server/storage.ts`)
     - `appAuth` (`[authMiddleware({ required: true })]`)
     - `adminAuth` (`[authMiddleware({ required: true }), requireAdmin]`) или `requireAdmin` + `authMiddleware`
@@ -55,8 +55,8 @@
     - `getObjectId(req): number | null` (из `req.currentObjectId`, `req.params.objectId`, `req.body.objectId`)
     - `handleError(res, err, fallbackMessage?)`
     - тип `AuthenticatedRequest` (`Request & { user: NonNullable<Request["user"]> }`)
-  - [ ] Проверить, что новые helpers не меняют текущий HTTP-контракт
-  - [ ] `npm run check`
+  - [x] Проверить, что новые helpers не меняют текущий HTTP-контракт
+  - [x] `npm run check`
 - **Критерий готовности**: `_common.ts` готов, код компилируется.
 
 ---
