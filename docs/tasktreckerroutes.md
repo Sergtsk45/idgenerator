@@ -134,23 +134,23 @@
 - **Риск**: multipart + лимитеры + blob cleanup в одном endpoint.
 
 ## Задача 1.6: `server/routes/acts.ts` (30-50 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести acts endpoints:
+  - [x] Перенести acts endpoints:
     - list/get/create/patch/delete (по API-контракту)
     - deprecated generate endpoint (`410`)
     - act templates
     - act template selections (если зарегистрированы в этом файле)
     - act material usages (list/replace)
     - act document attachments (list/replace)
-  - [ ] Перенести export и PDF-serving:
+  - [x] Перенести export и PDF-serving:
     - `POST /api/acts/:id/export`
     - `GET /api/pdfs/:filename`
     - `POST /api/acts/create-with-templates` (deprecated `410`)
-  - [ ] Локализовать импорты из `pdfGenerator`
-  - [ ] Экспортировать `registerActsRoutes(app)`
-  - [ ] Подключить модуль
-  - [ ] `npm run check`
+  - [x] Локализовать импорты из `pdfGenerator`
+  - [x] Экспортировать `registerActsRoutes(app)`
+  - [x] Подключить модуль
+  - [x] `npm run check`
 - **Риск**: не сломать fallback-логику шаблонов и генерацию PDF.
 
 ## Задача 1.7: `server/routes/schedule.ts` (40-70 мин)
