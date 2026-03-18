@@ -92,15 +92,15 @@
 - **Риск**: не потерять owner-check (`message.userId === req.user!.id`).
 
 ## Задача 1.3: `server/routes/works.ts` (25-40 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести works и work-collections:
+  - [x] Перенести works и work-collections:
     - works list/create/import/delete
     - collections list/get/import/delete
-  - [ ] Сохранить текущую semantics destructive-операций (`resetSchedule`, prod guard)
-  - [ ] Экспортировать `registerWorksRoutes(app)`
-  - [ ] Подключить модуль
-  - [ ] `npm run check`
+  - [x] Сохранить текущую semantics destructive-операций (`resetSchedule`, prod guard)
+  - [x] Экспортировать `registerWorksRoutes(app)`
+  - [x] Подключить модуль
+  - [x] `npm run check`
 - **Риск**: сохранить текущее поведение без “тихого” изменения авторизации/guard-логики.
 
 ## Задача 1.4: `server/routes/estimates.ts` (25-40 мин)
