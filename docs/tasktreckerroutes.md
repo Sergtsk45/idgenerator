@@ -80,15 +80,15 @@
 - **Риск**: разные HTTP методы (`POST` vs `PATCH` vs `DELETE`) на похожих путях.
 
 ## Задача 1.2: `server/routes/messages.ts` (20-35 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести messages endpoints:
+  - [x] Перенести messages endpoints:
     - clear/list/create/patch/process
-  - [ ] Перенести `GET /api/worklog/section3`
-  - [ ] Перенести `normalizeWorkMessage` + `getOpenAIClient` в модуль/утилиту
-  - [ ] Экспортировать `registerMessageRoutes(app)`
-  - [ ] Подключить модуль в диспетчере
-  - [ ] `npm run check`
+  - [x] Перенести `GET /api/worklog/section3`
+  - [x] Перенести `normalizeWorkMessage` + `getOpenAIClient` в модуль/утилиту
+  - [x] Экспортировать `registerMessageRoutes(app)`
+  - [x] Подключить модуль в диспетчере
+  - [x] `npm run check`
 - **Риск**: не потерять owner-check (`message.userId === req.user!.id`).
 
 ## Задача 1.3: `server/routes/works.ts` (25-40 мин)

@@ -3,7 +3,8 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { getOpenAIClient, normalizeWorkMessage } from "./routes/_openai";
+import { getOpenAIClient } from "./routes/_openai";
+import { addDaysISO } from "./routes/_dateUtils";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
 import {
@@ -19,6 +20,7 @@ import * as path from "path";
 import { telegramAuthMiddleware } from "./middleware/telegramAuth";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerAdminRoutes } from "./routes/admin";
+import { registerMessageRoutes } from "./routes/messages";
 import { authMiddleware } from "./middleware/auth";
 import { requireFeature, requireQuota } from "./middleware/tariff";
 import { db } from "./db";
@@ -26,36 +28,6 @@ import { users, objects } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { getQuota } from "@shared/tariff-features";
 
-function addDaysISO(dateStr: string, days: number): string {
-  // Expect YYYY-MM-DD. Work in UTC to avoid timezone shifts.
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  if (Number.isNaN(d.getTime())) {
-    throw new Error(`Invalid date: ${dateStr}`);
-  }
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function differenceInDaysISO(dateStr1: string, dateStr2: string): number {
-  // Calculate difference in days between two YYYY-MM-DD dates
-  const d1 = new Date(`${dateStr1}T00:00:00Z`);
-  const d2 = new Date(`${dateStr2}T00:00:00Z`);
-  if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) {
-    throw new Error(`Invalid date: ${dateStr1} or ${dateStr2}`);
-  }
-  const diffTime = d2.getTime() - d1.getTime();
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
-}
-
-function eachDayInRange(start: string, end: string): string[] {
-  const days: string[] = [];
-  let current = start;
-  while (current <= end) {
-    days.push(current);
-    current = addDaysISO(current, 1);
-  }
-  return days;
-}
 
 
 const invoiceUpload = multer({
@@ -1089,242 +1061,9 @@ export async function registerRoutes(
     }
   });
 
-  // Messages
-  app.delete(api.messages.list.path, ...appAuth, async (req, res) => {
-    await storage.clearMessages(req.user!.id);
-    return res.status(204).send();
-  });
+  // Message routes — extracted to server/routes/messages.ts
+  registerMessageRoutes(app);
 
-  app.get(api.messages.list.path, ...appAuth, async (req, res) => {
-    const messages = await storage.getMessages(req.user!.id);
-    res.json(messages);
-  });
-
-  app.post(api.messages.create.path, ...appAuth, async (req, res) => {
-    try {
-      const input = api.messages.create.input.parse(req.body);
-
-      // Резолвим текущий объект пользователя для привязки сообщения
-      const currentObj = await storage.getCurrentObject(req.user!.id);
-
-      const message = await storage.createMessage({
-        objectId: currentObj.id,
-        messageRaw: input.messageRaw,
-        userId: req.user!.id,
-      } as any);
-
-      // Trigger normalization in background (or await if fast enough)
-      // For MVP, we'll await it to show immediate result
-      try {
-        const normalized = await normalizeWorkMessage(input.messageRaw, currentObj.id);
-        await storage.updateMessageNormalized(message.id, normalized);
-        
-        // Return the updated message
-        const updated = await storage.getMessage(message.id);
-        res.status(201).json(updated);
-      } catch (aiError) {
-        console.error("AI Normalization failed:", aiError);
-        // Mark as processed without AI to avoid "infinite loading" in UI
-        const updated = await storage.updateMessageNormalized(message.id, null as any);
-        res.status(201).json(updated);
-      }
-
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
-      }
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  // Messages: explicit processing endpoint (sync with shared/routes.ts)
-  app.post(api.messages.process.path, ...appAuth, async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isFinite(id)) {
-        return res.status(400).json({ message: "Invalid message id" });
-      }
-
-      const message = await storage.getMessage(id);
-      if (!message) {
-        return res.status(404).json({ message: "Message not found" });
-      }
-
-      // Проверка владельца
-      if (message.userId !== req.user!.id) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
-      const processObj = await storage.getCurrentObject(req.user!.id);
-
-      // Re-run normalization on demand (useful if initial processing failed)
-      try {
-        const normalized = await normalizeWorkMessage(message.messageRaw, processObj.id);
-        await storage.updateMessageNormalized(message.id, normalized);
-      } catch (aiError) {
-        console.error("Message processing (AI) failed:", aiError);
-        // Mark as processed without AI to avoid "infinite loading" in UI
-        await storage.updateMessageNormalized(message.id, null as any);
-      }
-
-      const updated = await storage.getMessage(message.id);
-      return res.status(200).json(updated);
-    } catch (err) {
-      console.error("Message processing failed:", err);
-      return res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  // Messages: patch endpoint for inline editing
-  app.patch(api.messages.patch.path, ...appAuth, async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isFinite(id)) {
-        return res.status(400).json({ message: "Invalid message id" });
-      }
-
-      // Проверка владельца
-      const existing = await storage.getMessage(id);
-      if (!existing) {
-        return res.status(404).json({ message: "Message not found" });
-      }
-      if (existing.userId !== req.user!.id) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-
-      const input = api.messages.patch.input.parse(req.body);
-      const updated = await storage.patchMessage(id, input);
-
-      if (!updated) {
-        return res.status(404).json({ message: "Message not found" });
-      }
-
-      return res.status(200).json(updated);
-    } catch (err) {
-      console.error("Message patch failed:", err);
-      return res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  // Worklog Section 3: combined view of messages and acts, grouped by date
-  app.get(api.worklog.section3.path, ...appAuth, async (req, res) => {
-    try {
-      const showVolumes = req.query.showVolumes === "1";
-
-      const section3Obj = await storage.getCurrentObject(req.user!.id);
-
-      // Load messages and acts in parallel
-      const [allMessages, allActs] = await Promise.all([
-        storage.getMessages(req.user!.id),
-        storage.getActs(section3Obj.id),
-      ]);
-
-      type Segment = {
-        text: string;
-        sourceType: 'message' | 'act';
-        sourceId: number;
-        isPending: boolean;
-      };
-
-      type DateRow = {
-        date: string;
-        workConditions: string;
-        segments: Segment[];
-        representative: string;
-      };
-
-      // Group rows by date using a Map (insertion order preserved = sort later)
-      const byDate = new Map<string, DateRow>();
-
-      const getOrCreateRow = (date: string): DateRow => {
-        if (!byDate.has(date)) {
-          byDate.set(date, { date, workConditions: "", segments: [], representative: "" });
-        }
-        return byDate.get(date)!;
-      };
-
-      // First pass: acts (appear first in each date's segments list)
-      for (const act of allActs) {
-        if (!act.dateStart || !act.dateEnd || !act.worksData) continue;
-
-        const dateStart = String(act.dateStart);
-        const dateEnd = String(act.dateEnd);
-        const worksData = act.worksData as Array<{
-          description: string;
-          code?: string;
-          quantity?: number;
-          unit?: string;
-        }>;
-
-        if (!Array.isArray(worksData) || worksData.length === 0) continue;
-
-        const dates = eachDayInRange(dateStart, dateEnd);
-
-        for (const date of dates) {
-          const row = getOrCreateRow(date);
-
-          for (const workItem of worksData) {
-            let text = workItem.description || "";
-            if (showVolumes && workItem.quantity != null && workItem.unit) {
-              text += ` (${workItem.quantity} ${workItem.unit})`;
-            }
-
-            row.segments.push({ text, sourceType: 'act', sourceId: act.id, isPending: false });
-          }
-        }
-      }
-
-      // Second pass: messages (appear after acts in each date's segments list)
-      for (const msg of allMessages) {
-        const data = msg.normalizedData;
-
-        // Determine date
-        let dateStr = "";
-        if (data?.date) {
-          dateStr = data.date;
-        } else if (msg.createdAt) {
-          dateStr = new Date(msg.createdAt).toISOString().slice(0, 10);
-        }
-        if (!dateStr) continue;
-
-        // Build work description
-        let text = "";
-        if (msg.isProcessed && data) {
-          text = data.workDescription || msg.messageRaw || "";
-          const materials = Array.isArray(data.materials) ? data.materials : [];
-          if (materials.length > 0) text += ` — ${materials.join("; ")}`;
-        } else {
-          text = msg.messageRaw || "";
-        }
-
-        const row = getOrCreateRow(dateStr);
-
-        // Merge workConditions from message (if any)
-        if (data?.workConditions && !row.workConditions) {
-          row.workConditions = data.workConditions;
-        }
-        // Merge representative from message (if any)
-        if (data?.representative && !row.representative) {
-          row.representative = data.representative;
-        }
-
-        row.segments.push({
-          text,
-          sourceType: 'message',
-          sourceId: msg.id,
-          isPending: !msg.isProcessed,
-        });
-      }
-
-      // Sort rows by date and return
-      const rows = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
-
-      res.json(rows);
-    } catch (err) {
-      console.error("Worklog section3 fetch failed:", err);
-      return res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
 
   // Acts
   app.get(api.acts.list.path, ...appAuth, async (req, res) => {
