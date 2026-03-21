@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-21] - Задача 1.8: extract objects routes module
+
+### Изменено
+- `server/routes/objects.ts` — создан новый модуль с экспортом `registerObjectRoutes(app)`: object/current, patchCurrent, source-data (get/put), objects CRUD (list/create/getById/update/delete/select); quota check сохранён
+- `server/routes.ts` — objects блок удалён, добавлен вызов `registerObjectRoutes(app)`, удалены неиспользуемые импорты `telegramAuthMiddleware`, `users`
+
 ## [2026-03-21] - Задача 1.7: extract schedule routes module
 
 ### Изменено

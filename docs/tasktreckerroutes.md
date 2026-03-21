@@ -173,14 +173,14 @@
 - **Риск**: высокая связность и много бизнес-правил (act template sync, split sync).
 
 ## Задача 1.8: `server/routes/objects.ts` (15-30 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести object/current + source-data endpoints
-  - [ ] Перенести objects CRUD + select
-  - [ ] Сохранить quota checks по objects
-  - [ ] Экспортировать `registerObjectRoutes(app)`
-  - [ ] Подключить модуль
-  - [ ] `npm run check`
+  - [x] Перенести object/current + source-data endpoints
+  - [x] Перенести objects CRUD + select
+  - [x] Сохранить quota checks по objects
+  - [x] Экспортировать `registerObjectRoutes(app)`
+  - [x] Подключить модуль
+  - [x] `npm run check`
 
 ## Задача 1.9: `server/routes/voice.ts` (10-20 мин)
 - **Статус**: Не начата
