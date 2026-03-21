@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-03-21] - Отображение данных пользователя в UI панели администратора
+
+### Добавлено
+- `AdminUsers.tsx` — карточка пользователя теперь отображает `displayName` (основное имя), `email` с иконкой, бейджи провайдеров авторизации (Telegram / Email), дату последнего входа
+- Поиск в панели администратора расширен: учитывает `displayName` и `email` (ранее только `telegramUserId` и `objectTitle`)
+
+### Изменено
+- `server/storage.ts` — `listUsers()` дополнен параллельным запросом к таблице `auth_providers`; `AdminUserRow` расширен полями `displayName`, `email`, `authProviders`, `createdAt`, `lastLoginAt`
+- `client/src/hooks/use-admin.ts` — `AdminUserRow` обновлён, добавлен интерфейс `AdminUserAuthProvider`
+- Диалоги блокировки/снятия прав/смены тарифа используют `displayName` вместо `telegramUserId`
+
+---
+
 ## [2026-03-21] - Рефакторинг backend routes: модульная архитектура (ISS-002)
 
 ### Описание
