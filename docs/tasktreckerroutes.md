@@ -154,22 +154,22 @@
 - **Риск**: не сломать fallback-логику шаблонов и генерацию PDF.
 
 ## Задача 1.7: `server/routes/schedule.ts` (40-70 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести schedule endpoints:
+  - [x] Перенести schedule endpoints:
     - default/create/get
     - bootstrap-from-works
     - bootstrap-from-estimate
     - source-info/change-source
     - generate-acts
-  - [ ] Перенести schedule-tasks:
+  - [x] Перенести schedule-tasks:
     - patch, split, split-siblings
-  - [ ] Перенести task-materials:
+  - [x] Перенести task-materials:
     - list/replace/add/remove
-  - [ ] Перенести schedule helper-функции дат (`addDaysISO`, `differenceInDaysISO`, `eachDayInRange`) если используются только здесь
-  - [ ] Экспортировать `registerScheduleRoutes(app)`
-  - [ ] Подключить модуль
-  - [ ] `npm run check`
+  - [x] Перенести schedule helper-функции дат (`addDaysISO`, `differenceInDaysISO`, `eachDayInRange`) если используются только здесь
+  - [x] Экспортировать `registerScheduleRoutes(app)`
+  - [x] Подключить модуль
+  - [x] `npm run check`
 - **Риск**: высокая связность и много бизнес-правил (act template sync, split sync).
 
 ## Задача 1.8: `server/routes/objects.ts` (15-30 мин)

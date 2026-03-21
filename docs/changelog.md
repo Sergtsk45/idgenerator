@@ -1,5 +1,206 @@
 # Changelog
 
+## [2026-03-21] - Задача 1.7: extract schedule routes module
+
+### Изменено
+- `server/routes/schedule.ts` — создан новый модуль с экспортом `registerScheduleRoutes(app)`: schedule endpoints (default/create/get, bootstrap-from-works/estimate, source-info, change-source, generate-acts), schedule-tasks (patch, split, split-siblings), task-materials (list/replace/add/remove)
+- `server/routes.ts` — schedule/task-materials блок удалён (~937 строк), добавлен вызов `registerScheduleRoutes(app)`, удалены неиспользуемые импорты `requireFeature`, `requireQuota`, `addDaysISO`
+
+## [2026-03-14] - Sprint 6: Admin + Settings + RBAC + 404 tablet UI adaptation (v1.3)
+
+### Добавлено
+- `AdminGuard.tsx` — RBAC-guard для admin-маршрутов: проверяет роль `admin`, отображает страницу Access Denied (403) для не-администраторов, Task 6.6
+- `__tests__/admin-settings.e2e.ts` — E2E тесты Sprint 6 (AdminLayout hamburger, RBAC, 404, Settings two-column, AdminUsers search, AdminMaterials CRUD), Task 6.9
+
+### Изменено
+- `Settings.tsx` — двухколоночный layout на lg+: sidebar (w-64) с nav-секциями + правая scrollable область; мобильный single-scroll layout сохранён, Task 6.1
+- `AdminLayout.tsx` — гамбургер-кнопка на md breakpoint (768–1023px) открывает sidebar как Sheet overlay; desktop lg+ sidebar всегда виден; mobile (<md) нижняя навигация сохранена, Task 6.2
+- `AdminUsers.tsx` — контейнер `max-w-5xl lg:max-w-none`; карточки в 2-column grid на lg+, Task 6.3
+- `AdminMessages.tsx` — контейнер `max-w-5xl`; сообщения в 2-column grid на lg+, Task 6.4
+- `AdminMaterials.tsx` — контейнер `max-w-5xl`; материалы в 2-column grid на lg+; MaterialDialog шире `sm:max-w-lg`, Task 6.5
+- `not-found.tsx` — полноэкранная tablet-adaptive 404 страница с кнопками "На главную" и "Назад", Task 6.7
+- `App.tsx` — все `/admin/*` маршруты теперь обернуты в `AdminGuard` вместо `AuthGuard`, Task 6.8
+
+## [2026-03-14] - Sprint 5: Source Data + Materials + Documents + Objects tablet UI adaptation
+
+### Добавлено
+- `SourceMaterials.tsx` — master-detail layout на lg+ (список слева 380px, превью справа), Task 5.2
+- `SourceDocuments.tsx` — 2-колоночный layout на lg+ (список слева 420px, drag-drop зона справа), Task 5.3+5.4
+- `ObjectSelector.tsx` — поиск по объектам внутри bottom sheet, Task 5.6
+- `__tests__/source-data-objects.e2e.ts` — E2E тесты Sprint 5, Task 5.9
+
+### Изменено
+- `SourceData.tsx` — parties: horizontal scroll → `lg:grid-cols-4` grid на lg+; sections: `lg:grid-cols-2`; контейнер расширен до `lg:max-w-5xl`, Task 5.1
+- `SourceDocuments.tsx` — 2-колоночный layout, Task 5.3
+- `Objects.tsx` — grid `lg:grid-cols-2`, поиск по объектам, контейнер `lg:max-w-4xl`, Task 5.5
+- `ObjectSelector.tsx` — сброс поиска при закрытии sheet, Task 5.6
+
+### Подтверждено (уже реализовано ранее)
+- Dirty-state detection при смене объекта: `isDirty` в `SourceData.tsx`, Task 5.7
+- Query cache invalidation при смене объекта: `queryClient.invalidateQueries()` в `use-objects.ts`, Task 5.8
+
+## [2026-03-14] - Sprint 4: Schedule + Acts tablet UI adaptation
+
+### Добавлено
+- `Schedule.tsx` — zoom controls (кнопки ZoomOut/ZoomIn, 4 уровня: 3М / 2М / 6Н / 4Н), Task 4.2
+- `Schedule.tsx` — tabbed Task Editor (вкладки Основное / Материалы / Документация), Task 4.3
+- `Schedule.tsx` — inline Act Template Picker dialog с поиском, заменяет навигацию на `/select-act-template`, Task 4.4
+- `Acts.tsx` — двухколоночная grid-сетка для актов на lg+ (Task 4.5)
+- `Acts.tsx` — progress bar при генерации PDF (Task 4.7)
+- `__tests__/schedule-acts.e2e.ts` — E2E тесты для Sprint 4 (Task 4.9)
+
+### Изменено
+- `Schedule.tsx` — контейнер расширен до `lg:max-w-none`, левая панель Gantt шире на lg+, Task 4.1
+- `Schedule.tsx` — edit dialog шире `lg:max-w-3xl`, Task 4.3
+- `SplitTaskDialog.tsx` — dialog шире `sm:max-w-lg lg:max-w-2xl` на tablet, Task 4.8
+- `Acts.tsx` — export dialog шире `lg:max-w-2xl` на tablet, Task 4.5
+
+## [2026-03-14] - Исправление падения CJS-сборки в pdfGenerator
+
+### Исправлено
+- Использование `__filename` вместо `import.meta.url` в `server/pdfGenerator.ts` для совместимости с CJS-сборкой сервера (staging / prod).
+
+## [2026-03-10] - Финальная нормализация экранных ТЗ 02-04 для tablet UI
+
+### Изменено
+- `docs/TZfrontend/02-auth-home-worklog.md` — выровнены требования по плотности WorkLog и touch area: визуальная высота строк может быть компактной, но интерактивные зоны обязаны сохранять `44x44px+`; добавлен единый блок `Design System & Touch Targets`; убраны противоречивые формулировки про offline-очередь в пользу network error/retry сценариев.
+- `docs/TZfrontend/03-works-estimates.md` — добавлен единый блок `Design System & Touch Targets` для таблиц, аккордеонов, bulk actions и import-flow; в acceptance criteria зафиксированы обязательные проверки `44x44px+` и отсутствие hardcoded visual values.
+- `docs/TZfrontend/04-schedule-acts.md` — добавлен единый блок `Design System & Touch Targets` для Gantt toolbar, modal actions, export controls и form triggers; в acceptance criteria добавлены явные проверки `44x44px+` и обязательное использование design-system tokens.
+- `docs/TZfrontend/07-qa-rollout.md` — QA-документация очищена от legacy offline queue/sync требований: risk register, unit/integration/E2E scenarios, rollout checklist и release-notes template переведены на модель `network retry + state preservation`, а audit Design System расширен до проверки всех hardcoded visual values.
+- `docs/tasktracker.md` — зафиксирован отдельный финальный шаг по нормализации экранных ТЗ `02-04` и повторной консистентной проверке всего пакета `docs/TZfrontend/00-08`.
+
+## [2026-03-10] - Design System Integration в Foundation Documentation (Tablet UI)
+
+### Изменено
+- ✅ `docs/TZfrontend/README.md` — добавлена папка `design-system-12.03.2026-design-system/` в структуру документации как **обязательный DESIGN SYSTEM**; указаны ссылки на все 4 файла (style-guide, implementation-guide, CSS, JSON)
+- ✅ `docs/TZfrontend/01-foundation-platform-shell.md` — добавлен раздел **1.5 Design System Integration (Обязательное требование)** с детализацией:
+  - Список что регулируется Design System (цвета, spacing, radius, typography, touch targets, animations)
+  - Что остается отдельным инфраструктурным слоем (safe-area, Telegram tokens)
+  - Как применять Design System (CSS переменные, mapping к компонентам)
+  - Code Review rules (запрет на hardcoding, минимум 44px hit area для interactive контролов)
+- ✅ `docs/TZfrontend/00-development-plan.md` — добавлено в раздел 3 (Basic Requirements) главное требование **Design System Compliance** с пометкой ⭐; обновлен раздел 6 (Dependencies) с явным указанием Design System как обязательной зависимости; обновлены критерии DoD (раздел 8) с проверкой design-system соответствия и code review rules
+- ✅ `docs/TZfrontend/08-frontend-sprints-plan.md` — интегрирован Design System во все спринты:
+  - Добавлено напоминание в раздел 5 перед Sprint 1 про обязательность Design System
+  - Sprint 1: добавлены 2 новые задачи (1.3, 1.12) про интеграцию и review design-system tokens
+  - Sprint 2–6: обновлены все Acceptance Criteria с требованием **Design System Compliance** и указанием каких tokens использовать
+  - Sprint 6 (QA): добавлена явная audit-задача на проверку 0 hardcoded значений
+  - Обновлен Чек-лист для Tech Lead (раздел 11) с пунктом про обязательное изучение Design System и интеграцию tokens
+  - Добавлено в глоссарий (раздел 10.3) определение Design System
+
+### Зафиксировано
+- ✅ Design System `docs/TZfrontend/design-system-12.03.2026-design-system/` (style-guide, implementation-guide, CSS, JSON) является **обязательным Visual Contract** для всех компонентов tablet UI
+- ✅ **Правило accessibility**: touch targets минимум **44px** для всех interactive controls (проектный minimum; design-system может содержать 40px как нижнюю границу токенов, но размер hit area не должен быть ниже 44px)
+- ✅ **Code Review Gate**: Все PR должны быть проверены на использование design-system tokens (no hardcoded цветов/размеров/spacing)
+- ✅ Foundation документация полностью синхронизирована и готова для разработки Sprint 1+ с соблюдением Design System
+
+## [2026-03-12] - Dev bootstrap дефолтного admin-логина
+
+### Добавлено
+- `server/routes/auth.ts` — при старте в `NODE_ENV=development` автоматически создаётся или обновляется дефолтный email-admin для локальной проверки: `admin@admin.com / 12345678`.
+
+### Изменено
+- `client/src/pages/Login.tsx` — в dev-режиме форма логина предзаполняется дефолтными данными админа, чтобы ускорить ручную визуальную проверку ветки `feature/tablet-ui`.
+
+## [2026-03-10] - Вертикальная прокрутка в импорте PDF-счёта материалов
+
+### Исправлено
+- `client/src/components/materials/InvoicePreviewDialog.tsx` — в диалоге предпросмотра импорта PDF-счёта восстановлена вертикальная прокрутка длинного списка распознанных материалов; модальное окно теперь корректно ограничивает свою высоту, а внутренний список прокручивается внутри доступной области экрана.
+
+## [2026-03-10] - Responsive Shell Adapters для md/lg+ (Sprint 1 Subphase 2)
+
+### Добавлено
+- `client/src/components/ResponsiveShell.tsx` — page-level shell adapter, который рендерит `top-nav` для `md+` (primary navigation) и `sidebar` для `lg+` (secondary/quick-action pattern), читая существующий navigation manifest. Компонент не владеет auth/router/state и служит чистым presentational shell-слоем для tablet/desktop.
+
+### Изменено
+- `client/src/components/Header.tsx` — hamburger/sheet для primary navigation теперь mobile-only (`md:hidden`); на `md+` hamburger скрыт, основной доступ к навигации даёт `ResponsiveShell` top-nav. Временный fallback через `Header` Sheet на `md+` удалён.
+- `client/src/pages/SourceMaterialDetail.tsx` — подключена к `ResponsiveShell`, чтобы вложенный route `/source/materials/:id` сохранял доступ к shell navigation на `md+`.
+- `docs/project.md` и `docs/frontend.md` — зафиксирован shell-архитектура с `ResponsiveShell` и поведение navigation по breakpoints.
+
+### Зафиксировано
+- ✅ `npm run check` OK — TypeScript без ошибок.
+- ✅ `npm run build` OK — финальный бандл собран. (Старые warning'и про chunk size / import.meta / mixed dynamic import остаются и не связаны с этой задачей.)
+- ⏳ Ручная cross-device validation на реальных mobile/tablet/desktop устройствах остаётся следующей проверкой и не входила в этот кодовый подэтап.
+
+### Архитектурное резюме
+- **Sprint 1 Foundation-only**: адаптированы только shell и navigation; массовая адаптация page-content layout отложена на Sprint 2+.
+- **Navigation Contract**: единый manifest для `primary` (`/works`, `/schedule`, `/acts`, `/worklog`, `/source-data`), `secondary` (`/objects`, `/settings`), `quickAction` (`/`).
+- **Breakpoint behavior**:
+  - **mobile** (`< md`): `BottomNav` + hamburger `Header` Sheet
+  - **md** (`md..lg`): `ResponsiveShell` top-nav (горизонтальные кнопки primary)
+  - **lg+** (`>= lg`): `ResponsiveShell` top-nav + sidebar (secondary/quick-action)
+
+## [2026-03-10] - Точечные fixes по findings Sprint 1 shell/nav
+
+### Изменено
+- `client/src/components/ResponsiveShell.tsx` и `client/src/components/Header.tsx` — ссылки/кнопки в shell navigation и header quick actions переведены на корректную семантику через `Button asChild`, без изменения router/navigation contract; новые shell/header accessibility labels локализованы через `client/src/lib/i18n.ts`
+- `client/src/pages/Home.tsx`, `client/src/pages/SourceDocuments.tsx`, `client/src/pages/SourceMaterials.tsx` — закрыты точечные accessibility/UX замечания: убраны оставшиеся `Link -> Button` вложения, добавлены accessible labels для icon-only actions, а floating actions на `md+` снова привязаны к ширине page content
+- `client/src/pages/Acts.tsx` и `client/src/pages/SourceDocuments.tsx` — md+ positioning action area скорректирован так, чтобы floating action оставался привязанным к ширине page content, а не выглядел глобальным элементом viewport
+
+### Исправлено
+- `client/src/pages/Schedule.tsx` — удалён лишний `resize` listener для `isPortrait`, который больше не использовался после текущей tablet shell итерации
+
+## [2026-03-10] - Унификация navigation contract для tablet UI (Sprint 1)
+
+### Добавлено
+- `client/src/lib/navigation.ts` — единый navigation manifest с разделением на `primary`, `secondary`, `quickAction`, surface visibility intent для mobile и будущего `md/lg+` shell, а также правилами active-state для nested source routes (`/source/materials`, `/source/materials/:id`, `/source/documents`)
+
+### Изменено
+- `client/src/components/BottomNav.tsx` — нижняя навигация переведена на общий navigation contract; mobile-first поведение сохранено, компонент явно скрыт на `md+`
+- `client/src/components/Header.tsx` — sheet navigation и quick action теперь читают данные из общего manifest без локальных nav-массивов; на `md+` `Header` Sheet временно даёт fallback-доступ к primary navigation до отдельного top-nav/sidebar, сохраняя browser fallback и совместимость с Telegram MiniApp
+- `client/src/lib/i18n.ts` — navigation labels расширены ключами для `quickAction` (`homeChat`) и `secondary` (`objects`, `settings`), чтобы общий manifest не зависел от hardcoded-строк в `Header`
+- `docs/project.md` и `docs/frontend.md` — зафиксирован navigation contract как часть Sprint 1 foundation shell
+
+## [2026-03-10] - Старт Sprint 1 foundation shell для tablet UI
+
+### Добавлено
+- `client/src/index.css` — foundation-level токены shell для tablet UI: safe-area переменные, `pt-safe/pb-safe/pl-safe/pr-safe`, responsive padding/height tokens и базовый viewport fallback для Telegram MiniApp и browser fallback
+
+### Изменено
+- `tailwind.config.ts` — явно зафиксирован breakpoint contract для foundation-слоя tablet UI: `sm=640`, `md=768`, `lg=1024`, `xl=1280`, `2xl=1536`
+- `client/index.html` — viewport обновлён до `viewport-fit=cover` для корректной работы safe-area на iOS/iPadOS
+- `client/src/components/Header.tsx` — sticky header теперь учитывает верхнюю и боковые safe-area без изменения текущей mobile-first композиции
+- `client/src/components/TelegramThemeProvider.tsx` — CSS-переменные `--tg-viewport-height`, `--tg-viewport-stable-height` и `--tg-viewport-width` синхронизируются с Telegram WebApp и очищаются в browser fallback
+
+## [2026-03-10] - Актуализация git-стратегии под параллельную разработку
+
+### Изменено
+- `/docs/TZfrontend/strateg.md` — стратегия приведена к реальному режиму работы: `main` остаётся основной тестируемой веткой текущего приложения, найденные баги сначала исправляются в `main`, затем нужные изменения переносятся в `feature/tablet-ui`; для нового UI зафиксирован отдельный контур тестирования и запрещена подмена основного тестового сервера веткой `feature/tablet-ui`
+
+## [2026-03-10] - Git-стратегия для tablet UI и тестового сервера
+
+### Добавлено
+- `/docs/TZfrontend/strateg.md` — отдельный регламент по работе с веткой `feature/tablet-ui`: naming веток, порядок merge, правила синхронизации с `main`, правила деплоя на тестовый сервер и порядок добавления новых экранов/кнопок по итогам тестирования
+
+### Изменено
+- `/docs/TZfrontend/README.md` — стратегия добавлена в структуру пакета `TZfrontend` и включена в рекомендуемый порядок изучения перед стартом разработки
+
+## [2026-03-10] - Спринт-план для frontend-разработчика по tablet UI
+
+### Добавлено
+- `/docs/TZfrontend/08-frontend-sprints-plan.md` — приоритизированный план внедрения tablet UI по 6 спринтам: foundation shell, auth/home/worklog, works/estimates, schedule/acts, source-data/objects/settings, admin/QA/rollout
+
+### Изменено
+- `/docs/TZfrontend/README.md` — добавлен новый главный документ для frontend-разработчика с планом работ по спринтам и обновлена структура пакета `TZfrontend`
+
+## [2026-03-10] - Пакет ТЗ для tablet UI фронтенда
+
+### Добавлено
+- `/docs/TZfrontend/README.md` — индекс пакета ТЗ, карта экранов, список обязательных исходных документов и точка входа для frontend-разработчика
+- `/docs/TZfrontend/00-development-plan.md` — детальный план подготовки и внедрения tablet UI без регрессии мобильного сценария
+- `/docs/TZfrontend/01-foundation-platform-shell.md` — platform/shell требования: breakpoints, responsive navigation, safe-area, Telegram/browser parity, state rules, accessibility, performance
+- `/docs/TZfrontend/02-auth-home-worklog.md` — ТЗ по экранам аутентификации, главной странице и журналу работ
+- `/docs/TZfrontend/03-works-estimates.md` — ТЗ по экрану ВОР/Смета, импорту Excel и реестровым представлениям
+- `/docs/TZfrontend/04-schedule-acts.md` — ТЗ по графику работ, редактору задач, subflows выбора материалов/шаблонов и экрану актов
+- `/docs/TZfrontend/05-source-data-materials-documents.md` — ТЗ по исходным данным, материалам, карточке материала и документам качества
+- `/docs/TZfrontend/06-objects-settings-admin.md` — ТЗ по управлению объектами, настройкам, админке и служебным сценариям
+- `/docs/TZfrontend/07-qa-rollout.md` — матрица тестирования, критерии качества и rollout-стратегия для tablet UI
+
+### Характеристики ТЗ
+- **Ширина фокуса**: tablet portrait и landscape, с сохранением mobile-first поведения на узких экранах
+- **Покрытие маршрутов**: `/login`, `/register`, `/`, `/worklog`, `/works`, `/schedule`, `/acts`, `/select-act-template`, `/select-task-materials`, `/source-data`, `/source/materials`, `/source/materials/:id`, `/source/documents`, `/objects`, `/settings`, `/admin/*`
+- **Фокус требований**: shell и навигация, таблицы и формы, Telegram MiniApp ограничения, browser fallback, object switching, сложные редакторы и стратегия тестирования
+- **Качество**: acceptance criteria по экранам, accessibility, performance, контроль сетевых ошибок и rollout без регрессии основного mobile UX
+
 ## [2026-03-09] - Исправление цикла конфликта типа акта при назначении номера
 
 ### Исправлено
