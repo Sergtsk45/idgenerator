@@ -129,7 +129,18 @@ flowchart LR
   - `client/src/lib/materialsParser.ts` — парсер Excel-файла для импорта материалов.
 - `server/` — бэкенд (Express)
   - `server/index.ts` — входная точка, в dev подключает Vite middleware, в prod — статические файлы из `dist/public`.
-  - `server/routes.ts` — регистрация API роутов для works/messages/acts/admin.
+  - `server/routes.ts` — диспетчер API: импортирует и вызывает `register*Routes(app)` для каждого домена. Бизнес-логика вынесена в модули:
+    - `server/routes/auth.ts` — аутентификация (register/login/telegram/profile)
+    - `server/routes/tariff.ts` — статус тарифа и квот
+    - `server/routes/voice.ts` — транскрипция голоса (Whisper)
+    - `server/routes/objects.ts` — объекты (single current + multi-object CRUD)
+    - `server/routes/materials.ts` — материалы, документы качества, партии, привязки
+    - `server/routes/works.ts` — ВОР и коллекции работ
+    - `server/routes/messages.ts` — журнал работ и обработка сообщений
+    - `server/routes/schedule.ts` — График Ганта, задачи, материалы задач
+    - `server/routes/estimates.ts` — смета/ЛСР и позиции
+    - `server/routes/acts.ts` — акты АОСР, шаблоны, экспорт PDF
+    - `server/routes/admin.ts` — административный API
   - `server/storage.ts` — слой доступа к данным (Drizzle).
   - `server/db.ts` — подключение к Postgres через `DATABASE_URL`.
   - `server/pdfGenerator.ts` — генерация PDF (pdfmake), включая АОСР по шаблону `server/templates/aosr/aosr-template.json`.

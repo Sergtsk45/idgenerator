@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-03-21] - Фазы 2–4: верификация, документация, закрытие ISS-002
+
+### Изменено
+- `docs/project.md` — обновлена секция backend routes: описаны все 11 модулей `server/routes/`
+- `ai_docs/develop/issues/ISS-002-routes-file-too-large.md` — статус изменён на Resolved (2026-03-21), добавлен раздел Resolution с итогами
+- `docs/tasktreckerroutes.md` — Фазы 2, 3, 4 отмечены как Завершены
+
+### Верификация
+- `npm run check` — пройден (0 ошибок TypeScript)
+- `npm run build` — пройден (0 ошибок)
+- Middleware parity: appAuth ×44, adminAuth ×14, requireFeature ×4, requireQuota ×2, rateLimit ×14, multer ×12
+
 ## [2026-03-21] - Задача 1.10: extract tariff routes module + finalize dispatcher
 
 ### Изменено

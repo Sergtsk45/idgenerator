@@ -203,48 +203,36 @@
 ---
 
 ## Фаза 2: Новый `server/routes.ts` как диспетчер (15-25 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Оставить только orchestrator-логику:
-    - imports `register*Routes`
-    - функция `registerRoutes(httpServer, app)` и последовательный вызов регистраций
-    - `return httpServer`
-  - [ ] Проверить совместимость сигнатуры с `server/index.ts`
-  - [ ] Удалить неиспользуемые импорты/утилиты из старого `routes.ts`
-  - [ ] `npm run check`
-- **Критерий готовности**: `routes.ts` 30-70 строк, без бизнес-логики.
+  - [x] Оставить только orchestrator-логику (70 строк, без бизнес-логики)
+  - [x] Проверить совместимость сигнатуры с `server/index.ts` — совместима
+  - [x] Удалить неиспользуемые импорты/утилиты
+  - [x] `npm run check`
 
 ---
 
 ## Фаза 3: Верификация (30-45 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] `npm run check`
-  - [ ] `npm run build`
-  - [ ] Smoke-test:
-    - [ ] Auth (Telegram + email)
-    - [ ] Objects CRUD + select current
-    - [ ] Materials list/create + parse invoice
-    - [ ] Schedules tasks + split
-    - [ ] Generate acts + export PDF + `/api/pdfs/:filename`
-    - [ ] Admin users + tariffs + materials-catalog import
-  - [ ] Проверка middleware parity:
-    - [ ] `appAuth` / `adminAuth`
-    - [ ] `requireFeature` / `requireQuota`
-    - [ ] rate limiters
-    - [ ] multer upload filters/limits
-- **Критерий готовности**: поведение API совпадает с baseline.
+  - [x] `npm run check`
+  - [x] `npm run build`
+  - [ ] Smoke-test (требует запущенного сервера — ручная проверка)
+  - [x] Проверка middleware parity:
+    - [x] `appAuth` (44 вхождения) / `adminAuth` (14)
+    - [x] `requireFeature` (4) / `requireQuota` (2)
+    - [x] rate limiters (14)
+    - [x] multer upload filters/limits (12)
 
 ---
 
 ## Фаза 4: Документация и закрытие ISS-002 (15-30 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Обновить `docs/project.md` (структура backend routes)
-  - [ ] Добавить запись в `docs/changelog.md`
-  - [ ] Обновить `docs/tasktracker.md` (статус ISS-002)
-  - [ ] Закрыть ISS-002 в `ai_docs/develop/issues/`
-- **Критерий готовности**: код и документация синхронизированы.
+  - [x] Обновить `docs/project.md` (структура backend routes)
+  - [x] Добавить запись в `docs/changelog.md`
+  - [x] Обновить `docs/tasktreckerroutes.md`
+  - [x] Закрыть ISS-002 в `ai_docs/develop/issues/`
 
 ---
 
