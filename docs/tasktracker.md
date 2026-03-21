@@ -2,6 +2,218 @@
 
 ---
 
+## Задача: ISS-002 — декомпозиция `server/routes.ts` (модульные `server/routes/*`)
+- **Статус**: Завершена
+- **Дата начала**: (миграция в рамках ветки `refactor/routes-modularization`)
+- **Дата завершения**: 2026-03-21
+- **Описание**: Вынести монолитный `server/routes.ts` в доменные модули с `register*Routes(app)`, сохранить контракты API и middleware/quota/feature parity. Детальный пошаговый план и чеклисты: `docs/tasktreckerroutes.md`.
+- **Шаги выполнения**:
+  - [x] Фаза 0: `server/routes/_common.ts` и общие хелперы
+  - [x] Фаза 1: модули admin, messages, works, estimates, materials, acts, schedule, objects, voice, tariff (+ `auth.ts`)
+  - [x] Фаза 2: `server/routes.ts` как диспетчер (~70 строк включая опциональный dev-seed)
+  - [x] Фаза 3: `npm run check`, `npm run build`, middleware parity (см. changelog 2026-03-21)
+  - [x] Фаза 4: `docs/project.md`, `docs/changelog.md`, issue ISS-002 Resolved, синхронизация `docs/tasktreckerroutes.md`
+  - [ ] Опционально: полный ручной smoke по списку в `docs/tasktreckerroutes.md` (Фаза 3) перед релизом
+- **Зависимости**: нет
+
+---
+
+## Задача: Sprint 4 — Schedule + Acts tablet UI adaptation
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-14
+- **Дата завершения**: 2026-03-14
+- **Описание**: Tablet-адаптация экранов Schedule (Gantt) и Acts согласно ТЗ `04-schedule-acts.md` и плану спринтов.
+- **Шаги выполнения**:
+  - [x] Task 4.1: Расширить контейнер Schedule для lg+ (`lg:max-w-none`, `lg:px-6`)
+  - [x] Task 4.2: Zoom controls (4 уровня: 3М/2М/6Н/4Н) с кнопками ZoomIn/ZoomOut
+  - [x] Task 4.3: Task Editor — Tabs (Основное / Материалы / Документация), шире `lg:max-w-3xl`
+  - [x] Task 4.4: Inline Act Template Picker dialog (modal stacking) с поиском
+  - [x] Task 4.5: Acts — двухколоночный grid на lg+, export dialog шире
+  - [x] Task 4.6: Searchable dropdown в act template picker (Task 4.4 включает поиск)
+  - [x] Task 4.7: PDF export progress bar (симулированный прогресс при генерации)
+  - [x] Task 4.8: SplitTaskDialog — шире `sm:max-w-lg lg:max-w-2xl` на планшете
+  - [x] Task 4.9: E2E тесты `__tests__/schedule-acts.e2e.ts`
+  - [ ] Task 4.10: Ручное тестирование landscape orientation (требует реального устройства)
+- **Зависимости**: Sprint 1–3 (Foundation, Auth, Works) — все завершены
+
+---
+
+## Задача: Исправление import.meta.url в CJS-сборке (pdfGenerator)
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-14
+- **Дата завершения**: 2026-03-14
+- **Описание**: В `server/pdfGenerator.ts` использовался `import.meta.url`, который недоступен в CJS-билде сервера. Prod работал только благодаря старому `dist/`; при `--force-recreate` или пересборке сервер упал бы.
+- **Шаги выполнения**:
+  - [x] Заменить `createRequire(import.meta.url)` на `createRequire(__filename)` в `server/pdfGenerator.ts`
+  - [x] Проверить отсутствие других `import.meta.url` в файле
+  - [x] Зафиксировать в `docs/changelog.md`
+- **Зависимости**: нет
+
+---
+
+## Задача: Актуализация ТЗ TZfrontend под Design System и правила Touch Targets
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-10
+- **Дата завершения**: 2026-03-10
+- **Описание**: Корректировка пакета TZ (Technical Specification) для tablet UI в соответствии с дизайн-системой `docs/TZfrontend/design-system-12.03.2026-design-system` и установка проектного правила на минимальный размер touch targets (44px+) для мобильных и планшетных управляющих элементов. Design system зафиксирован как обязательный visual contract для всего фронтенда.
+- **Шаги выполнения**:
+  - [x] Обновить README в TZfrontend с ссылкой на design system
+  - [x] Актуализировать foundation docs (breakpoints, colors, typography) с reference на design system
+  - [x] Обновить screen docs (layout patterns, component usage) с дизайн-системой
+  - [x] Обновить QA docs с touch target requirements (44px+)
+  - [x] Зафиксировать design system как обязательный visual contract
+  - [x] Установить проектное правило minimum touch target 44px+ для mobile/tablet controls
+  - [x] Финально нормализовать экранные ТЗ `02-04` под единый стандарт Design System и hit area `44px+`
+  - [x] Выполнить повторную консистентную проверку пакета `docs/TZfrontend/00-08`
+- **Файлы**:
+  - [x] `docs/TZfrontend/README.md`
+  - [x] `docs/TZfrontend/01-foundation-platform-shell.md` — foundation requirements
+  - [x] `docs/TZfrontend/02-auth-home-worklog.md`, `03-works-estimates.md`, `04-schedule-acts.md`, `05-source-data-materials-documents.md`, `06-objects-settings-admin.md` — screen specs
+  - [x] `docs/TZfrontend/07-qa-rollout.md` — QA strategy
+  - [x] `docs/TZfrontend/design-system-12.03.2026-design-system/` — design system reference
+- **Результат**: Пакет TZ теперь полностью синхронизирован с design system. Design system назначен обязательным visual contract. Установлено проектное правило на минимальный touch target размер 44px+ для всех управляющих элементов на мобильных и планшетных устройствах. Экранные ТЗ `02-04` дополнительно выровнены по единому стандарту: одинаковые требования к tokens, interactive states, acceptance criteria и без противоречий по `40px`/offline-очередям.
+- **Зависимости**: Design System v1 (2026-03-12), tablet UI specification
+
+---
+
+## Задача: Dev default admin для локальной визуальной проверки
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-12
+- **Дата завершения**: 2026-03-12
+- **Описание**: Для быстрого локального QA ветки `feature/tablet-ui` добавлен dev-only bootstrap дефолтного email-admin и предзаполнение формы входа, чтобы можно было сразу войти в браузерной среде без ручной регистрации.
+- **Шаги выполнения**:
+  - [x] Найти текущую логику browser login и bootstrap пользователей
+  - [x] Добавить создание/обновление dev admin `admin@admin.com`
+  - [x] Предзаполнить dev-форму логина дефолтными значениями
+  - [x] Обновить документацию и подготовить повторный локальный запуск
+- **Файлы**:
+  - [x] `/server/routes/auth.ts`
+  - [x] `/server/routes.ts`
+  - [x] `/client/src/pages/Login.tsx`
+  - [x] `/docs/changelog.md`
+  - [x] `/docs/tasktracker.md`
+  - [x] `/docs/project.md`
+- **Результат**: Локальная dev-среда теперь поднимает доступный дефолтный admin-аккаунт и ускоряет ручную визуальную проверку UI после старта приложения.
+- **Зависимости**: `server/routes/auth.ts`, browser login flow, локальная PostgreSQL БД
+
+---
+
+## Задача: Sprint 1 foundation shell для tablet UI
+- **Статус**: В процессе
+- **Дата начала**: 2026-03-10
+- **Описание**: Реализация foundation-слоя tablet UI в ветке `feature/tablet-ui` без изменения бизнес-логики, auth-модели, router и state-management. Sprint 1 включает три подэтапа: foundation contract, navigation contract и md/lg+ shell adapters на базе общего manifest.
+- **Шаги выполнения**:
+  - [x] Проанализировать `docs/TZfrontend`, `docs/project.md`, `docs/frontend.md` и Telegram-гайды
+  - [x] Декомпозировать Sprint 1 через planner и проверить архитектурное направление через senior-reviewer
+  - [x] **Подэтап 1**: Реализовать foundation contract: breakpoints, viewport-fit, safe-area utilities, shell tokens, Telegram viewport CSS vars
+  - [x] **Подэтап 2**: Реализовать единый nav contract и подготовку shell adapters для mobile/tablet без регрессии mobile-first
+  - [x] Закрыть findings test-runner/reviewer по shell/nav accessibility, object context и md+ FAB positioning
+  - [x] **Подэтап 3 (Sprint 1 Subphase 2)**: Реализовать md/lg+ layout shell adapters (`ResponsiveShell`) на базе существующего navigation manifest
+    - [x] UI-101: Зафиксировать surface matrix на базе existing manifest
+    - [x] UI-102: Ввести `md..lg` top-nav adapter без переноса логики в `Header`
+    - [x] UI-103: Добавить `lg+` secondary/sidebar pattern через `ResponsiveShell`
+    - [x] UI-104: Убрать временный `md+` fallback через `Header Sheet` (hamburger/sheet теперь mobile-only)
+    - [x] UI-105: Провести узкую regression-проверку shell-navigation
+  - [ ] Финальная shell-проверка: cross-device validation на mobile/tablet/desktop (опционально, может быть в отдельной задаче)
+- **Файлы (Subphase 2)**:
+  - [x] `/client/src/components/ResponsiveShell.tsx` (новый page-level shell adapter)
+  - [x] `/client/src/components/Header.tsx` (hamburger/sheet → mobile-only)
+  - [x] `/client/src/components/BottomNav.tsx` (mobile-only, no changes)
+  - [x] `/client/src/pages/*.tsx` (SourceMaterialDetail подключён к shell на md+)
+- **Результат**: 
+  - ✅ **Subphase 2 завершена**: `ResponsiveShell` даёт `top-nav` (`md+`) и `sidebar` (`lg+`) для primary/secondary navigation, читая общий manifest. 
+  - ✅ `Header` больше не даёт временный fallback через Sheet на `md+`; hamburger/sheet теперь mobile-only.
+  - ✅ `BottomNav` остаётся mobile-only.
+  - ✅ `SourceMaterialDetail` подключён к shell, вложенная `/source/materials/:id` route сохраняет навигацию на `md+`.
+  - ✅ `npm run check` OK, `npm run build` OK (старые warning'и про chunk size не связаны с этой задачей).
+  - 📝 **Ограничение**: это Sprint 1 foundation-only, без массовой адаптации экранов Sprint 2+.
+- **Зависимости**: `docs/TZfrontend/08-frontend-sprints-plan.md`, `docs/TZfrontend/01-foundation-platform-shell.md`, `docs/project.md`, `docs/frontend.md`, Telegram WebApp API
+
+---
+
+## Задача: Актуализация git-стратегии под параллельную работу `main` и `feature/tablet-ui`
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-10
+- **Дата завершения**: 2026-03-10
+- **Описание**: Стратегия в `docs/TZfrontend/strateg.md` обновлена под реальный режим разработки: `main` продолжает тестироваться и получать hotfix, а `feature/tablet-ui` развивается параллельно и синхронизируется с `main` по мере необходимости.
+- **Шаги выполнения**:
+  - [x] Проверить текущую версию `strateg.md`
+  - [x] Уточнить роли веток `main` и `feature/tablet-ui`
+  - [x] Добавить правило: баги текущего приложения сначала исправляются в `main`
+  - [x] Описать отдельный контур тестирования нового UI
+  - [x] Зафиксировать изменения в `docs/changelog.md`
+- **Файлы**:
+  - [x] `/docs/TZfrontend/strateg.md`
+  - [x] `/docs/changelog.md`
+- **Результат**: Документ стратегии теперь соответствует параллельному процессу: основной тестовый сервер остаётся на `main`, а новый UI тестируется отдельно.
+- **Зависимости**: `docs/TZfrontend/strateg.md`, текущий процесс тестирования `main`
+
+---
+
+## Задача: Git-стратегия для внедрения tablet UI
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-10
+- **Дата завершения**: 2026-03-10
+- **Описание**: Создана рабочая ветка `feature/tablet-ui` и оформлена отдельная git-стратегия для проекта с правилами ветвления, merge и деплоя на тестовый сервер в процессе внедрения нового UI.
+- **Шаги выполнения**:
+  - [x] Проверить текущее состояние git-репозитория
+  - [x] Создать ветку `feature/tablet-ui`
+  - [x] Подготовить файл стратегии с правилами веток и merge
+  - [x] Описать правила деплоя на тестовый сервер
+  - [x] Добавить стратегию в `docs/TZfrontend/README.md`
+  - [x] Зафиксировать изменение в `docs/changelog.md`
+- **Файлы**:
+  - [x] `/docs/TZfrontend/strateg.md`
+  - [x] `/docs/TZfrontend/README.md`
+- **Результат**: В проекте зафиксирован единый регламент работы по tablet UI с безопасным тестовым контуром и понятным процессом добавления новых экранов и кнопок.
+- **Зависимости**: текущая ветка `feature/tablet-ui`, пакет `docs/TZfrontend`
+
+---
+
+## Задача: Подготовка спринт-плана для frontend-разработчика
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-10
+- **Дата завершения**: 2026-03-10
+- **Описание**: На основе пакета `docs/TZfrontend` подготовлен приоритизированный план работ по спринтам для frontend-разработчика и тимлида. План разбивает tablet UI адаптацию на последовательные этапы внедрения с зависимостями, критериями готовности, критическим путём и рекомендациями по демо.
+- **Шаги выполнения**:
+  - [x] Проанализировать базовый roadmap и пакет ТЗ по экранам
+  - [x] Сформировать 6 спринтов с приоритизацией и зависимостями
+  - [x] Описать scope, риски, DoD и артефакты каждого спринта
+  - [x] Обновить `docs/TZfrontend/README.md`
+  - [x] Зафиксировать изменение в `docs/changelog.md`
+- **Файлы**:
+  - [x] `/docs/TZfrontend/08-frontend-sprints-plan.md`
+  - [x] `/docs/TZfrontend/README.md`
+- **Результат**: Появился отдельный операционный документ, с которого можно начинать реализацию tablet UI без повторного анализа всех ТЗ.
+- **Зависимости**: `docs/TZfrontend/00-development-plan.md`, `docs/TZfrontend/01-foundation-platform-shell.md`, `docs/TZfrontend/02-07*.md`
+
+---
+
+## Задача: Подготовка полного пакета ТЗ для tablet UI
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-10
+- **Дата завершения**: 2026-03-10
+- **Описание**: Подготовлен комплект технических заданий для адаптации существующего mobile-first фронтенда под планшетный UI с учётом Telegram MiniApp, браузерного режима, навигации, state management, таблиц, форм, сложных экранов и стратегии тестирования.
+- **Шаги выполнения**:
+  - [x] Исследовать документацию, маршруты и ключевые frontend-компоненты проекта
+  - [x] Выделить архитектурные ограничения mobile-first shell и риски tablet-адаптации
+  - [x] Подготовить план и базовые platform/shell требования
+  - [x] Подготовить ТЗ по всем группам экранов в `docs/TZfrontend`
+  - [x] Обновить `docs/changelog.md`
+  - [x] Зафиксировать результат в `docs/tasktracker.md`
+- **Файлы**:
+  - [x] `/docs/TZfrontend/README.md`
+  - [x] `/docs/TZfrontend/00-development-plan.md`
+  - [x] `/docs/TZfrontend/01-foundation-platform-shell.md`
+  - [x] `/docs/TZfrontend/02-auth-home-worklog.md`
+  - [x] `/docs/TZfrontend/03-works-estimates.md`
+  - [x] `/docs/TZfrontend/04-schedule-acts.md`
+  - [x] `/docs/TZfrontend/05-source-data-materials-documents.md`
+  - [x] `/docs/TZfrontend/06-objects-settings-admin.md`
+  - [x] `/docs/TZfrontend/07-qa-rollout.md`
+- **Результат**: Создан единый пакет ТЗ по foundation-слою, всем основным экранам и QA/rollout части. Документы приведены к фактической архитектуре проекта и готовы к review фронтенд-разработчиком.
+- **Зависимости**: `docs/project.md`, `docs/frontend.md`, `docs/telegram-buttons-guide.md`, `docs/telegram-haptic-guide.md`, актуальная структура `client/src/*`
+
 ## Задача: Голосовой ввод (Voice-to-Text)
 - **Статус**: Завершена
 - **Дата начала**: 2026-03-06
@@ -2525,15 +2737,16 @@ server/fonts/TimesNewRomanBoldItalic.ttf
 ---
 
 ## Задача: Отображение данных пользователя в UI панели администратора
-- **Статус**: Не начата
+- **Статус**: Завершена (2026-03-21)
 - **Приоритет**: Средний
-- **Описание**: В админ-панели (вкладка «Пользователи») отображать полные данные о пользователях: display_name, email, роль, способ входа (Telegram / email), дата регистрации, дата последнего входа, привязанные auth_providers. Обеспечить корректное отображение для пользователей, зашедших через Telegram (показывать Telegram ID/username) и через email.
+- **Описание**: В админ-панели (вкладка «Пользователи») отображать полные данные о пользователях: display_name, email, роль, способ входа (Telegram / email), дата регистрации, дата последнего входа, привязанные auth_providers.
 - **Шаги выполнения**:
-  - [ ] Расширить API `GET /api/admin/users` — возвращать email, список auth_providers (provider + externalId), lastLoginAt
-  - [ ] Обновить `AdminUsers.tsx` — отобразить email, способ входа (иконки Telegram/Email), дату регистрации и последнего входа
-  - [ ] Добавить фильтрацию/поиск по email и display_name
-  - [ ] Показывать роль пользователя (user/admin) с возможностью смены
-  - [ ] Показывать статус блокировки и тариф
+  - [x] Расширить API `GET /api/admin/users` — возвращать email, список auth_providers (provider + externalId), lastLoginAt, displayName
+  - [x] Обновить `AdminUsers.tsx` — отобразить displayName (primary), email, способ входа (иконки TG/Email), lastLoginAt
+  - [x] Добавить фильтрацию/поиск по email и display_name
+  - [x] Показывать роль пользователя (ADMIN badge) с возможностью смены
+  - [x] Показывать статус блокировки и тариф
+- **Файлы изменены**: `server/storage.ts`, `client/src/hooks/use-admin.ts`, `client/src/pages/admin/AdminUsers.tsx`
 - **Зависимости**: Мультипровайдерная аутентификация (tasktracker2.md / выше)
 
 ---

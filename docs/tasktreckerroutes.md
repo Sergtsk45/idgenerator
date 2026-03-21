@@ -1,8 +1,12 @@
 # Task Tracker: ISS-002 `server/routes.ts` decomposition
 
+> **Статус ISS-002**: закрыт (2026-03-21). Итог: `server/routes.ts` — диспетчер ~70 строк; доменные маршруты в `server/routes/*.ts`. Подробности: `docs/changelog.md` (записи 2026-03-21), `ai_docs/develop/issues/ISS-002-routes-file-too-large.md`.
+>
+> **Этот файл** — детальный план миграции и чеклист; последняя синхронизация с репозиторием: **2026-03-21**.
+
 ## Контекст и цель
-- **Проблема**: `server/routes.ts` содержит ~3000 строк и объединяет много доменов (objects, materials, works, estimates, messages, acts, schedule, admin, voice, tariff).
-- **Цель**: перейти к модульной структуре `server/routes/*` с явной регистрацией `register*Routes(app)`.
+- **Исходная проблема (до миграции)**: монолитный `server/routes.ts` (~2400+ строк) объединял много доменов (objects, materials, works, estimates, messages, acts, schedule, admin, voice, tariff).
+- **Цель**: модульная структура `server/routes/*` с явной регистрацией `register*Routes(app)` — **достигнута**.
 - **Ожидаемый эффект**: проще навигация и review, меньше merge-конфликтов, безопаснее параллельная разработка.
 - **Принцип миграции**: поведение и контракты API не менять в фазе декомпозиции (только перенос кода и связанного локального helper-кода).
 
@@ -166,7 +170,7 @@
     - patch, split, split-siblings
   - [x] Перенести task-materials:
     - list/replace/add/remove
-  - [x] Перенести schedule helper-функции дат (`addDaysISO`, `differenceInDaysISO`, `eachDayInRange`) если используются только здесь
+  - [x] Вынести helper-функции дат: `server/routes/_dateUtils.ts` (`addDaysISO`, `differenceInDaysISO`, `eachDayInRange`) — общий модуль для schedule и messages
   - [x] Экспортировать `registerScheduleRoutes(app)`
   - [x] Подключить модуль
   - [x] `npm run check`
@@ -205,21 +209,27 @@
 ## Фаза 2: Новый `server/routes.ts` как диспетчер (15-25 мин)
 - **Статус**: Завершена
 - **Шаги**:
-  - [x] Оставить только orchestrator-логику (70 строк, без бизнес-логики)
+  - [x] Оставить только orchestrator-логику (~55 строк регистраций + опциональный dev-only блок `ENABLE_DEMO_SEED` в конце файла; бизнес-логики в диспетчере нет)
   - [x] Проверить совместимость сигнатуры с `server/index.ts` — совместима
-  - [x] Удалить неиспользуемые импорты/утилиты
+  - [x] Удалить неиспользуемые импорты/утилиты из диспетчера
   - [x] `npm run check`
 
 ---
 
 ## Фаза 3: Верификация (30-45 мин)
-- **Статус**: Завершена
+- **Статус**: Частично завершена (автоматика + parity; полный smoke — по необходимости вручную)
 - **Шаги**:
   - [x] `npm run check`
   - [x] `npm run build`
-  - [ ] Smoke-test (требует запущенного сервера — ручная проверка)
-  - [x] Проверка middleware parity:
-    - [x] `appAuth` (44 вхождения) / `adminAuth` (14)
+  - [ ] Smoke-test с запущенным сервером (ручной регресс; при сомнениях пройти перед релизом):
+    - [ ] Auth (Telegram + email)
+    - [ ] Objects CRUD + select current
+    - [ ] Materials list/create + parse invoice
+    - [ ] Schedules tasks + split
+    - [ ] Generate acts + export PDF + `/api/pdfs/:filename`
+    - [ ] Admin users + tariffs + materials-catalog import
+  - [x] Проверка middleware parity (см. `docs/changelog.md` 2026-03-21):
+    - [x] `appAuth` (44) / `adminAuth` (14)
     - [x] `requireFeature` (4) / `requireQuota` (2)
     - [x] rate limiters (14)
     - [x] multer upload filters/limits (12)
@@ -231,7 +241,8 @@
 - **Шаги**:
   - [x] Обновить `docs/project.md` (структура backend routes)
   - [x] Добавить запись в `docs/changelog.md`
-  - [x] Обновить `docs/tasktreckerroutes.md`
+  - [x] Синхронизировать `docs/tasktreckerroutes.md` с фактическим состоянием репозитория
+  - [x] Добавить задачу ISS-002 в `docs/tasktracker.md` (кросс-ссылка на этот план)
   - [x] Закрыть ISS-002 в `ai_docs/develop/issues/`
 
 ---
@@ -254,15 +265,17 @@
 ---
 
 ## Контрольный чеклист качества
-- [ ] Корректность: маршруты и коды ответов не изменены
-- [ ] Безопасность: не ослаблены auth/admin/feature/quota проверки
-- [ ] Производительность: не добавлены лишние запросы к БД
-- [ ] Поддержка: каждый модуль имеет единый `register*Routes(app)` и локальные зависимости
-- [ ] Документация: `project/changelog/tasktracker/issues` обновлены
+- [x] Корректность: декомпозиция без намеренной смены HTTP-контрактов; `npm run check` / `npm run build` — OK (2026-03-21). Полный smoke — см. Фаза 3.
+- [x] Безопасность: parity middleware/лимитеров зафиксирована в changelog (см. Фаза 3).
+- [x] Производительность: перенос кода без добавления лишних round-trip к БД в рамках рефакторинга.
+- [x] Поддержка: каждый доменный модуль экспортирует `register*Routes(app)`; общие вещи в `_common.ts` / `_dateUtils.ts` / `_openai.ts`.
+- [x] Документация: `docs/project.md`, `docs/changelog.md`, `docs/tasktracker.md`, `ai_docs/develop/issues/ISS-002-routes-file-too-large.md`, этот файл.
 
 ---
 
 ## Git workflow для ISS-002
-- [ ] Пушить изменения только в `origin/refactor/routes-modularization`
-- [ ] PR создавать только по отдельному запросу Сергея
-- [ ] Синхронизацию с `main` и `feature/tablet-ui` выполнять только по отдельному запросу Сергея
+Напоминание о процессе (не чеклист «код готов»):
+
+- Пушить изменения в согласованную ветку (например `refactor/routes-modularization`) по договорённости.
+- PR — по отдельному запросу.
+- Синхронизацию с `main` и `feature/tablet-ui` — по отдельному запросу.

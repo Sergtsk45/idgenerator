@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-03-21] - Синхронизация трекера ISS-002 (`tasktreckerroutes.md`)
+
+### Изменено
+- `docs/tasktreckerroutes.md` — шапка со статусом закрытия ISS-002, уточнён контекст после миграции, фаза 3: явный список ручного smoke (открыты до прохождения), фаза 4: шаг про `docs/tasktracker.md`, чеклист качества и git-workflow приведены в соответствие с репозиторием
+- `docs/tasktracker.md` — добавлена задача «ISS-002 — декомпозиция server/routes.ts» со ссылкой на детальный план
+
+---
+
+## [2026-03-21] - Отображение данных пользователя в UI панели администратора
+
+### Добавлено
+- `AdminUsers.tsx` — карточка пользователя теперь отображает `displayName` (основное имя), `email` с иконкой, бейджи провайдеров авторизации (Telegram / Email), дату последнего входа
+- Поиск в панели администратора расширен: учитывает `displayName` и `email` (ранее только `telegramUserId` и `objectTitle`)
+
+### Изменено
+- `server/storage.ts` — `listUsers()` дополнен параллельным запросом к таблице `auth_providers`; `AdminUserRow` расширен полями `displayName`, `email`, `authProviders`, `createdAt`, `lastLoginAt`
+- `client/src/hooks/use-admin.ts` — `AdminUserRow` обновлён, добавлен интерфейс `AdminUserAuthProvider`
+- Диалоги блокировки/снятия прав/смены тарифа используют `displayName` вместо `telegramUserId`
+
+---
+
 ## [2026-03-21] - Рефакторинг backend routes: модульная архитектура (ISS-002)
 
 ### Описание
