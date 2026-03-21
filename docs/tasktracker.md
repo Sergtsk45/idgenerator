@@ -2,6 +2,22 @@
 
 ---
 
+## Задача: ISS-002 — декомпозиция `server/routes.ts` (модульные `server/routes/*`)
+- **Статус**: Завершена
+- **Дата начала**: (миграция в рамках ветки `refactor/routes-modularization`)
+- **Дата завершения**: 2026-03-21
+- **Описание**: Вынести монолитный `server/routes.ts` в доменные модули с `register*Routes(app)`, сохранить контракты API и middleware/quota/feature parity. Детальный пошаговый план и чеклисты: `docs/tasktreckerroutes.md`.
+- **Шаги выполнения**:
+  - [x] Фаза 0: `server/routes/_common.ts` и общие хелперы
+  - [x] Фаза 1: модули admin, messages, works, estimates, materials, acts, schedule, objects, voice, tariff (+ `auth.ts`)
+  - [x] Фаза 2: `server/routes.ts` как диспетчер (~70 строк включая опциональный dev-seed)
+  - [x] Фаза 3: `npm run check`, `npm run build`, middleware parity (см. changelog 2026-03-21)
+  - [x] Фаза 4: `docs/project.md`, `docs/changelog.md`, issue ISS-002 Resolved, синхронизация `docs/tasktreckerroutes.md`
+  - [ ] Опционально: полный ручной smoke по списку в `docs/tasktreckerroutes.md` (Фаза 3) перед релизом
+- **Зависимости**: нет
+
+---
+
 ## Задача: Sprint 4 — Schedule + Acts tablet UI adaptation
 - **Статус**: Завершена
 - **Дата начала**: 2026-03-14
