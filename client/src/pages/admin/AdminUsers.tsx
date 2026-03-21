@@ -52,7 +52,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, ShieldCheck, Ban, UserCheck, CalendarIcon } from "lucide-react";
+import { Search, ShieldCheck, Ban, UserCheck, CalendarIcon, Mail, MessageCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -151,9 +151,9 @@ function UserCard({ user }: { user: AdminUserRow }) {
   return (
     <div className="border rounded-xl p-4 bg-card space-y-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-sm font-medium truncate">{user.telegramUserId}</span>
+            <span className="text-sm font-medium truncate">{user.displayName || user.telegramUserId}</span>
             {user.isAdmin && (
               <Badge variant="default" className="text-[10px] px-1.5 py-0">
                 <ShieldCheck className="h-3 w-3 mr-0.5" /> ADMIN
@@ -165,12 +165,36 @@ function UserCard({ user }: { user: AdminUserRow }) {
               </Badge>
             )}
           </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+            <span className="font-mono text-[11px] text-muted-foreground">{user.telegramUserId}</span>
+            {user.email && (
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Mail className="h-3 w-3" />{user.email}
+              </span>
+            )}
+          </div>
+          {user.authProviders.length > 0 && (
+            <div className="flex gap-1 mt-1 flex-wrap">
+              {user.authProviders.map((p) => (
+                <Badge key={p.provider} variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5">
+                  {p.provider === 'telegram' ? <MessageCircle className="h-2.5 w-2.5" /> : <Mail className="h-2.5 w-2.5" />}
+                  {p.provider === 'telegram' ? 'TG' : p.provider === 'email' ? 'Email' : 'Phone'}
+                </Badge>
+              ))}
+            </div>
+          )}
           {user.objectTitle && (
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{user.objectTitle}</p>
           )}
-          <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+          <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
             <span>Акты: {user.actsCount}</span>
             <span>Сообщения: {user.messagesCount}</span>
+            {user.lastLoginAt && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {format(new Date(user.lastLoginAt), "d MMM yyyy", { locale: ru })}
+              </span>
+            )}
           </div>
         </div>
 
@@ -208,7 +232,7 @@ function UserCard({ user }: { user: AdminUserRow }) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Заблокировать пользователя?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Пользователь {user.telegramUserId} потеряет доступ к приложению.
+                  Пользователь {user.displayName || user.telegramUserId} потеряет доступ к приложению.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -235,7 +259,7 @@ function UserCard({ user }: { user: AdminUserRow }) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Снять права администратора?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Пользователь {user.telegramUserId} потеряет доступ к панели администратора.
+                  Пользователь {user.displayName || user.telegramUserId} потеряет доступ к панели администратора.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -285,7 +309,7 @@ function UserCard({ user }: { user: AdminUserRow }) {
           <DialogHeader>
             <DialogTitle>Управление тарифом</DialogTitle>
             <DialogDescription>
-              Изменение тарифа пользователя {user.telegramUserId}
+              Изменение тарифа пользователя {user.displayName || user.telegramUserId}
             </DialogDescription>
           </DialogHeader>
           
@@ -351,8 +375,13 @@ export default function AdminUsers() {
   const [filter, setFilter] = useState<Filter>("all");
 
   const filtered = (users ?? []).filter((u) => {
+    const q = search.toLowerCase();
     const matchSearch =
-      !search || u.telegramUserId.includes(search) || (u.objectTitle ?? "").toLowerCase().includes(search.toLowerCase());
+      !search ||
+      u.telegramUserId.includes(search) ||
+      (u.displayName ?? "").toLowerCase().includes(q) ||
+      (u.email ?? "").toLowerCase().includes(q) ||
+      (u.objectTitle ?? "").toLowerCase().includes(q);
     const matchFilter =
       filter === "all" ||
       (filter === "blocked" && u.isBlocked) ||

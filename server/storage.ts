@@ -31,6 +31,7 @@ import {
   invoiceParseCorrections,
   invoiceImports,
   users,
+  authProviders,
   type User,
   type InsertWork,
   type InsertEstimate,
@@ -3249,6 +3250,11 @@ export const storage = new DatabaseStorage();
 
 export interface AdminUserRow {
   telegramUserId: string;
+  displayName: string;
+  email: string | null;
+  authProviders: { provider: string; externalId: string | null }[];
+  createdAt: string | null;
+  lastLoginAt: string | null;
   objectId: number | null;
   objectTitle: string | null;
   isBlocked: boolean;
@@ -3285,6 +3291,8 @@ export const adminStorage = {
         tariff: users.tariff,
         subscriptionEndsAt: users.subscriptionEndsAt,
         trialUsed: users.trialUsed,
+        createdAt: users.createdAt,
+        lastLoginAt: users.lastLoginAt,
         objectId: objects.id,
         objectTitle: objects.title,
       })
@@ -3294,44 +3302,52 @@ export const adminStorage = {
 
     if (rows.length === 0) return [];
 
-    // Подсчет актов и сообщений по пользователям
     const userIds = Array.from(new Set(rows.map((r) => r.userId)));
-    
-    const [actsCountRows, messagesCountRows] = await Promise.all([
+
+    const [actsCountRows, messagesCountRows, providerRows] = await Promise.all([
       db
-        .select({ 
-          userId: objects.userId,
-          cnt: count() 
-        })
+        .select({ userId: objects.userId, cnt: count() })
         .from(acts)
         .innerJoin(objects, eq(acts.objectId, objects.id))
         .where(inArray(objects.userId, userIds))
         .groupBy(objects.userId),
       db
-        .select({ 
-          userId: messages.userId,
-          cnt: count() 
-        })
+        .select({ userId: messages.userId, cnt: count() })
         .from(messages)
         .where(inArray(messages.userId, userIds))
         .groupBy(messages.userId),
+      db
+        .select({ userId: authProviders.userId, provider: authProviders.provider, externalId: authProviders.externalId })
+        .from(authProviders)
+        .where(inArray(authProviders.userId, userIds)),
     ]);
 
     const actsMap = new Map(actsCountRows.map((r) => [r.userId, Number(r.cnt)]));
     const messagesMap = new Map(messagesCountRows.map((r) => [r.userId, Number(r.cnt)]));
+    const providersMap = new Map<number, { provider: string; externalId: string | null }[]>();
+    for (const p of providerRows) {
+      const list = providersMap.get(p.userId) ?? [];
+      list.push({ provider: p.provider, externalId: p.externalId ?? null });
+      providersMap.set(p.userId, list);
+    }
 
     // Группируем по пользователям
     const userMap = new Map<number, AdminUserRow>();
-    
+
     for (const row of rows) {
       if (!userMap.has(row.userId)) {
         userMap.set(row.userId, {
           telegramUserId: String(row.userId),
+          displayName: row.displayName,
+          email: row.email ?? null,
+          authProviders: providersMap.get(row.userId) ?? [],
+          createdAt: row.createdAt ? row.createdAt.toISOString() : null,
+          lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
           objectId: row.objectId,
           objectTitle: row.objectTitle,
           isBlocked: row.isBlocked,
           isAdmin: row.role === 'admin',
-          objectsCount: 1,
+          objectsCount: row.objectId != null ? 1 : 0,
           actsCount: actsMap.get(row.userId) ?? 0,
           messagesCount: messagesMap.get(row.userId) ?? 0,
           tariff: (row.tariff as 'basic' | 'standard' | 'premium') ?? 'basic',
@@ -3340,7 +3356,7 @@ export const adminStorage = {
         });
       } else {
         const existing = userMap.get(row.userId)!;
-        existing.objectsCount += 1;
+        if (row.objectId != null) existing.objectsCount += 1;
       }
     }
 
