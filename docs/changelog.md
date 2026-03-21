@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-21] - Задача 1.9: extract voice routes module
+
+### Изменено
+- `server/routes/voice.ts` — создан новый модуль с экспортом `registerVoiceRoutes(app)`: voiceUpload (multer), voiceRateLimiter, `POST /api/voice/transcribe`
+- `server/routes.ts` — voice блок и top-level multer/rateLimit declarations удалены, убраны неиспользуемые импорты `getOpenAIClient`, `multer`, `rateLimit`
+
 ## [2026-03-21] - Задача 1.8: extract objects routes module
 
 ### Изменено
