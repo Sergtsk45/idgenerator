@@ -1,5 +1,32 @@
 # Changelog
 
+## [2026-03-21] - Рефакторинг backend routes: модульная архитектура (ISS-002)
+
+### Описание
+Полный рефакторинг `server/routes.ts` (2426 строк) в 11 изолированных модулей по принципу Single Responsibility. Закрывает технический долг ISS-002.
+
+### Добавлено
+- `server/routes/tariff.ts` — `GET /api/tariff/status` (квоты объектов и импортов)
+- `server/routes/voice.ts` — `POST /api/voice/transcribe` (Whisper), multer upload, rate limiter
+- `server/routes/objects.ts` — single-object current/patch/source-data + multi-object CRUD (list/create/getById/update/delete/select)
+- `server/routes/schedule.ts` — Gantt-граф: schedules CRUD, bootstrap-from-works/estimate, source-info, change-source, generate-acts; schedule-tasks (patch/split/split-siblings); task-materials (list/replace/add/remove)
+- `server/routes/_common.ts` — общие экспорты: `appAuth`, `adminAuth`, `storage`, `getObjectId()`, `handleError()`
+- `server/routes/_dateUtils.ts` — ISO-date утилиты (`addDaysISO`, `differenceInDaysISO`, `eachDayInRange`)
+
+### Изменено
+- `server/routes.ts` — 2426 строк → 70 строк; чистый диспетчер, только импорты и вызовы `register*Routes(app)`
+- `docs/project.md` — обновлена секция backend: описаны все 11 модулей `server/routes/`
+
+### Верификация
+- `npm run check` — 0 ошибок TypeScript
+- `npm run build` — 0 ошибок
+- Middleware parity: `appAuth` ×44, `adminAuth` ×14, `requireFeature` ×4, `requireQuota` ×2, rate limiters ×14, multer ×12
+
+### Закрыто
+- ISS-002: `routes.ts` violates Single Responsibility Principle → **Resolved**
+
+---
+
 ## [2026-03-21] - Фазы 2–4: верификация, документация, закрытие ISS-002
 
 ### Изменено
