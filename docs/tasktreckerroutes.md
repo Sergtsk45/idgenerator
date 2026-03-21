@@ -192,13 +192,13 @@
   - [x] `npm run check`
 
 ## Задача 1.10: `server/routes/tariff.ts` (10-20 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести `GET /api/tariff/status`
-  - [ ] Сохранить логику quotas (`objects`, `invoiceImports`)
-  - [ ] Экспортировать `registerTariffRoutes(app)`
-  - [ ] Подключить модуль
-  - [ ] `npm run check`
+  - [x] Перенести `GET /api/tariff/status`
+  - [x] Сохранить логику quotas (`objects`, `invoiceImports`)
+  - [x] Экспортировать `registerTariffRoutes(app)`
+  - [x] Подключить модуль
+  - [x] `npm run check`
 
 ---
 
