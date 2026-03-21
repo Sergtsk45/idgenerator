@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-21] - Задача 1.10: extract tariff routes module + finalize dispatcher
+
+### Изменено
+- `server/routes/tariff.ts` — создан новый модуль с экспортом `registerTariffRoutes(app)`: `GET /api/tariff/status` с quota-логикой (objects, invoiceImports)
+- `server/routes.ts` — последний inline-маршрут удалён; файл теперь чистый диспетчер (только импорты + вызовы `register*Routes`)
+
 ## [2026-03-21] - Задача 1.9: extract voice routes module
 
 ### Изменено
