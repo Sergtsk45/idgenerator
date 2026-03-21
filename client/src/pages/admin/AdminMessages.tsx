@@ -53,7 +53,7 @@ export default function AdminMessages() {
 
   return (
     <AdminLayout title="Очередь AI">
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold">Необработанные сообщения</h2>
@@ -98,6 +98,7 @@ export default function AdminMessages() {
           </div>
         )}
 
+        <div className="lg:grid lg:grid-cols-2 lg:gap-3 lg:items-start space-y-4 lg:space-y-0">
         {messages?.map((msg) => (
           <div key={msg.id} className="border rounded-xl p-4 bg-card space-y-2">
             <div className="flex items-start justify-between gap-3">
@@ -127,6 +128,7 @@ export default function AdminMessages() {
             </div>
           </div>
         ))}
+        </div>
       </div>
     </AdminLayout>
   );

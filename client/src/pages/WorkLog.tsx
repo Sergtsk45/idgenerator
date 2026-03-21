@@ -6,8 +6,7 @@
  */
 
 import { useState } from "react";
-import { BottomNav } from "@/components/BottomNav";
-import { Header } from "@/components/Header";
+import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { useSection3 } from "@/hooks/use-section3";
 import { usePatchMessage } from "@/hooks/use-messages";
 import { useLanguageStore, translations } from "@/lib/i18n";
@@ -169,11 +168,15 @@ export default function WorkLog() {
   const progress = totalSegs > 0 ? Math.round((processedSegs / totalSegs) * 100) : 0;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <Header title={t.title} subtitle={objectSubtitle} showAvatar showObjectSelector />
+    <ResponsiveShell
+      title={t.title}
+      subtitle={objectSubtitle}
+      showAvatar
+      showObjectSelector
+    >
 
       {/* Pill-табы (как в референсе) */}
-      <div className="border-b border-border/40 bg-background sticky top-14 z-20" data-testid="worklog-tabs">
+      <div className="sticky top-14 z-20 border-b border-border/40 bg-background md:top-28" data-testid="worklog-tabs">
         <div className="relative">
           <div className="flex gap-2.5 overflow-x-auto px-4 py-3 scrollbar-hide snap-x snap-mandatory">
             {TABS.map((tab) => (
@@ -181,7 +184,7 @@ export default function WorkLog() {
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
                 className={cn(
-                  "shrink-0 w-20 h-20 flex items-center justify-center rounded-lg text-[14px] font-medium transition-colors snap-start",
+                  "shrink-0 w-20 h-20 lg:w-24 lg:h-24 lg:text-base flex items-center justify-center rounded-lg text-[14px] font-medium transition-colors snap-start",
                   activeTab === tab.value
                     ? "bg-primary text-white"
                     : "bg-muted/60 text-muted-foreground hover:text-foreground",
@@ -231,7 +234,7 @@ export default function WorkLog() {
                 <table className="w-full border-collapse text-[10px]" data-testid="section3-table">
                   <thead>
                     <tr>
-                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top w-6 italic">
+                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top w-6 italic sticky left-0 z-10 bg-background">
                         {t.section3.rowNumber}
                       </th>
                       <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top italic">
@@ -248,8 +251,8 @@ export default function WorkLog() {
                       </th>
                     </tr>
                     <tr>
-                      {["1", "2", "3", "4", "5"].map((n) => (
-                        <th key={n} className="border border-foreground px-0.5 py-0.5 text-[8px] font-bold text-center">{n}</th>
+                      {["1", "2", "3", "4", "5"].map((n, i) => (
+                        <th key={n} className={cn("border border-foreground px-0.5 py-0.5 text-[8px] font-bold text-center", i === 0 && "sticky left-0 z-10 bg-background")}>{n}</th>
                       ))}
                     </tr>
                   </thead>
@@ -283,7 +286,7 @@ export default function WorkLog() {
               
               return (
                 <tr key={row.date} data-testid={`worklog-row-${row.date}`}>
-                  <td className="border border-foreground px-0.5 py-3 text-center align-top font-bold text-[9px]">
+                  <td className="border border-foreground px-0.5 py-3 text-center align-top font-bold text-[9px] sticky left-0 z-[1] bg-background">
                     {rowIndex + 1}
                   </td>
                   <td className="border border-foreground px-1 py-3 align-top text-[9px]">
@@ -397,7 +400,7 @@ export default function WorkLog() {
                 <table className="w-full border-collapse text-[10px]" data-testid="section1-table">
                   <thead>
                     <tr>
-                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top w-6 italic">
+                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top w-6 italic sticky left-0 z-10 bg-background">
                         {t.section1.rowNumber}
                       </th>
                       <th className="border border-foreground px-1 py-1 text-[8px] font-normal text-center align-top italic">
@@ -417,15 +420,15 @@ export default function WorkLog() {
                       </th>
                     </tr>
                     <tr>
-                      {["1", "2", "3", "4", "5", "6"].map((n) => (
-                        <th key={n} className="border border-foreground px-0.5 py-0.5 text-[8px] font-bold text-center">{n}</th>
+                      {["1", "2", "3", "4", "5", "6"].map((n, i) => (
+                        <th key={n} className={cn("border border-foreground px-0.5 py-0.5 text-[8px] font-bold text-center", i === 0 && "sticky left-0 z-10 bg-background")}>{n}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {[1, 2, 3].map((i) => (
                       <tr key={i}>
-                        <td className="border border-foreground px-0.5 py-3 text-center align-top font-bold text-[9px]">{i}</td>
+                        <td className="border border-foreground px-0.5 py-3 text-center align-top font-bold text-[9px] sticky left-0 z-[1] bg-background">{i}</td>
                         {Array.from({ length: 5 }).map((_, c) => (
                           <td key={c} className="border border-foreground px-1 py-3 align-top text-[9px]">&nbsp;</td>
                         ))}
@@ -453,7 +456,7 @@ export default function WorkLog() {
                 <table className="w-full border-collapse text-[10px]" data-testid="section2-table">
                   <thead>
                     <tr>
-                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top w-6 italic">
+                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top w-6 italic sticky left-0 z-10 bg-background">
                         {t.section2.rowNumber}
                       </th>
                       <th className="border border-foreground px-1 py-1 text-[8px] font-normal text-center align-top italic">
@@ -470,15 +473,15 @@ export default function WorkLog() {
                       </th>
                     </tr>
                     <tr>
-                      {["1", "2", "3", "4", "5"].map((n) => (
-                        <th key={n} className="border border-foreground px-0.5 py-0.5 text-[8px] font-bold text-center">{n}</th>
+                      {["1", "2", "3", "4", "5"].map((n, i) => (
+                        <th key={n} className={cn("border border-foreground px-0.5 py-0.5 text-[8px] font-bold text-center", i === 0 && "sticky left-0 z-10 bg-background")}>{n}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {[1, 2, 3].map((i) => (
                       <tr key={i}>
-                        <td className="border border-foreground px-0.5 py-3 text-center align-top font-bold text-[9px]">{i}</td>
+                        <td className="border border-foreground px-0.5 py-3 text-center align-top font-bold text-[9px] sticky left-0 z-[1] bg-background">{i}</td>
                         {Array.from({ length: 4 }).map((_, c) => (
                           <td key={c} className="border border-foreground px-1 py-3 align-top text-[9px]">&nbsp;</td>
                         ))}
@@ -506,7 +509,7 @@ export default function WorkLog() {
                 <table className="w-full border-collapse text-[10px]" data-testid="section4-table">
                   <thead>
                     <tr>
-                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top w-6 italic">
+                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top w-6 italic sticky left-0 z-10 bg-background">
                         {t.section4.rowNumber}
                       </th>
                       <th className="border border-foreground px-1 py-1 text-[8px] font-normal text-center align-top italic">
@@ -529,15 +532,15 @@ export default function WorkLog() {
                       </th>
                     </tr>
                     <tr>
-                      {["1", "2", "3", "4", "5", "6", "7"].map((n) => (
-                        <th key={n} className="border border-foreground px-0.5 py-0.5 text-[8px] font-bold text-center">{n}</th>
+                      {["1", "2", "3", "4", "5", "6", "7"].map((n, i) => (
+                        <th key={n} className={cn("border border-foreground px-0.5 py-0.5 text-[8px] font-bold text-center", i === 0 && "sticky left-0 z-10 bg-background")}>{n}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {[1, 2, 3].map((i) => (
                       <tr key={i}>
-                        <td className="border border-foreground px-0.5 py-3 text-center align-top font-bold text-[9px]">{i}</td>
+                        <td className="border border-foreground px-0.5 py-3 text-center align-top font-bold text-[9px] sticky left-0 z-[1] bg-background">{i}</td>
                         {Array.from({ length: 6 }).map((_, c) => (
                           <td key={c} className="border border-foreground px-1 py-3 align-top text-[9px]">&nbsp;</td>
                         ))}
@@ -565,7 +568,7 @@ export default function WorkLog() {
                 <table className="w-full border-collapse text-sm" data-testid="section5-table">
                   <thead>
                     <tr>
-                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic">
+                      <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top w-12 italic sticky left-0 z-10 bg-background">
                         {t.section5.rowNumber}
                       </th>
                       <th className="border border-foreground px-2 py-2 text-xs font-normal text-center align-top italic">
@@ -576,15 +579,15 @@ export default function WorkLog() {
                       </th>
                     </tr>
                     <tr>
-                      {["1","2","3"].map((n) => (
-                        <th key={n} className="border border-foreground px-1 py-1 text-xs font-bold text-center">{n}</th>
+                      {["1","2","3"].map((n, i) => (
+                        <th key={n} className={cn("border border-foreground px-1 py-1 text-xs font-bold text-center", i === 0 && "sticky left-0 z-10 bg-background")}>{n}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {[1,2,3,4,5].map((i) => (
                       <tr key={i}>
-                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold">{i}</td>
+                        <td className="border border-foreground px-2 py-6 text-center align-top font-bold sticky left-0 z-[1] bg-background">{i}</td>
                         <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
                         <td className="border border-foreground px-2 py-6 align-top">&nbsp;</td>
                       </tr>
@@ -605,7 +608,6 @@ export default function WorkLog() {
         )}
       </div>
 
-      <BottomNav />
-    </div>
+    </ResponsiveShell>
   );
 }

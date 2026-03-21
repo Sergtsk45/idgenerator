@@ -75,7 +75,7 @@ function MaterialDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{initial ? "Редактировать материал" : "Добавить материал"}</DialogTitle>
         </DialogHeader>
@@ -211,7 +211,7 @@ export default function AdminMaterials() {
 
   return (
     <AdminLayout title="Справочник материалов">
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="max-w-5xl mx-auto space-y-4">
         <div className="flex gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -261,7 +261,7 @@ export default function AdminMaterials() {
           </div>
         )}
 
-        <div className="space-y-2">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-2 lg:items-start space-y-2 lg:space-y-0">
           {filtered.map((m) => (
             <div
               key={m.id}

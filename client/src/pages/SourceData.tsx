@@ -7,8 +7,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { BottomNav } from "@/components/BottomNav";
-import { Header } from "@/components/Header";
+import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -163,20 +162,20 @@ export default function SourceData() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen h-[100dvh] bg-background bg-grain">
-      <Header
-        title={t?.title ?? (language === "ru" ? "Исходные" : "Source")}
-        subtitle={
-          currentObjectQuery.data?.title
-            ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObjectQuery.data.title}`
-            : undefined
-        }
-        showObjectSelector
-      />
+    <ResponsiveShell
+      className="min-h-screen h-[100dvh] bg-background bg-grain"
+      title={t?.title ?? (language === "ru" ? "Исходные" : "Source")}
+      subtitle={
+        currentObjectQuery.data?.title
+          ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObjectQuery.data.title}`
+          : undefined
+      }
+      showObjectSelector
+    >
 
       {/* Object selector (always above parties/sections) */}
-      <div className="sticky top-14 z-30 bg-background/95 backdrop-blur border-b border-border/40">
-        <div className="max-w-md mx-auto px-4 py-2 space-y-2">
+      <div className="sticky top-14 z-30 border-b border-border/40 bg-background/95 backdrop-blur md:top-28">
+        <div className="max-w-md lg:max-w-5xl mx-auto px-4 py-2 space-y-2">
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -225,11 +224,12 @@ export default function SourceData() {
         ) : (
           <div className="h-full flex flex-col">
             {/* Parties / participants — вне ScrollArea, чтобы горизонтальный свайп работал на мобильных */}
-            <div className="max-w-md mx-auto w-full px-4 pt-4 pb-1 shrink-0">
+            <div className="max-w-md lg:max-w-5xl mx-auto w-full px-4 pt-4 pb-1 shrink-0">
               <div className="text-sm font-medium mb-2">{language === "ru" ? "Стороны/участники" : "Parties"}</div>
             </div>
             <div
-              className="flex gap-3 overflow-x-auto pb-3 shrink-0"
+              className="flex gap-3 overflow-x-auto pb-3 shrink-0 lg:grid lg:grid-cols-4 lg:overflow-x-visible lg:px-4"
+              data-testid="parties-grid"
               style={{ paddingLeft: "1rem", paddingRight: "1rem", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}
             >
               {([
@@ -245,7 +245,7 @@ export default function SourceData() {
                 return (
                   <Card
                     key={role.key}
-                    className="min-w-[180px] max-w-[220px] flex-shrink-0 rounded-xl cursor-pointer hover:border-primary/50 transition-colors"
+                    className="min-w-[180px] max-w-[220px] flex-shrink-0 lg:min-w-0 lg:max-w-none lg:flex-shrink-0 rounded-xl cursor-pointer hover:border-primary/50 transition-colors"
                     onClick={() => setPartyDialogRole(role.key)}
                   >
                     <CardContent className="p-4">
@@ -262,7 +262,7 @@ export default function SourceData() {
               })}
 
               <Card
-                className="min-w-[180px] max-w-[220px] flex-shrink-0 rounded-xl cursor-pointer hover:border-primary/50 transition-colors"
+                className="min-w-[180px] max-w-[220px] flex-shrink-0 lg:min-w-0 lg:max-w-none lg:flex-shrink-0 rounded-xl cursor-pointer hover:border-primary/50 transition-colors"
                 onClick={() => setPersonsDialogOpen(true)}
               >
                 <CardContent className="p-4">
@@ -283,11 +283,11 @@ export default function SourceData() {
             </div>
 
             <ScrollArea className="flex-1">
-              <div className="max-w-md mx-auto px-4 pr-2 py-4">
+              <div className="max-w-md lg:max-w-5xl mx-auto px-4 pr-2 py-4">
                 {/* Sections (cards, not tabs) */}
                 <div className="mb-6">
                   <div className="text-sm font-medium mb-2">{language === "ru" ? "Разделы" : "Sections"}</div>
-                  <div className="grid gap-3">
+                  <div className="grid gap-3 lg:grid-cols-2" data-testid="sections-grid">
                     <Card className="rounded-xl cursor-pointer hover:border-primary/50 hover:bg-muted/20 transition-colors" onClick={() => setLocation("/source/materials")}>
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-3">
@@ -462,7 +462,7 @@ export default function SourceData() {
 
       {/* Плавающая кнопка сохранения */}
       {isDirty && (
-        <div className="fixed bottom-20 left-0 right-0 flex justify-center z-40 pointer-events-none">
+        <div className="fixed bottom-20 left-0 right-0 z-40 flex justify-center pointer-events-none md:bottom-6 lg:left-0">
           <Button
             className="pointer-events-auto rounded-full px-6 shadow-lg"
             onClick={save}
@@ -853,8 +853,7 @@ export default function SourceData() {
         </DialogContent>
       </Dialog>
 
-      <BottomNav />
-    </div>
+    </ResponsiveShell>
   );
 }
 

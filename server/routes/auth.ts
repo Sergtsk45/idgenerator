@@ -11,8 +11,8 @@ import { authService } from '../auth-service';
 import { authMiddleware } from '../middleware/auth';
 import { telegramAuthMiddleware } from '../middleware/telegramAuth';
 import { db } from '../db';
-import { users } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { authProviders, users } from '@shared/schema';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 const loginRateLimiter = rateLimit({
@@ -31,7 +31,98 @@ const registerRateLimiter = rateLimit({
   message: { error: 'Too many registration attempts, please try again later' },
 });
 
-export function registerAuthRoutes(app: Express) {
+const DEFAULT_DEV_ADMIN_EMAIL = 'admin@admin.com';
+const DEFAULT_DEV_ADMIN_PASSWORD = '12345678';
+const DEFAULT_DEV_ADMIN_DISPLAY_NAME = 'Admin';
+
+async function ensureDefaultDevAdminUser() {
+  if (process.env.NODE_ENV !== 'development') {
+    return;
+  }
+
+  const existingRows = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, DEFAULT_DEV_ADMIN_EMAIL))
+    .limit(1);
+
+  let userId: number;
+
+  if (existingRows.length === 0) {
+    const passwordHash = await authService.hashPassword(DEFAULT_DEV_ADMIN_PASSWORD);
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        displayName: DEFAULT_DEV_ADMIN_DISPLAY_NAME,
+        email: DEFAULT_DEV_ADMIN_EMAIL,
+        passwordHash,
+        role: 'admin',
+        isBlocked: false,
+        tariff: 'standard',
+        trialUsed: true,
+      })
+      .returning();
+
+    userId = newUser.id;
+    console.info(`[Auth] Created default dev admin: ${DEFAULT_DEV_ADMIN_EMAIL}`);
+  } else {
+    const existingUser = existingRows[0];
+
+    if (existingUser.role !== 'admin') {
+      console.warn(
+        `[Auth] Skipped default dev admin bootstrap: ${DEFAULT_DEV_ADMIN_EMAIL} already exists and is not an admin`
+      );
+      return;
+    }
+
+    userId = existingUser.id;
+
+    const passwordMatches =
+      !!existingUser.passwordHash &&
+      (await authService.verifyPassword(DEFAULT_DEV_ADMIN_PASSWORD, existingUser.passwordHash));
+
+    if (!passwordMatches || existingUser.isBlocked) {
+      const passwordHash = await authService.hashPassword(DEFAULT_DEV_ADMIN_PASSWORD);
+
+      await db
+        .update(users)
+        .set({
+          passwordHash,
+          isBlocked: false,
+        })
+        .where(eq(users.id, userId));
+
+      console.info(`[Auth] Refreshed default dev admin credentials: ${DEFAULT_DEV_ADMIN_EMAIL}`);
+    }
+  }
+
+  const linkedEmailProviders = await db
+    .select({ id: authProviders.id, externalId: authProviders.externalId })
+    .from(authProviders)
+    .where(
+      and(
+        eq(authProviders.userId, userId),
+        eq(authProviders.provider, 'email')
+      )
+    )
+    .limit(5);
+
+  if (linkedEmailProviders.length === 0) {
+    await db.insert(authProviders).values({
+      userId,
+      provider: 'email',
+      externalId: DEFAULT_DEV_ADMIN_EMAIL,
+    });
+  } else if (!linkedEmailProviders.some((provider) => provider.externalId === DEFAULT_DEV_ADMIN_EMAIL)) {
+    console.warn(
+      `[Auth] Skipped linking default dev admin email provider: user ${userId} already has another email provider`
+    );
+  }
+}
+
+export async function registerAuthRoutes(app: Express) {
+  await ensureDefaultDevAdminUser();
+
   // POST /api/auth/login/telegram — аутентификация через Telegram initData
   app.post(
     '/api/auth/login/telegram',

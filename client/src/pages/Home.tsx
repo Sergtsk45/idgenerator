@@ -6,8 +6,7 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { BottomNav } from "@/components/BottomNav";
-import { Header } from "@/components/Header";
+import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -156,8 +155,13 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background bg-grain">
-      <Header title={t.title} subtitle={objectSubtitle} showAvatar showObjectSelector />
+    <ResponsiveShell
+      title={t.title}
+      subtitle={objectSubtitle}
+      showAvatar
+      showObjectSelector
+      className="bg-background bg-grain"
+    >
 
       {/* Browser access banner (outside Telegram) */}
       {!isInTelegram && (needsAuth || hasInvalidAuth) && (
@@ -185,11 +189,11 @@ export default function Home() {
                       : "To use the app in browser (outside Telegram), please log in."}
                 </p>
                 <div className="mt-3">
-                  <Link href="/login">
-                    <Button size="sm" variant={hasInvalidAuth ? "secondary" : "default"}>
+                  <Button asChild size="sm" variant={hasInvalidAuth ? "secondary" : "default"}>
+                    <Link href="/login">
                       {language === "ru" ? "Войти" : "Log in"}
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </div>
               </AlertDescription>
             </Alert>
@@ -252,14 +256,19 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <ScrollArea ref={scrollRef} className="flex-1 px-4 py-6 mb-36">
-        <div className="max-w-md mx-auto min-h-[calc(100vh-12rem)] flex flex-col justify-end">
+      {/* lg+ two-column layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Main chat column */}
+        <div className="flex flex-1 flex-col min-w-0 overflow-hidden relative" data-testid="home-chat-column">
+
+      <ScrollArea ref={scrollRef} className="flex-1 px-4 py-6 mb-36 md:mb-32 lg:mb-28">
+        <div className="mx-auto w-full max-w-3xl min-h-[calc(100vh-12rem)] flex flex-col justify-end">
           {showOnboarding && (
             <div className="bg-card border rounded-2xl p-4 mb-6 relative shadow-sm">
               <button
                 onClick={handleDismissOnboarding}
                 className="absolute top-3 right-3 text-muted-foreground/60 hover:text-muted-foreground"
-                aria-label="Закрыть"
+                aria-label={language === "ru" ? "Закрыть подсказку" : "Dismiss onboarding"}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -313,9 +322,11 @@ export default function Home() {
                   : "Open the app in Telegram or configure an access token for browser access."}
               </p>
               <div className="mt-4">
-                <Link href="/login">
-                  <Button>{language === "ru" ? "Перейти к входу" : "Go to login"}</Button>
-                </Link>
+                <Button asChild>
+                  <Link href="/login">
+                    {language === "ru" ? "Перейти к входу" : "Go to login"}
+                  </Link>
+                </Button>
               </div>
             </div>
           ) : sortedMessages.length === 0 ? (
@@ -347,8 +358,8 @@ export default function Home() {
       </ScrollArea>
 
       {/* Панель ввода */}
-      <div className="fixed bottom-16 left-0 right-0 bg-background border-t border-border/40 px-4 pt-3 pb-3">
-        <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-2">
+      <div className="fixed bottom-16 left-0 right-0 border-t border-border/40 bg-background px-4 md:px-6 lg:px-8 pt-3 pb-3 md:bottom-0">
+        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-2">
           <div className="flex items-end gap-2">
             {/* Поле ввода с микрофоном внутри */}
             <div className="relative flex-1">
@@ -383,7 +394,7 @@ export default function Home() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className={`absolute right-1 bottom-1 h-8 w-8 transition-all ${
+                  className={`absolute right-1 bottom-1 h-8 w-8 md:h-9 md:w-9 transition-all ${
                     isRecording
                       ? "text-red-500 animate-pulse bg-red-50 dark:bg-red-950/30"
                       : "text-muted-foreground/60"
@@ -392,6 +403,7 @@ export default function Home() {
                   onPointerDown={(e) => { e.preventDefault(); startRecording(); }}
                   onPointerUp={() => { if (isRecording) stopRecording(); }}
                   onPointerLeave={() => { if (isRecording) cancelRecording(); }}
+                  aria-label={language === "ru" ? "Голосовой ввод" : "Voice input"}
                 >
                   {isTranscribing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -408,6 +420,7 @@ export default function Home() {
               size="icon"
               className="h-11 w-11 rounded-full bg-primary hover:bg-primary/90 shadow-md shadow-primary/20 shrink-0"
               disabled={!inputValue.trim() || createMessage.isPending}
+              aria-label={language === "ru" ? "Отправить сообщение" : "Send message"}
             >
               {createMessage.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -426,7 +439,24 @@ export default function Home() {
         </form>
       </div>
 
-      <BottomNav />
-    </div>
+        </div>{/* end Main chat column */}
+
+        {/* Right panel — recent entries (lg+) */}
+        <aside className="hidden lg:flex lg:w-80 xl:w-96 flex-col border-l border-border/40 bg-muted/20 p-4 shrink-0 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+            {language === "ru" ? "Последние записи" : "Recent entries"}
+          </h3>
+          {sortedMessages.slice(-10).reverse().map((msg) => (
+            <div key={msg.id} className="mb-2 p-2 rounded-lg bg-card border border-border/40 text-xs">
+              <p className="text-muted-foreground truncate">{msg.messageRaw}</p>
+            </div>
+          ))}
+          {sortedMessages.length === 0 && (
+            <p className="text-xs text-muted-foreground">{t.noMessages}</p>
+          )}
+        </aside>
+      </div>{/* end lg+ two-column layout */}
+
+    </ResponsiveShell>
   );
 }

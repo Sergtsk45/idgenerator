@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BottomNav } from "@/components/BottomNav";
-import { Header } from "@/components/Header";
+import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { useActs } from "@/hooks/use-acts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FileText, CalendarIcon, Download, Loader2, ChevronRight, Check, FileDown } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -96,6 +96,8 @@ export default function Acts() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [exportActId, setExportActId] = useState<number | null>(null);
   const [exportingActId, setExportingActId] = useState<number | null>(null);
+  // Export progress indicator (Task 4.7)
+  const [exportProgress, setExportProgress] = useState(0);
 
   // Эталонный АОСР (005_АОСР 4): данные, которые пойдут в formData при экспорте PDF
   const [aosrForm, setAosrForm] = useState({
@@ -290,11 +292,17 @@ export default function Acts() {
 
   const handleDownloadAct = async (actId: number) => {
     setExportingActId(actId);
+    setExportProgress(10);
+    // Simulate progress while waiting for PDF generation (Task 4.7)
+    const progressTimer = setInterval(() => {
+      setExportProgress((p) => (p < 85 ? p + 15 : p));
+    }, 600);
     try {
       const exportResult = await exportAct.mutateAsync({
         actId,
         templateIds: [],
       });
+      setExportProgress(100);
       if (exportResult.files && exportResult.files.length > 0) {
         toast({
           title: language === "ru" ? "Успех" : "Success",
@@ -311,7 +319,9 @@ export default function Acts() {
         variant: "destructive",
       });
     } finally {
+      clearInterval(progressTimer);
       setExportingActId(null);
+      setExportProgress(0);
     }
   };
 
@@ -383,18 +393,18 @@ export default function Acts() {
   const handleGenerate = handleExport;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background bg-grain">
-      <Header
-        title={t.title}
-        subtitle={
-          currentObject.data?.title
-            ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.data.title}`
-            : undefined
-        }
-        showObjectSelector
-      />
+    <ResponsiveShell
+      className="bg-background bg-grain"
+      title={t.title}
+      subtitle={
+        currentObject.data?.title
+          ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.data.title}`
+          : undefined
+      }
+      showObjectSelector
+    >
 
-      <div className="flex-1 px-4 py-6 pb-24 max-w-md mx-auto w-full">
+      <div className="flex-1 px-4 py-6 pb-24 w-full max-w-md lg:max-w-4xl mx-auto">
         <div className="mb-3">
           <Button
             variant="outline"
@@ -425,9 +435,9 @@ export default function Acts() {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">{/* 2-col on lg+ (Task 4.5) */}
             {acts.length === 0 ? (
-              <div className="text-center py-16 space-y-4">
+              <div className="text-center py-16 space-y-4 lg:col-span-2">
                 <div className="bg-muted/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
                   <FileText className="h-10 w-10 text-muted-foreground/50" />
                 </div>
@@ -499,6 +509,15 @@ export default function Acts() {
                           )}
                         </Button>
                       </div>
+                      {/* Export progress bar (Task 4.7) */}
+                      {exportingActId === act.id && exportProgress > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <Progress value={exportProgress} className="h-1" />
+                          <p className="text-[10px] text-muted-foreground text-right">
+                            {language === "ru" ? "Генерация PDF..." : "Generating PDF..."}
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -508,18 +527,19 @@ export default function Acts() {
         )}
       </div>
 
-      <div className="fixed bottom-20 right-4 z-40 md:right-[max(1rem,calc(50vw-220px))]">
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) setExportActId(null);
-          }}
-        >
-          <DialogContent className="sm:max-w-lg max-h-[90vh] rounded-2xl flex flex-col overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>{language === "ru" ? "Экспорт АОСР" : "Export AOSR"}</DialogTitle>
-            </DialogHeader>
+      <div className="fixed inset-x-0 bottom-20 z-40 md:bottom-6 lg:left-72">
+        <div className="mx-auto flex w-full max-w-md justify-end px-4">
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) setExportActId(null);
+            }}
+          >
+            <DialogContent className="sm:max-w-lg lg:max-w-2xl max-h-[90vh] rounded-2xl flex flex-col overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>{language === "ru" ? "Экспорт АОСР" : "Export AOSR"}</DialogTitle>
+              </DialogHeader>
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="py-4 space-y-4 pr-4">
                 <div className="grid gap-4 grid-cols-2">
@@ -1005,8 +1025,9 @@ export default function Acts() {
                 )}
               </Button>
             </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Материалы для п.3 (picker) */}
@@ -1141,7 +1162,6 @@ export default function Acts() {
         </DialogContent>
       </Dialog>
 
-      <BottomNav />
-    </div>
+    </ResponsiveShell>
   );
 }

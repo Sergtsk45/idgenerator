@@ -6,8 +6,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { BottomNav } from "@/components/BottomNav";
-import { Header } from "@/components/Header";
+import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Drawer, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
@@ -119,9 +118,7 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
   }, [newDoc.docDate]);
 
   return (
-    <div className="flex flex-col min-h-screen h-[100dvh] bg-background bg-grain">
-      <Header title={title} />
-
+    <ResponsiveShell className="min-h-screen h-[100dvh] bg-background bg-grain" title={title}>
       <div className="flex-1 min-h-0 overflow-hidden px-4 py-6 pb-24 flex flex-col">
         {materialQuery.isLoading ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground">
@@ -220,8 +217,6 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
           </ScrollArea>
         )}
       </div>
-
-      <BottomNav />
 
       <Drawer open={addBatchOpen} onOpenChange={setAddBatchOpen}>
         <DrawerContent className="max-h-[90vh]">
@@ -597,7 +592,7 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-    </div>
+    </ResponsiveShell>
   );
 }
 

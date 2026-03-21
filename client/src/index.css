@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import './design-system.css';
 
 @tailwind base;
 @tailwind components;
@@ -58,6 +59,20 @@
   --font-sans: 'Inter', sans-serif;
   --font-display: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  /* Safe-area and shell foundation tokens. */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --app-viewport-height: var(--tg-viewport-stable-height, 100dvh);
+  --app-viewport-width: var(--tg-viewport-width, 100vw);
+  --shell-header-height: 3.5rem;
+  --shell-bottom-nav-height: 4rem;
+  --shell-content-max-width: 100%;
+  --shell-content-padding-x: 1rem;
+  --shell-content-padding-y: 1rem;
+  --shell-font-scale: 1;
 }
 
 .dark {
@@ -93,7 +108,41 @@
   --ring: 224.3 76.3% 48%;
 }
 
+@media (min-width: 768px) {
+  :root {
+    --shell-header-height: 4rem;
+    --shell-bottom-nav-height: 4.5rem;
+    --shell-content-padding-x: 1.5rem;
+    --shell-content-padding-y: 1.25rem;
+    --shell-content-max-width: 64rem;
+    --shell-font-scale: 1.02;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --shell-content-padding-x: 2rem;
+    --shell-content-padding-y: 1.5rem;
+    --shell-content-max-width: 72rem;
+    --shell-font-scale: 1.04;
+  }
+}
+
 @layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+  }
+
+  body,
+  #root {
+    min-height: 100vh;
+    min-height: var(--app-viewport-height);
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
@@ -115,6 +164,22 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .pt-safe {
+    padding-top: var(--safe-area-top);
+  }
+
+  .pb-safe {
+    padding-bottom: var(--safe-area-bottom);
+  }
+
+  .pl-safe {
+    padding-left: var(--safe-area-left);
+  }
+
+  .pr-safe {
+    padding-right: var(--safe-area-right);
   }
   
   /* Telegram Theme Utilities */

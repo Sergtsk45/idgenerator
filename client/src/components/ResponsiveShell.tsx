@@ -1,0 +1,225 @@
+/**
+ * @file: ResponsiveShell.tsx
+ * @description: Responsive shell wrapper — adapts layout for mobile (sm/md) and tablet/desktop (lg+).
+ *   Mobile: standard flex-col with BottomNav space.
+ *   lg+: full-width content, no BottomNav padding. Sidebar visible on lg+.
+ *   Uses CSS shell tokens (--shell-content-max-width, --shell-content-padding-x/y).
+ * @dependencies: Header, BottomNav, @/lib/navigation, @/lib/i18n, wouter
+ * @created: 2026-03-10
+ * @updated: 2026-03-13
+ */
+
+import { type ReactNode } from "react";
+import { Link, useLocation } from "wouter";
+import { BottomNav } from "@/components/BottomNav";
+import { Header } from "@/components/Header";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useLanguageStore, translations } from "@/lib/i18n";
+import {
+  getNavigationItemsForSurface,
+  getNavigationLabel,
+  getQuickActionForSurface,
+  isNavigationItemActive,
+  type NavigationItem,
+  type NavigationLabels,
+} from "@/lib/navigation";
+
+type HeaderProps = Parameters<typeof Header>[0];
+
+interface ResponsiveShellProps extends HeaderProps {
+  children: ReactNode;
+  className?: string;
+}
+
+export function ResponsiveShell({
+  children,
+  className,
+  ...headerProps
+}: ResponsiveShellProps) {
+  return (
+    <div className={cn("flex min-h-screen flex-col bg-background", className)}>
+      <div className="flex min-h-screen flex-1 flex-col lg:flex-row">
+        <ShellSidebar />
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Header {...headerProps} />
+          <ShellTopNav />
+          {children}
+        </div>
+      </div>
+
+      <BottomNav />
+    </div>
+  );
+}
+
+function ShellTopNav() {
+  const [location] = useLocation();
+  const { language } = useLanguageStore();
+  const labels: NavigationLabels = translations[language].nav;
+  const shellT = translations[language].shell;
+  const primaryItems = getNavigationItemsForSurface("shellPrimaryMdUp", { groups: "primary" });
+  const secondaryItems = getNavigationItemsForSurface("shellSecondaryMdUp", { groups: "secondary" });
+  const quickAction = getQuickActionForSurface("shellQuickActionMdUp");
+
+  return (
+    <div className="sticky top-14 z-30 hidden border-b border-border/50 bg-background/95 backdrop-blur md:block">
+      <div className="flex h-14 items-center gap-3 px-4">
+        <nav aria-label={shellT.primaryNavigation} className="min-w-0 flex-1 overflow-x-auto">
+          <div className="flex min-w-max items-center gap-2">
+            {primaryItems.map((item) => (
+              <ShellTextLink
+                key={item.id}
+                item={item}
+                pathname={location}
+                label={getNavigationLabel(item, labels)}
+              />
+            ))}
+          </div>
+        </nav>
+
+        <div className="hidden items-center gap-2 md:flex lg:hidden">
+          {secondaryItems.map((item) => (
+            <ShellCompactLink
+              key={item.id}
+              item={item}
+              pathname={location}
+              label={getNavigationLabel(item, labels)}
+            />
+          ))}
+
+          {quickAction ? (
+            <ShellCompactLink
+              item={quickAction}
+              pathname={location}
+              label={getNavigationLabel(quickAction, labels)}
+            />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShellSidebar() {
+  const [location] = useLocation();
+  const { language } = useLanguageStore();
+  const labels: NavigationLabels = translations[language].nav;
+  const shellT = translations[language].shell;
+  const secondaryItems = getNavigationItemsForSurface("shellSecondaryMdUp", { groups: "secondary" });
+  const quickAction = getQuickActionForSurface("shellQuickActionMdUp");
+
+  return (
+    <aside className="hidden w-72 shrink-0 border-r border-border/50 bg-muted/20 lg:flex lg:flex-col">
+      <div className="sticky top-0 flex h-screen flex-col px-4 py-6">
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            {shellT.navigation}
+          </p>
+        </div>
+
+        {quickAction ? (
+          <Button
+            asChild
+            variant={isNavigationItemActive(quickAction, location) ? "default" : "secondary"}
+            className="mb-6 h-11 w-full justify-start gap-3 rounded-2xl px-4"
+          >
+            <Link href={quickAction.href}>
+              {quickAction.icon ? <quickAction.icon className="h-4 w-4" /> : null}
+              {getNavigationLabel(quickAction, labels)}
+            </Link>
+          </Button>
+        ) : null}
+
+        <nav aria-label={shellT.secondaryNavigation} className="space-y-2">
+          {secondaryItems.map((item) => (
+            <ShellSidebarLink
+              key={item.id}
+              item={item}
+              pathname={location}
+              label={getNavigationLabel(item, labels)}
+            />
+          ))}
+        </nav>
+      </div>
+    </aside>
+  );
+}
+
+function ShellTextLink({
+  item,
+  pathname,
+  label,
+}: {
+  item: NavigationItem;
+  pathname: string;
+  label: string;
+}) {
+  const isActive = isNavigationItemActive(item, pathname);
+
+  return (
+    <Button
+      asChild
+      variant={isActive ? "secondary" : "ghost"}
+      className={cn("h-9 rounded-xl px-4", isActive && "font-semibold")}
+    >
+      <Link href={item.href}>
+        {label}
+      </Link>
+    </Button>
+  );
+}
+
+function ShellCompactLink({
+  item,
+  pathname,
+  label,
+}: {
+  item: NavigationItem;
+  pathname: string;
+  label: string;
+}) {
+  const isActive = isNavigationItemActive(item, pathname);
+  const Icon = item.icon;
+
+  return (
+    <Button
+      asChild
+      variant={isActive ? "secondary" : "ghost"}
+      size="sm"
+      className={cn("h-9 rounded-xl px-3", isActive && "font-semibold")}
+    >
+      <Link href={item.href}>
+        {Icon ? <Icon className="mr-1.5 h-4 w-4" /> : null}
+        {label}
+      </Link>
+    </Button>
+  );
+}
+
+function ShellSidebarLink({
+  item,
+  pathname,
+  label,
+}: {
+  item: NavigationItem;
+  pathname: string;
+  label: string;
+}) {
+  const isActive = isNavigationItemActive(item, pathname);
+  const Icon = item.icon;
+
+  return (
+    <Button
+      asChild
+      variant={isActive ? "secondary" : "ghost"}
+      className={cn("h-11 w-full justify-start gap-3 rounded-2xl px-4", isActive && "font-semibold")}
+    >
+      <Link href={item.href}>
+        {Icon ? <Icon className="h-4 w-4" /> : null}
+        {label}
+      </Link>
+    </Button>
+  );
+}

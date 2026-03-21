@@ -11,8 +11,18 @@ import { getAuthToken } from "@/lib/auth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface AdminUserAuthProvider {
+  provider: 'telegram' | 'email' | 'phone';
+  externalId: string | null;
+}
+
 export interface AdminUserRow {
   telegramUserId: string;
+  displayName: string;
+  email: string | null;
+  authProviders: AdminUserAuthProvider[];
+  createdAt: string | null;
+  lastLoginAt: string | null;
   objectId: number | null;
   objectTitle: string | null;
   isBlocked: boolean;

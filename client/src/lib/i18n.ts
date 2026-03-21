@@ -24,11 +24,23 @@ export const translations = {
   en: {
     nav: {
       home: 'Home',
+      homeChat: 'Work Log (chat)',
       works: 'Works',
       worklog: 'Work Log',
       acts: 'Acts',
       schedule: 'Schedule',
-      sourceData: 'Source'
+      sourceData: 'Source',
+      objects: 'My Objects',
+      settings: 'Settings'
+    },
+    shell: {
+      navigation: 'Navigation',
+      primaryNavigation: 'Primary navigation',
+      secondaryNavigation: 'Secondary navigation',
+      openMenu: 'Open navigation menu',
+      back: 'Back',
+      search: 'Search',
+      selectObject: 'Select object',
     },
     home: {
       title: 'Work Log',
@@ -257,11 +269,23 @@ export const translations = {
   ru: {
     nav: {
       home: 'Главная',
+      homeChat: 'Журнал работ (чат)',
       works: 'ВОР',
       worklog: 'ЖР',
       acts: 'Акты',
       schedule: 'График работ',
-      sourceData: 'Исходные'
+      sourceData: 'Исходные',
+      objects: 'Мои объекты',
+      settings: 'Настройки'
+    },
+    shell: {
+      navigation: 'Навигация',
+      primaryNavigation: 'Основная навигация',
+      secondaryNavigation: 'Вторичная навигация',
+      openMenu: 'Открыть меню навигации',
+      back: 'Назад',
+      search: 'Поиск',
+      selectObject: 'Выбрать объект',
     },
     home: {
       title: 'Журнал работ',
