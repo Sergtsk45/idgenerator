@@ -183,13 +183,13 @@
   - [x] `npm run check`
 
 ## Задача 1.9: `server/routes/voice.ts` (10-20 мин)
-- **Статус**: Не начата
+- **Статус**: Завершена
 - **Шаги**:
-  - [ ] Перенести voice endpoint
-  - [ ] Перенести `voiceUpload` + `voiceRateLimiter`
-  - [ ] Экспортировать `registerVoiceRoutes(app)`
-  - [ ] Подключить модуль
-  - [ ] `npm run check`
+  - [x] Перенести voice endpoint
+  - [x] Перенести `voiceUpload` + `voiceRateLimiter`
+  - [x] Экспортировать `registerVoiceRoutes(app)`
+  - [x] Подключить модуль
+  - [x] `npm run check`
 
 ## Задача 1.10: `server/routes/tariff.ts` (10-20 мин)
 - **Статус**: Не начата
