@@ -4,7 +4,7 @@
 **Discovered:** 2026-03-01 (during multi-auth code review)  
 **Reported by:** review agent  
 **Severity:** Medium  
-**Status:** Open  
+**Status:** Resolved (2026-03-21)  
 
 ## Description
 
@@ -49,6 +49,14 @@ server/routes/
 ```
 
 Каждый модуль экспортирует функцию `register<Feature>Routes(app: Express)`.
+
+## Resolution (2026-03-21)
+
+Выполнен полный рефакторинг в ветке `refactor/routes-modularization`:
+- `server/routes.ts` (2426 строк) → чистый диспетчер (70 строк)
+- Созданы 11 модулей в `server/routes/`: auth, tariff, voice, objects, materials, works, messages, schedule, estimates, acts, admin
+- Общие утилиты: `_common.ts` (appAuth, adminAuth, storage, helpers), `_dateUtils.ts`, `_openai.ts`
+- `npm run check` + `npm run build` — пройдены без ошибок
 
 ## Priority
 
