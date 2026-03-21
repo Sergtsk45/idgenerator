@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-21] - Задача 1.7: extract schedule routes module
+
+### Изменено
+- `server/routes/schedule.ts` — создан новый модуль с экспортом `registerScheduleRoutes(app)`: schedule endpoints (default/create/get, bootstrap-from-works/estimate, source-info, change-source, generate-acts), schedule-tasks (patch, split, split-siblings), task-materials (list/replace/add/remove)
+- `server/routes.ts` — schedule/task-materials блок удалён (~937 строк), добавлен вызов `registerScheduleRoutes(app)`, удалены неиспользуемые импорты `requireFeature`, `requireQuota`, `addDaysISO`
+
 ## [2026-03-14] - Sprint 6: Admin + Settings + RBAC + 404 tablet UI adaptation (v1.3)
 
 ### Добавлено
