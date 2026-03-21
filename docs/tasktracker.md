@@ -2721,15 +2721,16 @@ server/fonts/TimesNewRomanBoldItalic.ttf
 ---
 
 ## Задача: Отображение данных пользователя в UI панели администратора
-- **Статус**: Не начата
+- **Статус**: Завершена (2026-03-21)
 - **Приоритет**: Средний
-- **Описание**: В админ-панели (вкладка «Пользователи») отображать полные данные о пользователях: display_name, email, роль, способ входа (Telegram / email), дата регистрации, дата последнего входа, привязанные auth_providers. Обеспечить корректное отображение для пользователей, зашедших через Telegram (показывать Telegram ID/username) и через email.
+- **Описание**: В админ-панели (вкладка «Пользователи») отображать полные данные о пользователях: display_name, email, роль, способ входа (Telegram / email), дата регистрации, дата последнего входа, привязанные auth_providers.
 - **Шаги выполнения**:
-  - [ ] Расширить API `GET /api/admin/users` — возвращать email, список auth_providers (provider + externalId), lastLoginAt
-  - [ ] Обновить `AdminUsers.tsx` — отобразить email, способ входа (иконки Telegram/Email), дату регистрации и последнего входа
-  - [ ] Добавить фильтрацию/поиск по email и display_name
-  - [ ] Показывать роль пользователя (user/admin) с возможностью смены
-  - [ ] Показывать статус блокировки и тариф
+  - [x] Расширить API `GET /api/admin/users` — возвращать email, список auth_providers (provider + externalId), lastLoginAt, displayName
+  - [x] Обновить `AdminUsers.tsx` — отобразить displayName (primary), email, способ входа (иконки TG/Email), lastLoginAt
+  - [x] Добавить фильтрацию/поиск по email и display_name
+  - [x] Показывать роль пользователя (ADMIN badge) с возможностью смены
+  - [x] Показывать статус блокировки и тариф
+- **Файлы изменены**: `server/storage.ts`, `client/src/hooks/use-admin.ts`, `client/src/pages/admin/AdminUsers.tsx`
 - **Зависимости**: Мультипровайдерная аутентификация (tasktracker2.md / выше)
 
 ---
