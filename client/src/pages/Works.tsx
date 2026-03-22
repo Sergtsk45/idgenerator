@@ -25,7 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Loader2, FileUp, Download } from "lucide-react";
+import { Search, Loader2, FileUp, Download, FileText } from "lucide-react";
+import { PillTabs } from "@/components/ui/pill-tabs";
+import { OdooEmptyState } from "@/components/ui/odoo-empty-state";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguageStore, translations } from "@/lib/i18n";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -422,37 +424,18 @@ export default function Works() {
     return estimatesList.find((e) => e.id === selectedEstimateId) ?? null;
   }, [estimatesList, selectedEstimateId]);
 
-  // Segmented tab toggle — shared between sidebar and mobile toolbar
+  // 17.1 PillTabs toggle — shared between sidebar and mobile toolbar
   const tabToggle = (
-    <div className="flex rounded-xl gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        className={cn(
-          "flex-1 h-10 px-3 text-[13px] font-medium rounded-xl transition-colors",
-          tab === "works"
-            ? "bg-primary/10 text-primary border-primary/60 hover:bg-primary/15"
-            : "bg-transparent text-primary/80 border-primary/30 hover:bg-primary/5 hover:border-primary/50 hover:text-primary"
-        )}
-        onClick={() => setTab("works")}
-      >
-        {language === "ru" ? "Ведомость (ВОР)" : "BoQ"}
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        className={cn(
-          "flex-1 h-10 px-3 text-[13px] font-medium rounded-xl transition-colors",
-          tab === "estimate"
-            ? "bg-primary/10 text-primary border-primary/60 hover:bg-primary/15"
-            : "bg-transparent text-primary/80 border-primary/30 hover:bg-primary/5 hover:border-primary/50 hover:text-primary"
-        )}
-        onClick={() => setTab("estimate")}
-      >
-        {language === "ru" ? "Смета (ЛС)" : "Estimate"}
-      </Button>
-    </div>
+    <PillTabs
+      activeTab={tab}
+      onTabChange={(v) => setTab(v as "works" | "estimate")}
+      tabs={[
+        { label: language === "ru" ? "ВОР" : "BoQ", value: "works" },
+        { label: language === "ru" ? "Смета" : "Estimate", value: "estimate" },
+      ]}
+    />
   );
+
 
   // Works tab controls — shared between sidebar and mobile toolbar
   const worksControls = (
@@ -902,19 +885,24 @@ export default function Works() {
                   </p>
                 </div>
               ) : workCollectionsList.length === 0 ? (
-                <div className="py-10 text-center text-muted-foreground">
-                  {language === "ru"
-                    ? "Коллекции ВОР не найдены. Импортируйте Excel-файл ВОР."
-                    : "No work collections found. Import a BoQ Excel file."}
-                </div>
+                /* 17.6 OdooEmptyState */
+                <OdooEmptyState
+                  icon={<FileText />}
+                  title={language === "ru" ? "Нет ВОР" : "No BoQ"}
+                  hint={language === "ru" ? "Импортируйте Excel-файл ВОР через кнопку «Импорт»" : "Import a BoQ Excel file using the Import button"}
+                />
               ) : !workCollectionDetails ? (
-                <div className="py-10 text-center text-muted-foreground">
-                  {language === "ru" ? "Выберите коллекцию ВОР" : "Select a work collection"}
-                </div>
+                <OdooEmptyState
+                  icon={<FileText />}
+                  title={language === "ru" ? "Выберите коллекцию" : "Select a collection"}
+                  hint={language === "ru" ? "Выберите коллекцию ВОР из списка слева" : "Select a work collection from the list"}
+                />
               ) : filteredWorkCollectionSections.length === 0 ? (
-                <div className="py-10 text-center text-muted-foreground">
-                  {language === "ru" ? "По запросу ничего не найдено" : "No results for this search"}
-                </div>
+                <OdooEmptyState
+                  icon={<Search />}
+                  title={language === "ru" ? "Ничего не найдено" : "No results"}
+                  hint={language === "ru" ? "Попробуйте изменить поисковый запрос" : "Try adjusting your search query"}
+                />
               ) : (
                 <Accordion type="multiple" className="w-full">
                   {filteredWorkCollectionSections.map((sec) => {

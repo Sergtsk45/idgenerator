@@ -18,7 +18,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguageStore, translations } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight, FileText, Loader2, Package, Plus, Save, Users, Wrench } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Loader2, Package, Plus, Save, Users, Wrench, Building2, MapPin } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { OdooCard } from "@/components/ui/odoo-card";
+import { Progress } from "@/components/ui/progress";
 import { useCreateDocument, useDocuments } from "@/hooks/use-documents";
 import { MaterialWizard } from "@/components/materials/MaterialWizard";
 import { useProjectMaterials } from "@/hooks/use-materials";
@@ -177,21 +180,22 @@ export default function SourceData() {
       <div className="sticky top-14 z-30 border-b border-border/40 bg-background/95 backdrop-blur md:top-28">
         <div className="max-w-md lg:max-w-5xl mx-auto px-4 py-2 space-y-2">
           <div className="flex items-center gap-2">
-            <Button
+            {/* 16.1 Object selector — Odoo style */}
+            <button
               type="button"
-              variant="outline"
-              className="flex-1 justify-between rounded-xl"
+              className="flex-1 flex items-center gap-2 px-3 py-2 rounded-[--o-radius-lg] bg-[--p50] border border-[--p300] hover:bg-[--p100] transition-colors text-left"
               onClick={() => setObjectDialogOpen(true)}
               data-testid="source-object-selector"
             >
-              <span className="truncate">
-                {language === "ru" ? "Объект" : "Object"}:{" "}
-                <span className="font-medium">
+              <Building2 className="h-4 w-4 text-[--p500] shrink-0" strokeWidth={1.5} />
+              <span className="flex-1 truncate text-[13px]">
+                <span className="text-[--g500]">{language === "ru" ? "Объект" : "Object"}:</span>{" "}
+                <span className="font-medium text-[--g900]">
                   {draft.object.title || (language === "ru" ? "Объект по умолчанию" : "Default object")}
                 </span>
               </span>
-              <ChevronDown className="h-4 w-4 opacity-70" />
-            </Button>
+              <ChevronDown className="h-4 w-4 text-[--p500] shrink-0" />
+            </button>
 
             <Button
               type="button"
@@ -225,7 +229,7 @@ export default function SourceData() {
           <div className="h-full flex flex-col">
             {/* Parties / participants — вне ScrollArea, чтобы горизонтальный свайп работал на мобильных */}
             <div className="max-w-md lg:max-w-5xl mx-auto w-full px-4 pt-4 pb-1 shrink-0">
-              <div className="text-sm font-medium mb-2">{language === "ru" ? "Стороны/участники" : "Parties"}</div>
+              <p className="o-overline text-[--g500] mb-2">{language === "ru" ? "СТОРОНЫ / УЧАСТНИКИ" : "PARTIES"}</p>
             </div>
             <div
               className="flex gap-3 overflow-x-auto pb-3 shrink-0 lg:grid lg:grid-cols-4 lg:overflow-x-visible lg:px-4"
@@ -243,78 +247,95 @@ export default function SourceData() {
                 const filled = String(party.fullName ?? "").trim().length > 0;
 
                 return (
-                  <Card
+                  /* 16.3 Chip участника */
+                  <OdooCard
                     key={role.key}
-                    className="min-w-[180px] max-w-[220px] flex-shrink-0 lg:min-w-0 lg:max-w-none lg:flex-shrink-0 rounded-xl cursor-pointer hover:border-primary/50 transition-colors"
+                    hoverable
                     onClick={() => setPartyDialogRole(role.key)}
+                    className="min-w-[180px] max-w-[220px] flex-shrink-0 lg:min-w-0 lg:max-w-none lg:flex-shrink-0 cursor-pointer"
                   >
-                    <CardContent className="p-4">
-                      <div className={cn("h-1 rounded-t-xl -mt-4 -mx-4 mb-3", filled ? "bg-emerald-500" : "bg-muted")} />
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="text-sm font-medium">{role.title}</div>
-                        <div className={`h-2 w-2 rounded-full mt-1 ${filled ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                    <div className="p-3">
+                      <p className="o-overline text-[--g500] mb-1">{role.title}</p>
+                      <p className="text-[13px] font-medium text-[--g900] line-clamp-2 leading-snug">{name}</p>
+                      <div className="mt-2 flex items-center gap-1.5">
+                        {inn ? (
+                          <>
+                            <span className="h-4 w-4 rounded-full bg-[--success] flex items-center justify-center shrink-0">
+                              <span className="text-white text-[8px] font-bold">✓</span>
+                            </span>
+                            <span className="text-[11px] text-[--g600] font-mono">ИНН {inn}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="h-4 w-4 rounded-full border border-[--g300] bg-[--g100] shrink-0" />
+                            <span className="text-[11px] text-[--g400]">
+                              {language === "ru" ? "ИНН не указан" : "INN not set"}
+                            </span>
+                          </>
+                        )}
                       </div>
-                      <div className="mt-2 text-sm leading-snug line-clamp-2">{name}</div>
-                      <div className="mt-2 text-xs text-muted-foreground">{inn ? `ИНН ${inn}` : (language === "ru" ? "ИНН не указан" : "INN not set")}</div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </OdooCard>
                 );
               })}
 
-              <Card
-                className="min-w-[180px] max-w-[220px] flex-shrink-0 lg:min-w-0 lg:max-w-none lg:flex-shrink-0 rounded-xl cursor-pointer hover:border-primary/50 transition-colors"
+              <OdooCard
+                hoverable
                 onClick={() => setPersonsDialogOpen(true)}
+                className="min-w-[180px] max-w-[220px] flex-shrink-0 lg:min-w-0 lg:max-w-none lg:flex-shrink-0 cursor-pointer"
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="text-sm font-medium">{language === "ru" ? "Ответственные лица" : "Responsible persons"}</div>
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                <div className="p-3">
+                  <p className="o-overline text-[--g500] mb-1">{language === "ru" ? "ЛИЦА" : "PERSONS"}</p>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-[--p500] shrink-0" strokeWidth={1.5} />
+                    <span className="text-[13px] font-medium text-[--g900]">
+                      {language === "ru" ? "Ответственные лица" : "Responsible persons"}
+                    </span>
                   </div>
-                  <div className="mt-2 text-sm leading-snug line-clamp-2 text-muted-foreground">
-                    {language === "ru" ? "Подписанты и основания" : "Signers and authority basis"}
-                  </div>
-                  <div className="mt-2 text-xs text-muted-foreground tabular-nums">
+                  <div className="mt-2 text-[11px] text-[--g500] tabular-nums">
                     {language === "ru"
                       ? `Заполнено: ${personsFilledCount}/8`
                       : `Filled: ${personsFilledCount}/8`}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </OdooCard>
             </div>
 
             <ScrollArea className="flex-1">
               <div className="max-w-md lg:max-w-5xl mx-auto px-4 pr-2 py-4">
-                {/* Sections (cards, not tabs) */}
+                {/* 16.4 Sections overline */}
                 <div className="mb-6">
-                  <div className="text-sm font-medium mb-2">{language === "ru" ? "Разделы" : "Sections"}</div>
+                  <p className="o-overline text-[--g500] mb-2">{language === "ru" ? "РАЗДЕЛЫ" : "SECTIONS"}</p>
                   <div className="grid gap-3 lg:grid-cols-2" data-testid="sections-grid">
-                    <Card className="rounded-xl cursor-pointer hover:border-primary/50 hover:bg-muted/20 transition-colors" onClick={() => setLocation("/source/materials")}>
-                      <CardContent className="p-4">
+                    {/* 16.5 Stat card Материалы с progress bar */}
+                    <OdooCard hoverable onClick={() => setLocation("/source/materials")} className="cursor-pointer">
+                      <div className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3 min-w-0">
-                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                              <Package className="h-5 w-5" />
+                            <div className="h-10 w-10 rounded-[--o-radius-md] bg-[--p50] flex items-center justify-center text-[--p500] shrink-0">
+                              <Package className="h-5 w-5" strokeWidth={1.5} />
                             </div>
                             <div className="min-w-0">
-                              <div className="font-medium">{language === "ru" ? "Материалы" : "Materials"}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {language === "ru"
-                                  ? "Материалы объекта, партии/поставки, привязки документов"
-                                  : "Object materials, batches, document bindings"}
-                              </div>
+                              <p className="text-[14px] font-semibold text-[--g900]">{language === "ru" ? "Материалы" : "Materials"}</p>
+                              <p className="text-[11px] text-[--g500] truncate">
+                                {language === "ru" ? "Партии, поставки, документы" : "Batches, deliveries, docs"}
+                              </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className="text-sm font-medium tabular-nums text-muted-foreground">{materialsCount}</div>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[15px] font-bold text-[--g900] tabular-nums">{materialsCount}</span>
+                            <ChevronRight className="h-4 w-4 text-[--g400]" strokeWidth={1.5} />
                           </div>
                         </div>
+                        <Progress
+                          value={Math.min(100, materialsCount * 10)}
+                          className="h-1 mt-3 bg-[--g200] [&>div]:bg-[--p500]"
+                        />
                         <div className="mt-3 flex gap-2 flex-wrap">
                           <Button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            className="rounded-xl"
+                            variant="odoo-secondary"
+                            size="compact"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (!Number.isFinite(objectId)) {
@@ -324,42 +345,41 @@ export default function SourceData() {
                               setWizardOpen(true);
                             }}
                           >
-                            <Plus className="h-4 w-4 mr-2" />
-                            {language === "ru" ? "Добавить" : "Add"}
+                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            {language === "ru" ? "+ Поставка" : "+ Delivery"}
                           </Button>
                           <Button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            className="rounded-xl"
+                            variant="odoo-secondary"
+                            size="compact"
                             onClick={(e) => {
                               e.stopPropagation();
                               toast({ title: language === "ru" ? "Скоро" : "Soon", description: language === "ru" ? "Сканирование будет добавлено позже" : "Scan flow will be added later" });
                             }}
                           >
-                            {language === "ru" ? "Скан" : "Scan"}
+                            📷 {language === "ru" ? "Скан" : "Scan"}
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </OdooCard>
 
-                    <Card className="rounded-xl cursor-pointer hover:border-primary/50 hover:bg-muted/20 transition-colors" onClick={() => setLocation("/source/documents")}>
-                      <CardContent className="p-4">
+                    <OdooCard hoverable onClick={() => setLocation("/source/documents")} className="cursor-pointer">
+                      <div className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3 min-w-0">
-                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                              <FileText className="h-5 w-5" />
+                            <div className="h-10 w-10 rounded-[--o-radius-md] bg-[--p50] flex items-center justify-center text-[--p500] shrink-0">
+                              <FileText className="h-5 w-5" strokeWidth={1.5} />
                             </div>
                             <div className="min-w-0">
-                              <div className="font-medium">{language === "ru" ? "Документы качества" : "Quality documents"}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {language === "ru" ? "Реестр сертификатов/паспортов/протоколов (scope=project)" : "Registry (project scope)"}
-                              </div>
+                              <p className="text-[14px] font-semibold text-[--g900]">{language === "ru" ? "Документы качества" : "Quality documents"}</p>
+                              <p className="text-[11px] text-[--g500] truncate">
+                                {language === "ru" ? "Сертификаты, паспорта, протоколы" : "Certificates, passports, protocols"}
+                              </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className="text-sm font-medium tabular-nums text-muted-foreground">{docsCount}</div>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[15px] font-bold text-[--g900] tabular-nums">{docsCount}</span>
+                            <ChevronRight className="h-4 w-4 text-[--g400]" strokeWidth={1.5} />
                           </div>
                         </div>
                         <div className="mt-3 flex gap-2 flex-wrap">
@@ -389,8 +409,8 @@ export default function SourceData() {
                             {language === "ru" ? "Скан" : "Scan"}
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </OdooCard>
 
                     <Card
                       className="rounded-xl opacity-70 cursor-not-allowed"
@@ -450,6 +470,44 @@ export default function SourceData() {
                   </div>
                 </div>
 
+                {/* 16.7 Accordion «Реквизиты объекта» */}
+                <Accordion type="single" collapsible className="mt-4">
+                  <AccordionItem value="details" className="border border-[--g200] rounded-[--o-radius-lg] px-4">
+                    <AccordionTrigger className="py-3 hover:no-underline">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-[--p500]" strokeWidth={1.5} />
+                        <span className="text-[13px] font-medium text-[--g900]">
+                          {language === "ru" ? "Реквизиты объекта" : "Object details"}
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="pb-3 space-y-2 text-[13px]">
+                        {[
+                          {
+                            label: language === "ru" ? "Название" : "Title",
+                            value: draft.object.title,
+                          },
+                          {
+                            label: language === "ru" ? "Адрес" : "Address",
+                            value: draft.object.address,
+                          },
+                          {
+                            label: language === "ru" ? "Город" : "City",
+                            value: (draft.object as any).city,
+                          },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="flex gap-2">
+                            <span className="text-[--g500] shrink-0 min-w-[80px]">{label}:</span>
+                            <span className="text-[--g800]">
+                              {value || <span className="text-[--g400] italic">{language === "ru" ? "Не указан" : "Not set"}</span>}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </div>
             </ScrollArea>
           </div>

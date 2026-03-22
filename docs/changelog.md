@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026-03-22] - Odoo UI: Задачи 15, 16, 17 завершены
+
+### Задача 15: Schedule.tsx
+- **15.1** Info-card «График сформирован»: OdooCard с BarChart2 + источник + кол-во задач + диапазон дат
+- **15.2** Period switcher «Нед.|Мес.»: pill-кнопки меняют шаг навигации (7/30 дней)
+- 15.3–15.7: подтверждены как уже реализованные (bar colors, metadata, legend, sticky col, month nav)
+
+### Задача 16: SourceData.tsx
+- **16.1** Object selector: `bg-[--p50] border border-[--p300]` + Building2 иконка
+- **16.2** Overline «СТОРОНЫ / УЧАСТНИКИ» (`o-overline`)
+- **16.3** Chip участника: OdooCard hoverable + o-overline роль + ✓ ИНН зелёный / ○ серый индикатор
+- **16.4** Overline «РАЗДЕЛЫ» + OdooCard stat cards
+- **16.5** Stat card Материалы: Progress bar + кнопки «+ Поставка» / «📷 Скан» (`odoo-secondary compact`)
+- **16.7** Accordion «Реквизиты объекта»: название / адрес / город
+- Добавлены импорты: Accordion, OdooCard, Progress, Building2, MapPin
+
+### Задача 17: Works.tsx
+- **17.1** tabToggle → PillTabs component (ВОР / Смета)
+- **17.6** OdooEmptyState для «Нет ВОР», «Выберите коллекцию», «Ничего не найдено»
+- Добавлены импорты: PillTabs, OdooEmptyState, FileText
+
+---
+
 ## [2026-03-22] - Odoo UI: Задача 14 WorkLog.tsx завершена
 
 ### Добавлено

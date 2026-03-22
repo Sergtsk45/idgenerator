@@ -45,7 +45,7 @@ import { useProjectMaterials } from "@/hooks/use-materials";
 import { ExecutiveSchemesEditor, type ExecutiveSchemeItem } from "@/components/schedule/ExecutiveSchemesEditor";
 import { SplitTaskDialog } from "@/components/schedule/SplitTaskDialog";
 import type { ScheduleTask, Work } from "@shared/schema";
-import { Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, RotateCcw, AlertTriangle, ChevronsUpDown, Check, MoreVertical, Package, Scissors, ZoomIn, ZoomOut, Search } from "lucide-react";
+import { Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, RotateCcw, AlertTriangle, ChevronsUpDown, Check, MoreVertical, Package, Scissors, ZoomIn, ZoomOut, Search, BarChart2 } from "lucide-react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PillTabs } from "@/components/ui/pill-tabs";
 import { cn } from "@/lib/utils";
@@ -940,6 +940,10 @@ export default function Schedule() {
   };
 
   const [viewOffsetDays, setViewOffsetDays] = useState(0);
+  // 15.2 Period switcher: шаг навигации
+  const [viewPeriod, setViewPeriod] = useState<"week" | "month">("month");
+  const navStep = viewPeriod === "week" ? 7 : 30;
+
   const viewCalendarStart = useMemo(
     () => format(addDays(parseISO(calendarStart), viewOffsetDays), "yyyy-MM-dd"),
     [calendarStart, viewOffsetDays],
@@ -1017,6 +1021,35 @@ export default function Schedule() {
             </div>
           </div>
 
+          {/* 15.1 Info-card «График сформирован» */}
+          {!isLoadingSchedule && schedule && tasks.length > 0 && (
+            <OdooCard>
+              <div className="px-4 py-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-[--o-radius-md] bg-[--p50] flex items-center justify-center text-[--p500] shrink-0">
+                    <BarChart2 className="h-4 w-4" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold text-[--g900]">
+                      {language === "ru" ? "График сформирован" : "Schedule ready"}
+                    </p>
+                    <p className="text-[11px] text-[--g500]">
+                      {tasks.length} {language === "ru" ? "задач" : "tasks"} ·{" "}
+                      {sourceType === "estimate"
+                        ? (language === "ru" ? "источник: смета" : "source: estimate")
+                        : (language === "ru" ? "источник: ВОР" : "source: BoQ")}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-[--g500] tabular-nums shrink-0">
+                  {calendarStart && format(parseISO(calendarStart), "d MMM", { locale: language === "ru" ? ru : enUS })}
+                  {" — "}
+                  {(schedule as any)?.calendarEnd && format(parseISO(String((schedule as any).calendarEnd)), "d MMM yyyy", { locale: language === "ru" ? ru : enUS })}
+                </p>
+              </div>
+            </OdooCard>
+          )}
+
           {defaultError || scheduleError ? (
             <OdooCard className="text-sm text-destructive">
               {t.errorLoad}
@@ -1060,7 +1093,7 @@ export default function Schedule() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => setViewOffsetDays((d) => d - 30)}
+                    onClick={() => setViewOffsetDays((d) => d - navStep)}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -1080,7 +1113,7 @@ export default function Schedule() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => setViewOffsetDays((d) => d + 30)}
+                    onClick={() => setViewOffsetDays((d) => d + navStep)}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -1113,6 +1146,23 @@ export default function Schedule() {
                     >
                       <ZoomIn className="h-3 w-3" />
                     </Button>
+                  </div>
+
+                  {/* 15.2 Period switcher */}
+                  <div className="flex items-center gap-0.5 bg-muted/40 rounded-full p-0.5">
+                    {(["week", "month"] as const).map((p) => (
+                      <Button
+                        key={p}
+                        type="button"
+                        variant={viewPeriod === p ? "default" : "ghost"}
+                        onClick={() => setViewPeriod(p)}
+                        className="h-6 min-h-0 px-2.5 py-0 rounded-full text-[11px] font-medium"
+                      >
+                        {p === "week"
+                          ? (language === "ru" ? "Нед." : "Wk")
+                          : (language === "ru" ? "Мес." : "Mo")}
+                      </Button>
+                    ))}
                   </div>
 
                   {/* Task filter pills */}
