@@ -24,8 +24,8 @@ export function BottomNav() {
   const navItems = getNavigationItemsForSurface("bottomNavMobile", { groups: "primary" });
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background pb-safe md:hidden">
-      <div className="flex justify-around items-stretch h-16 max-w-md mx-auto">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[--g200] shadow-[0_-1px_3px_rgba(0,0,0,0.05)] pb-safe lg:hidden">
+      <div className="flex justify-around items-stretch h-14 max-w-md mx-auto">
         {navItems.map((item) => {
           const isActive = isNavigationItemActive(item, location);
           const label = getNavigationLabel(item, t);
@@ -39,12 +39,14 @@ export function BottomNav() {
             <Link key={item.id} href={item.href} className="flex-1">
               <div
                 className={cn(
-                  "flex flex-col items-center justify-center h-full w-full gap-1 transition-colors duration-150 cursor-pointer",
-                  isActive ? "text-primary" : "text-muted-foreground"
+                  "flex flex-col items-center justify-center h-full w-full gap-1 transition-colors duration-[--duration-fast] cursor-pointer",
+                  isActive ? "text-[--p700]" : "text-[--g500]"
                 )}
               >
                 <Icon size={22} strokeWidth={isActive ? 2 : 1.5} />
-                <span className="text-[10px] font-medium leading-none">{label}</span>
+                <span className={cn("text-[10px] leading-none", isActive ? "font-semibold" : "font-medium")}>
+                  {label}
+                </span>
               </div>
             </Link>
           );

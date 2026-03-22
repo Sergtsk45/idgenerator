@@ -15,21 +15,32 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-destructive-foreground border border-destructive-border",
         outline:
-          // Shows the background color of whatever card / sidebar / accent background it is inside of.
-          // Inherits the current text color.
           " border [border-color:var(--button-outline)]  shadow-xs active:shadow-none ",
         secondary: "border bg-secondary text-secondary-foreground border border-secondary-border ",
-        // Add a transparent border so that when someone toggles a border on later, it doesn't shift layout/size.
         ghost: "border border-transparent",
+        // ─── Odoo variants ───────────────────────────────────────────
+        "odoo-primary":
+          "bg-[--p500] text-white rounded-full px-5 hover:bg-[--p700] active:bg-[--p700] transition-colors duration-[--duration-fast] border-0",
+        "odoo-secondary":
+          "bg-transparent border border-[--g300] text-[--g700] rounded-full px-5 hover:bg-[--g100] active:bg-[--g200] transition-colors duration-[--duration-fast]",
+        "odoo-ghost":
+          "bg-transparent border border-transparent text-[--p500] rounded-[--o-radius-md] hover:bg-[--p50] active:bg-[--p100] transition-colors duration-[--duration-fast]",
+        "odoo-icon":
+          "bg-transparent border border-transparent rounded-[--o-radius-md] text-[--g700] hover:bg-[--g100] active:bg-[--g200] transition-colors duration-[--duration-fast]",
+        "odoo-fab":
+          "rounded-full bg-[--p500] text-white shadow-[--o-shadow-lg] fixed bottom-[88px] right-4 hover:bg-[--p700] transition-colors duration-[--duration-fast] border-0 z-50",
       },
-      // Heights are set as "min" heights, because sometimes Ai will place large amount of content
-      // inside buttons. With a min-height they will look appropriate with small amounts of content,
-      // but will expand to fit large amounts of content.
       size: {
         default: "min-h-9 px-4 py-2",
         sm: "min-h-8 rounded-md px-3 text-xs",
         lg: "min-h-10 rounded-md px-8",
         icon: "h-9 w-9",
+        // ─── Odoo sizes ──────────────────────────────────────────────
+        cta:     "h-12 px-6 text-base",
+        std:     "h-10 px-5",
+        compact: "h-8 px-3 text-xs",
+        "odoo-icon-sm": "h-9 w-9 p-0",
+        "odoo-fab-size": "h-14 w-14 p-0",
       },
     },
     defaultVariants: {

@@ -29,6 +29,7 @@ import { Search, Loader2, FileUp, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguageStore, translations } from "@/lib/i18n";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { OdooTable, OdooTHead, OdooTh, OdooTBody, OdooTr, OdooTd } from "@/components/ui/odoo-table";
 import { WorkItemCard } from "@/components/WorkItemCard";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
@@ -932,120 +933,85 @@ export default function Works() {
                           </div>
                         </AccordionTrigger>
                         <AccordionContent>
-                          <div className="overflow-x-auto">
-                            <table className="w-full border-collapse text-xs">
-                              <thead>
+                          <OdooTable className="mt-1">
+                            <OdooTHead>
+                              <tr>
+                                <OdooTh className="w-14 sticky left-0 z-10 bg-[--g100]">
+                                  {language === "ru" ? "№" : "No"}
+                                </OdooTh>
+                                <OdooTh className="w-44">{language === "ru" ? "Шифр" : "Code"}</OdooTh>
+                                <OdooTh>{language === "ru" ? "Наименование" : "Name"}</OdooTh>
+                                <OdooTh className="w-16">{language === "ru" ? "Ед." : "Unit"}</OdooTh>
+                                <OdooTh numeric className="w-24">{language === "ru" ? "Кол-во" : "Qty"}</OdooTh>
+                                <OdooTh numeric className="w-28">{language === "ru" ? "Сумма" : "Total"}</OdooTh>
+                              </tr>
+                            </OdooTHead>
+                            <OdooTBody>
+                              {positions.length === 0 ? (
                                 <tr>
-                                  {/* Task 3.2: sticky first column */}
-                                  <th className="border p-2 text-left w-14 sticky left-0 z-10 bg-background">
-                                    {language === "ru" ? "№" : "No"}
-                                  </th>
-                                  <th className="border p-2 text-left w-44">
-                                    {language === "ru" ? "Шифр" : "Code"}
-                                  </th>
-                                  <th className="border p-2 text-left">
-                                    {language === "ru" ? "Наименование" : "Name"}
-                                  </th>
-                                  <th className="border p-2 text-left w-16">
-                                    {language === "ru" ? "Ед." : "Unit"}
-                                  </th>
-                                  <th className="border p-2 text-right w-24">
-                                    {language === "ru" ? "Кол-во" : "Qty"}
-                                  </th>
-                                  <th className="border p-2 text-right w-28">
-                                    {language === "ru" ? "Сумма" : "Total"}
-                                  </th>
+                                  <OdooTd colSpan={6} className="text-center text-[--g500]">
+                                    {language === "ru" ? "Нет позиций" : "No positions"}
+                                  </OdooTd>
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {positions.length === 0 ? (
-                                  <tr>
-                                    <td
-                                      colSpan={6}
-                                      className="border p-4 text-center text-muted-foreground"
-                                    >
-                                      {language === "ru" ? "Нет позиций" : "No positions"}
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  positions.map((p: any) => {
-                                    const resources: any[] = p?.resources ?? [];
-                                    return (
-                                      <tr key={String(p?.id ?? `${p?.lineNo}-${p?.code}`)}>
-                                        {/* Task 3.2: sticky first td */}
-                                        <td className="border p-2 align-top sticky left-0 z-[1] bg-background">{p?.lineNo ?? ""}</td>
-                                        <td className="border p-2 align-top">{p?.code ?? ""}</td>
-                                        <td className="border p-2">
-                                          <div className="font-medium">{p?.description ?? ""}</div>
-                                          {p?.notes ? (
-                                            <div className="mt-1 text-[11px] text-muted-foreground whitespace-pre-wrap">
-                                              {String(p.notes)}
-                                            </div>
-                                          ) : null}
-                                          {resources.length > 0 ? (
-                                            <details className="mt-2">
-                                              <summary className="cursor-pointer text-[11px] text-muted-foreground">
-                                                {language === "ru"
-                                                  ? `Ресурсы: ${resources.length}`
-                                                  : `Resources: ${resources.length}`}
-                                              </summary>
-                                              <div className="mt-2 overflow-x-auto">
-                                                <table className="w-full border-collapse text-[11px]">
-                                                  <thead>
-                                                    <tr>
-                                                      <th className="border p-1 text-left w-16">
-                                                        {language === "ru" ? "Тип" : "Type"}
-                                                      </th>
-                                                      <th className="border p-1 text-left w-32">
-                                                        {language === "ru" ? "Код" : "Code"}
-                                                      </th>
-                                                      <th className="border p-1 text-left">
-                                                        {language === "ru" ? "Наименование" : "Name"}
-                                                      </th>
-                                                      <th className="border p-1 text-left w-16">
-                                                        {language === "ru" ? "Ед." : "Unit"}
-                                                      </th>
-                                                      <th className="border p-1 text-right w-20">
-                                                        {language === "ru" ? "Кол-во" : "Qty"}
-                                                      </th>
-                                                      <th className="border p-1 text-right w-24">
-                                                        {language === "ru" ? "Сумма" : "Total"}
-                                                      </th>
+                              ) : (
+                                positions.map((p: any) => {
+                                  const resources: any[] = p?.resources ?? [];
+                                  return (
+                                    <OdooTr key={String(p?.id ?? `${p?.lineNo}-${p?.code}`)}>
+                                      <OdooTd className="align-top sticky left-0 z-[1] bg-white">{p?.lineNo ?? ""}</OdooTd>
+                                      <OdooTd className="align-top">{p?.code ?? ""}</OdooTd>
+                                      <OdooTd>
+                                        <div className="font-medium text-[--g900]">{p?.description ?? ""}</div>
+                                        {p?.notes ? (
+                                          <div className="mt-1 text-[11px] text-[--g500] whitespace-pre-wrap">
+                                            {String(p.notes)}
+                                          </div>
+                                        ) : null}
+                                        {resources.length > 0 ? (
+                                          <details className="mt-2">
+                                            <summary className="cursor-pointer text-[11px] text-[--g500]">
+                                              {language === "ru"
+                                                ? `Ресурсы: ${resources.length}`
+                                                : `Resources: ${resources.length}`}
+                                            </summary>
+                                            <div className="mt-2 overflow-x-auto border border-[--g200] rounded-[--o-radius-md]">
+                                              <table className="w-full border-collapse text-[11px]">
+                                                <thead className="bg-[--g100]">
+                                                  <tr>
+                                                    <th className="o-th w-16">{language === "ru" ? "Тип" : "Type"}</th>
+                                                    <th className="o-th w-32">{language === "ru" ? "Код" : "Code"}</th>
+                                                    <th className="o-th">{language === "ru" ? "Наименование" : "Name"}</th>
+                                                    <th className="o-th w-16">{language === "ru" ? "Ед." : "Unit"}</th>
+                                                    <th className="o-th text-right w-20">{language === "ru" ? "Кол-во" : "Qty"}</th>
+                                                    <th className="o-th text-right w-24">{language === "ru" ? "Сумма" : "Total"}</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {resources.map((r: any, idx: number) => (
+                                                    <tr key={String(r?.id ?? idx)} className="even:bg-[--g50] border-b border-[--g200]">
+                                                      <td className="o-td">{r?.resourceType ?? ""}</td>
+                                                      <td className="o-td">{r?.resourceCode ?? ""}</td>
+                                                      <td className="o-td">{r?.name ?? ""}</td>
+                                                      <td className="o-td">{r?.unit ?? ""}</td>
+                                                      <td className="o-td o-numeric">{r?.quantity ?? ""}</td>
+                                                      <td className="o-td o-numeric">{r?.quantityTotal ?? ""}</td>
                                                     </tr>
-                                                  </thead>
-                                                  <tbody>
-                                                    {resources.map((r: any, idx: number) => (
-                                                      <tr key={String(r?.id ?? idx)}>
-                                                        <td className="border p-1">{r?.resourceType ?? ""}</td>
-                                                        <td className="border p-1">{r?.resourceCode ?? ""}</td>
-                                                        <td className="border p-1">{r?.name ?? ""}</td>
-                                                        <td className="border p-1">{r?.unit ?? ""}</td>
-                                                        <td className="border p-1 text-right">{r?.quantity ?? ""}</td>
-                                                        <td className="border p-1 text-right">
-                                                          {r?.quantityTotal ?? ""}
-                                                        </td>
-                                                      </tr>
-                                                    ))}
-                                                  </tbody>
-                                                </table>
-                                              </div>
-                                            </details>
-                                          ) : null}
-                                        </td>
-                                        <td className="border p-2 align-top">{p?.unit ?? ""}</td>
-                                        <td className="border p-2 text-right align-top">
-                                          {p?.quantityTotal ?? ""}
-                                        </td>
-                                        <td className="border p-2 text-right align-top">
-                                          {p?.totalCurrentCost ?? ""}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          </details>
+                                        ) : null}
+                                      </OdooTd>
+                                      <OdooTd className="align-top">{p?.unit ?? ""}</OdooTd>
+                                      <OdooTd numeric className="align-top">{p?.quantityTotal ?? ""}</OdooTd>
+                                      <OdooTd numeric className="align-top">{p?.totalCurrentCost ?? ""}</OdooTd>
+                                    </OdooTr>
+                                  );
+                                })
+                              )}
+                            </OdooTBody>
+                          </OdooTable>
                         </AccordionContent>
                       </AccordionItem>
                     );

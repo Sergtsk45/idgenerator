@@ -483,7 +483,7 @@ export default function Acts() {
                           </CardDescription>
                         </div>
                       </div>
-                      <Badge variant={act.status === "signed" ? "default" : "secondary"} className="capitalize">
+                      <Badge variant={act.status === "signed" ? "success" : "neutral"} className="capitalize">
                         {act.status}
                       </Badge>
                     </CardHeader>
@@ -608,7 +608,7 @@ export default function Acts() {
                                     data-testid={`checkbox-category-${category}`}
                                   />
                                   <span className="text-sm font-medium">{categoryName}</span>
-                                  <Badge variant="outline" className="ml-auto mr-2 text-xs">
+                                  <Badge variant="neutral" className="ml-auto mr-2">
                                     {templates.filter((t) => selectedTemplates.has(t.templateId)).length}/{templates.length}
                                   </Badge>
                                 </div>

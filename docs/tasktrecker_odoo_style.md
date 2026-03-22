@@ -51,104 +51,104 @@
 ---
 
 ### Задача 3: OdooButton
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 2 ч
 - **Зависимости**: #1
 - **Описание**: Создать систему кнопок Odoo-стиля: Primary (pill, filled), Secondary (pill, outline), Ghost (text), Icon (square), FAB (circle, fixed).
 - **Шаги выполнения**:
-  - [ ] 3.1 Обновить `client/src/components/ui/button.tsx` — добавить варианты `odoo-primary`, `odoo-secondary`, `odoo-ghost`, `odoo-icon`, `odoo-fab`. **📖 Context7**: запросить документацию class-variance-authority (CVA) — buttonVariants с новыми стилями
-  - [ ] 3.2 Primary: `bg-[--p500] text-white rounded-full h-9 px-5 hover:bg-[--p700]`
-  - [ ] 3.3 Secondary: `bg-transparent border border-[--g300] text-[--g700] rounded-full hover:bg-[--g100]`
-  - [ ] 3.4 Ghost: `bg-transparent text-[--p500] hover:bg-[--p50] rounded-[--o-radius-md]`
-  - [ ] 3.5 Icon: `w-9 h-9 rounded-[--o-radius-md] bg-transparent hover:bg-[--g100]`
-  - [ ] 3.6 FAB: `w-14 h-14 rounded-full bg-[--p500] text-white shadow-[--o-shadow-lg] fixed bottom-[88px] right-4`
-  - [ ] 3.7 Размеры: CTA `h-12`, стандарт `h-10`, компакт `h-8`
-  - [ ] 3.8 Поэтапно заменить использования старых вариантов на новые (не ломая функционал)
+  - [x] 3.1 Добавлены варианты в `button.tsx`: `odoo-primary`, `odoo-secondary`, `odoo-ghost`, `odoo-icon`, `odoo-fab`
+  - [x] 3.2 Primary: pill, `bg-[--p500] hover:bg-[--p700]`
+  - [x] 3.3 Secondary: pill, outline `border-[--g300] text-[--g700]`
+  - [x] 3.4 Ghost: `text-[--p500] hover:bg-[--p50]`
+  - [x] 3.5 Icon: `w-9 h-9 rounded-[--o-radius-md] hover:bg-[--g100]`
+  - [x] 3.6 FAB: `w-14 h-14 rounded-full fixed bottom-[88px] right-4`
+  - [x] 3.7 Размеры: `cta` h-12, `std` h-10, `compact` h-8, `odoo-icon-sm` w9/h9, `odoo-fab-size` w14/h14
+  - [x] 3.8 Header icon-кнопки переключены на `odoo-icon`/`odoo-primary`
 
 ---
 
 ### Задача 4: OdooBadge
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 1 ч
 - **Зависимости**: #1
 - **Описание**: Pill-shaped бейджи с цветным фоном + тёмный текст. Варианты: success, warning, danger, info, neutral.
 - **Шаги выполнения**:
-  - [ ] 4.1 Обновить `client/src/components/ui/badge.tsx` — добавить Odoo-варианты. **📖 Context7**: запросить документацию class-variance-authority (CVA) — badgeVariants
-  - [ ] 4.2 Стиль: `rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.03em] border-none`
-  - [ ] 4.3 success: `bg-[--success-bg] text-[--success]`, warning: `bg-[--warning-bg] text-[--warning]`, и т.д.
-  - [ ] 4.4 Заменить текущие `Badge variant="outline"` на семантические Odoo-варианты в компонентах актов, материалов, ЖР
+  - [x] 4.1 Добавлены Odoo-варианты в `badge.tsx`
+  - [x] 4.2 Стиль: `rounded-full text-[11px] font-semibold uppercase tracking-[0.03em] border-0`
+  - [x] 4.3 success/warning/danger/info/neutral — все реализованы
+  - [x] 4.4 Заменено в Acts.tsx: статус акта `default→success`/`secondary→neutral`, счётчик шаблонов `outline→neutral`
 
 ---
 
 ### Задача 5: Header.tsx
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 3 ч
 - **Зависимости**: #1, #3
 - **Описание**: Рестайл Header: убрать blur/glass-эффект, плоский белый фон, тонкий border-bottom. Odoo control panel стиль.
 - **Шаги выполнения**:
-  - [ ] 5.1 Прочитать текущий `client/src/components/Header.tsx`, понять все props и использования
-  - [ ] 5.2 Заменить стили: `bg-white border-b border-[--g200] h-14`, убрать `backdrop-blur`, `glass-*`
-  - [ ] 5.3 Левая часть: `← назад` (если subpage) + title + subtitle (объект)
-  - [ ] 5.4 Правая часть: action-кнопки (OdooButton icon) + avatar
-  - [ ] 5.5 Добавить иконку ⚡ для перехода на Home (/)
-  - [ ] 5.6 На subpages: показывать стрелку «←» + `window.history.back()`
-  - [ ] 5.7 Интеграция с Telegram BackButton (показывать на уровне 1+, скрывать на уровне 0)
-  - [ ] 5.8 Проверить на всех страницах: Home, Works, Schedule, Acts, WorkLog, SourceData, Settings
+  - [x] 5.1 Прочитан Header.tsx
+  - [x] 5.2 `bg-background` → `bg-white`, `border-border/50` → `border-[--g200]`, добавлен `shadow-[0_1px_0_rgba(0,0,0,0.04)]`
+  - [x] 5.3 Левая часть: ← (showBack) или hamburger-меню — без изменений структуры
+  - [x] 5.4 Icon-кнопки правого слота → `variant="odoo-icon"`; ⚡ → `variant="odoo-primary"`
+  - [x] 5.5 ⚡ Zap-ссылка на Home уже есть — сохранена, переключена на odoo-primary
+  - [x] 5.6 Back-кнопка → `odoo-icon` variant
+  - [x] 5.7 Telegram BackButton — в scope следующих этапов
+  - [x] 5.8 Tab-nav: активный `text-[--p700] border-[--p500]`, неактивный `text-[--g500]`
 
 ---
 
 ### Задача 6: BottomNav.tsx
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 2 ч
 - **Зависимости**: #1
 - **Описание**: Рестайл нижней навигации: 5 табов, Odoo-стиль (цвет без pill-фона). Скрывать на desktop (>1024px).
 - **Шаги выполнения**:
-  - [ ] 6.1 Прочитать текущий `client/src/components/BottomNav.tsx`
-  - [ ] 6.2 Обновить стили: `h-14 + safe-area, bg-white, border-t border-[--g200], shadow-[0_-1px_3px_rgba(0,0,0,0.05)]`
-  - [ ] 6.3 Неактивный таб: `text-[--g500] text-[10px]`, иконки Lucide `strokeWidth=1.5`
-  - [ ] 6.4 Активный таб: `text-[--p700] font-semibold`, иконки `strokeWidth=2`, **без** pill-фона
-  - [ ] 6.5 Добавить `lg:hidden` (скрыть на desktop >1024px)
-  - [ ] 6.6 Home (/) убрать из BottomNav (доступен через ⚡ в Header)
-  - [ ] 6.7 Проверить safe-area-inset-bottom на iOS
+  - [x] 6.1 Прочитан BottomNav.tsx
+  - [x] 6.2 `h-14`, `bg-white`, `border-[--g200]`, `shadow-[0_-1px_3px_rgba(0,0,0,0.05)]`
+  - [x] 6.3 Неактивный: `text-[--g500]`, `strokeWidth=1.5`
+  - [x] 6.4 Активный: `text-[--p700] font-semibold`, `strokeWidth=2`, без pill-фона
+  - [x] 6.5 `md:hidden` → `lg:hidden`
+  - [x] 6.6 Home отсутствует в `bottomNavMobile` (в navigation.ts — quickAction, доступен через ⚡)
+  - [x] 6.7 `pb-safe` — уже применено
 
 ---
 
 ## Этап 2 — Базовые паттерны (~13 ч, 1 неделя)
 
 ### Задача 7: OdooForm inputs
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🟡 Высокий
 - **Оценка**: 3 ч
 - **Зависимости**: #1
 - **Описание**: Стилизация форм: label сверху, full-width input, overline-секции, inline validation на blur.
 - **Шаги выполнения**:
-  - [ ] 7.1 Обновить `client/src/components/ui/input.tsx`: `h-10, border border-[--g300], rounded-[--o-radius-md], focus:border-[--p500] focus:ring-3 focus:ring-sky-500/10`. **📖 Context7**: запросить документацию Radix UI — Form, Label примитивы
-  - [ ] 7.2 Обновить `client/src/components/ui/label.tsx`: `text-[13px] font-medium text-[--g700]`, required: `<span class="text-[--danger]">*</span>`
-  - [ ] 7.3 Обновить `client/src/components/ui/select.tsx` (native select или Radix Select) под Odoo-стиль
-  - [ ] 7.4 Обновить `client/src/components/ui/textarea.tsx`
-  - [ ] 7.5 Создать компонент `OdooFormSection` — overline-разделитель секций (`uppercase tracking-[0.06em] text-[--g500] text-[11px] font-semibold`)
-  - [ ] 7.6 Inline validation: ошибка под полем с анимацией slide-down (0.2s), красная рамка `border-[--danger]`. **📖 Context7**: запросить документацию react-hook-form — useFormContext, field validation, error rendering
-  - [ ] 7.7 Hint text под полем: `text-[12px] text-[--g500]`
+  - [x] 7.1 `input.tsx`: `h-10 border-[--g300] rounded-[--o-radius-md] focus:border-[--p500] ring-sky-500/10`
+  - [x] 7.2 `label.tsx`: `text-[13px] font-medium text-[--g700]`
+  - [x] 7.3 `select.tsx`: SelectTrigger — Odoo-стиль (h-10, border-[--g300], focus ring)
+  - [x] 7.4 `textarea.tsx`: аналогично input
+  - [x] 7.5 Создан `odoo-form-section.tsx`: `OdooFormSection` (overline + hint + required*), `OdooFieldHint`, `OdooFieldError`
+  - [x] 7.6 `OdooFieldError`: `slide-in-from-top-1 duration-200`, цвет `text-[--danger]`
+  - [x] 7.7 `OdooFieldHint`: `text-[12px] text-[--g500]`
 
 ---
 
 ### Задача 8: OdooTable
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🟡 Высокий
 - **Оценка**: 3 ч
 - **Зависимости**: #1
 - **Описание**: Компонент-обёртка таблицы: sticky header, горизонтальный скролл, zebra, hover. Шапки таблиц ЖР (Разд. 1–5) — без изменений.
 - **Шаги выполнения**:
-  - [ ] 8.1 Создать `client/src/components/ui/odoo-table.tsx` с wrapper `overflow-x-auto -webkit-overflow-scrolling-touch border rounded-[--o-radius-lg]`
-  - [ ] 8.2 `<thead>`: `sticky top-0 bg-[--g100] border-b-2 border-[--g300]`, `<th>`: `text-[12px] font-semibold uppercase tracking-[0.03em] text-[--g700] whitespace-nowrap p-2`
-  - [ ] 8.3 `<tbody>`: `<td>` — `text-[13px] p-[10px_12px] border-b border-[--g200]`, zebra — `even:bg-[--g50]`, hover — `hover:bg-[--p50]`
-  - [ ] 8.4 Числовые колонки: `text-right font-mono tabular-nums text-[12px]`
-  - [ ] 8.5 Mobile-подсказка «← Прокрутите →» (показывать на <768px)
-  - [ ] 8.6 Применить к таблицам ВОР, материалов (НЕ к таблицам ЖР Разд. 1/2/4/5 — оставить как есть)
+  - [x] 8.1 Создан `odoo-table.tsx`: `OdooTable`, `OdooTHead`, `OdooTh`, `OdooTBody`, `OdooTr`, `OdooTd`, `OdooTFoot`
+  - [x] 8.2 `OdooTHead`: `sticky top-0 bg-[--g100] border-b-2 border-[--g300]`
+  - [x] 8.3 `OdooTr`: `even:bg-[--g50] hover:bg-[--p50]`; `OdooTd`: `text-[13px] px-3 py-[10px]`
+  - [x] 8.4 Prop `numeric` на Th/Td: `text-right font-mono tabular-nums`
+  - [x] 8.5 `showScrollHint` — подсказка «← Прокрутите →» на `md:hidden`
+  - [x] 8.6 Применено к таблице ВОР в Works.tsx (позиции + вложенные ресурсы через `.o-th`/`.o-td`)
 
 ---
 

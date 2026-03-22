@@ -68,7 +68,7 @@ export function Header({
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border/50 bg-background pt-safe">
+      <header className="sticky top-0 z-40 border-b border-[--g200] bg-white pt-safe shadow-[0_1px_0_rgba(0,0,0,0.04)]">
         <div
           className="mx-auto flex h-14 max-w-md md:max-w-none items-center justify-between px-4"
           style={{
@@ -109,7 +109,7 @@ export function Header({
 
         {/* md+ horizontal primary nav tab bar */}
         <div
-          className="hidden md:flex border-t border-border/50 overflow-x-auto scrollbar-hide"
+          className="hidden md:flex border-t border-[--g200] overflow-x-auto scrollbar-hide"
           data-testid="header-tab-nav"
         >
           <div className="flex items-stretch mx-auto w-full md:max-w-none px-2">
@@ -124,8 +124,8 @@ export function Header({
                     className={cn(
                       "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors duration-150 min-h-[44px]",
                       isActive
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                        ? "border-[--p500] text-[--p700]"
+                        : "border-transparent text-[--g500] hover:text-[--g900] hover:border-[--g300]"
                     )}
                   >
                     {Icon && <Icon size={16} />}
@@ -160,7 +160,7 @@ function LeftSlot({
 
   if (showBack) {
     return (
-      <Button variant="ghost" size="icon" className="-ml-2 shrink-0" onClick={onBack}>
+      <Button variant="odoo-icon" size="odoo-icon-sm" className="-ml-2 shrink-0" onClick={onBack}>
         <ArrowLeft className="h-5 w-5" />
         <span className="sr-only">{shellT.back}</span>
       </Button>
@@ -178,8 +178,8 @@ function LeftSlot({
       <Sheet>
         <SheetTrigger asChild>
           <Button
-            variant="ghost"
-            size="icon"
+            variant="odoo-icon"
+            size="odoo-icon-sm"
             className="-ml-2 shrink-0 md:hidden"
             aria-label={shellT.openMenu}
           >
@@ -246,15 +246,15 @@ function RightSlot({
   return (
     <div className="flex items-center gap-1 shrink-0">
       {showZapLink && quickAction && (
-        <Button asChild size="icon" className="w-9 h-9 rounded-full">
+        <Button asChild variant="odoo-primary" size="odoo-icon-sm" className="rounded-full">
           <Link href={quickAction.href}>
-            <Zap className="h-5 w-5 text-primary-foreground" fill="currentColor" />
+            <Zap className="h-5 w-5" fill="currentColor" />
             <span className="sr-only">{getNavigationLabel(quickAction, t)}</span>
           </Link>
         </Button>
       )}
       {showSearch && (
-        <Button variant="ghost" size="icon" className="-mr-1">
+        <Button variant="odoo-icon" size="odoo-icon-sm" className="-mr-1">
           <Search className="h-5 w-5" />
           <span className="sr-only">{shellT.search}</span>
         </Button>
@@ -272,7 +272,7 @@ function RightSlot({
       {secondaryItems.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="hidden md:inline-flex -mr-1 min-h-[44px] min-w-[44px]">
+            <Button variant="odoo-icon" size="odoo-icon-sm" className="hidden md:inline-flex -mr-1">
               <MoreHorizontal className="h-5 w-5" />
               <span className="sr-only">{shellT.navigation}</span>
             </Button>
