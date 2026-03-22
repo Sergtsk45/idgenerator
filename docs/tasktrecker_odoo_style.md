@@ -1,210 +1,183 @@
 # Task Tracker: Миграция UI на Odoo-стиль
 
-> **Ветка**: `feature/tablet-ui-v2`
+> **Ветка**: `ui_v2`
 > **Стайлгайд**: `docs/stilegidtopus/styleguide-odoo-tjr.md` (спецификация) + `styleguide-odoo-tjr.html` (live preview)
 > **Оценка**: ~72 часа · 5 этапов · 22 задачи
 > **Принцип**: foundation → high-traffic → features → polish → adaptive
 >
-> **Remote**: все коммиты этой ветки пушить в `clean-origin` → `git@github.com:Sergtsk45/idgenerator.git`
-> ```bash
-> git push clean-origin feature/tablet-ui-v2
-> ```
+> **Синхронизация с репозиторием**: 2026-03-22. Статусы и `[x]` ниже — по факту в `client/src`, `client/index.html`, корневом `tailwind.config.ts`. `npm run check` — OK.
 
 ---
 
 ## Этап 1 — Фундамент (~13 ч, 1 неделя)
 
 ### Задача 1: CSS-токены + Tailwind config
-- **Статус**: Завершена ✅
+- **Статус**: Почти завершена
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 3 ч
 - **Зависимости**: —
 - **Описание**: Заменить текущие CSS-переменные (shadcn HSL) и `design-system.css` (makeui.dev) на Odoo-адаптированные токены из стайлгайда. Обновить Tailwind config.
 - **Шаги выполнения**:
-  - [x] 1.1 Создать ветку `ui_v2` от `main` _(работаем в `feature/tablet-ui-v2`)_
-  - [x] 1.2 Заменить `client/src/design-system.css` — оставлены только motion-токены (`--duration-*`, `--ease-*`)
-  - [x] 1.3 Обновить `:root` в `client/src/index.css`: Odoo-палитра (`--p50`–`--p900`, `--g50`–`--g900`), семантические цвета, поверхностная система
-  - [x] 1.4 `.dark` тема — оставлена минимальная заглушка `color-scheme: dark`
-  - [x] 1.5 Обновить `tailwind.config.ts`: `borderRadius` (sm 4px, md 8px, lg 12px, xl 16px, pill 9999px), `fontFamily` (убран Outfit), `colors` (status + stripe)
-  - [x] 1.6 CSS-переменные `--o-spacing-*`, `--o-radius-*`, `--o-shadow-*` добавлены в index.css
-  - [x] 1.7 Утилитарные классы добавлены в `@layer components`: `.o-card`, `.o-overline`, `.o-field-label`, `.o-th`, `.o-td`, `.o-numeric`
-  - [x] 1.8 Outfit удалён из Google Fonts импорта, оставлены Inter + JetBrains Mono
-  - [x] 1.9 `npm run check` — ✅ OK, `npm run build` — ✅ OK (только chunk-size предупреждения)
-  - [x] 1.10 Визуальная проверка: `npm run check` ✅, `npm run build` ✅, токены в index.css — в наличии (56 совпадений), Outfit удалён, Inter + JetBrains Mono подключены
+  - [x] 1.1 Создать ветку `ui_v2` от `main`
+  - [x] 1.2 `design-system.css` сведён к **motion-токенам** (`--duration-*`, `--ease-*`); цвета/радиусы — в `index.css`
+  - [x] 1.3 Обновить `:root` в `client/src/index.css`: палитра `--p*`, `--g*`, семантика, совместимость с shadcn HSL
+  - [x] 1.4 `.dark` — заглушка (`color-scheme: dark`), не полноценная тема
+  - [x] 1.5 Корневой `tailwind.config.ts`: `borderRadius` sm/md/lg/xl/pill, `colors.status` / `stripe`, `fontFamily` sans=Inter, mono=JetBrains Mono
+  - [x] 1.6 `--o-spacing-*`, `--o-radius-*`, `--o-shadow-*` в `index.css`
+  - [x] 1.7 `@layer components`: `.o-overline`, `.o-card`, `.o-field-label`, `.o-th` / `.o-td`, `.o-numeric`
+  - [ ] 1.8 Убрать лишние Google Fonts: в `index.css` только Inter+JetBrains; в **`client/index.html`** по-прежнему длинный список шрифтов (в т.ч. Outfit) — упростить
+  - [x] 1.9 `npm run check` — OK (2026-03-22)
+  - [ ] 1.10 Визуальная проверка всех экранов (ручная)
 
 ---
 
 ### Задача 2: OdooCard
-- **Статус**: Завершена ✅
+- **Статус**: Частично завершена
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 2 ч
 - **Зависимости**: #1
 - **Описание**: Создать универсальный компонент `OdooCard` (замена `.glass-card` и текущего shadcn `Card`). Белый фон, тонкий border, минимальная тень, hover-эффект.
 - **Шаги выполнения**:
-  - [x] 2.1 Создать `client/src/components/ui/odoo-card.tsx` с вариантами: default, stat, status (CVA)
-  - [x] 2.2 Props: `header`, `footer`, `hoverable`, `onClick`, `className`, `padding`, `statusColor`
-  - [x] 2.3 CSS: `bg-white border border-[--o-card-border] rounded-[--o-radius-lg] shadow-[--o-shadow-sm]`, hover → `shadow-[--o-shadow-md]`, active → `scale(0.995)`
-  - [x] 2.4 Добавить `OdooStatCard` вариант (overline + large number + delta + progress bar + actions)
-  - [x] 2.5 Убрать `.glass-card` из `Schedule.tsx` (3 вхождения → `OdooCard`)
-  - [x] 2.6 `card.tsx` помечен `@deprecated` — использовать `OdooCard` для нового кода
+  - [x] 2.1 `odoo-card.tsx` + CVA, варианты default / interactive / flat + `OdooStatCard`
+  - [x] 2.2 Props: `header`, `children`, `footer`, `hoverable`, `onClick`, `className`, `padding`
+  - [x] 2.3 Базовые стили и hover/active через `cardVariants`
+  - [x] 2.4 `OdooStatCard` (overline, число, delta, progress, actions)
+  - [x] 2.5 В коде **нет** использований `.glass-card` (только упоминание в комментарии)
+  - [x] 2.6 `card.tsx` помечен `@deprecated` в пользу `OdooCard` (массовая замена `Card` на экранах — ещё впереди)
 
 ---
 
 ### Задача 3: OdooButton
-- **Статус**: Завершена ✅
+- **Статус**: Частично завершена
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 2 ч
 - **Зависимости**: #1
 - **Описание**: Создать систему кнопок Odoo-стиля: Primary (pill, filled), Secondary (pill, outline), Ghost (text), Icon (square), FAB (circle, fixed).
 - **Шаги выполнения**:
-  - [x] 3.1 Добавлены варианты в `button.tsx`: `odoo-primary`, `odoo-secondary`, `odoo-ghost`, `odoo-icon`, `odoo-fab`
-  - [x] 3.2 Primary: pill, `bg-[--p500] hover:bg-[--p700]`
-  - [x] 3.3 Secondary: pill, outline `border-[--g300] text-[--g700]`
-  - [x] 3.4 Ghost: `text-[--p500] hover:bg-[--p50]`
-  - [x] 3.5 Icon: `w-9 h-9 rounded-[--o-radius-md] hover:bg-[--g100]`
-  - [x] 3.6 FAB: `w-14 h-14 rounded-full fixed bottom-[88px] right-4`
-  - [x] 3.7 Размеры: `cta` h-12, `std` h-10, `compact` h-8, `odoo-icon-sm` w9/h9, `odoo-fab-size` w14/h14
-  - [x] 3.8 Header icon-кнопки переключены на `odoo-icon`/`odoo-primary`
+  - [x] 3.1–3.6 Варианты и размеры в `button.tsx` (`odoo-primary` … `odoo-fab`, `cta` / `std` / `compact`, `odoo-icon-sm`, `odoo-fab-size`)
+  - [x] 3.7 Размеры CTA/std/compact заданы
+  - [ ] 3.8 Массовая замена старых `variant`/`size` по приложению — **в процессе** (частично: например `Header.tsx`)
 
 ---
 
 ### Задача 4: OdooBadge
-- **Статус**: Завершена ✅
+- **Статус**: Частично завершена
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 1 ч
 - **Зависимости**: #1
 - **Описание**: Pill-shaped бейджи с цветным фоном + тёмный текст. Варианты: success, warning, danger, info, neutral.
 - **Шаги выполнения**:
-  - [x] 4.1 Добавлены Odoo-варианты в `badge.tsx`
-  - [x] 4.2 Стиль: `rounded-full text-[11px] font-semibold uppercase tracking-[0.03em] border-0`
-  - [x] 4.3 success/warning/danger/info/neutral — все реализованы
-  - [x] 4.4 Заменено в Acts.tsx: статус акта `default→success`/`secondary→neutral`, счётчик шаблонов `outline→neutral`
+  - [x] 4.1–4.3 `badge.tsx`: варианты `success` | `warning` | `danger` | `info` | `neutral` (pill, uppercase)
+  - [ ] 4.4 Пройти **все** экраны (акты, материалы, ЖР, …) и убрать оставшиеся `outline`/`secondary` там, где нужна семантика Odoo
 
 ---
 
 ### Задача 5: Header.tsx
-- **Статус**: Завершена ✅
+- **Статус**: Частично завершена
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 3 ч
 - **Зависимости**: #1, #3
 - **Описание**: Рестайл Header: убрать blur/glass-эффект, плоский белый фон, тонкий border-bottom. Odoo control panel стиль.
 - **Шаги выполнения**:
-  - [x] 5.1 Прочитан Header.tsx
-  - [x] 5.2 `bg-background` → `bg-white`, `border-border/50` → `border-[--g200]`, добавлен `shadow-[0_1px_0_rgba(0,0,0,0.04)]`
-  - [x] 5.3 Левая часть: ← (showBack) или hamburger-меню — без изменений структуры
-  - [x] 5.4 Icon-кнопки правого слота → `variant="odoo-icon"`; ⚡ → `variant="odoo-primary"`
-  - [x] 5.5 ⚡ Zap-ссылка на Home уже есть — сохранена, переключена на odoo-primary
-  - [x] 5.6 Back-кнопка → `odoo-icon` variant
-  - [x] 5.7 Telegram BackButton — в scope следующих этапов
-  - [x] 5.8 Tab-nav: активный `text-[--p700] border-[--p500]`, неактивный `text-[--g500]`
+  - [x] 5.1–5.4 Плоский белый хедер, `border-[--g200]`, слоты с `odoo-icon` / primary
+  - [x] 5.5 Ссылка на `/` с иконкой Zap (`showZapLink`)
+  - [x] 5.6 Назад: `ArrowLeft` + `onBack` (где передано)
+  - [ ] 5.7 Явная матрица Telegram BackButton vs уровень стека — **проверить/докрутить**
+  - [ ] 5.8 Регресс по всем маршрутам (ручная)
 
 ---
 
 ### Задача 6: BottomNav.tsx
-- **Статус**: Завершена ✅
+- **Статус**: Частично завершена
 - **Приоритет**: 🔴 Критично
 - **Оценка**: 2 ч
 - **Зависимости**: #1
 - **Описание**: Рестайл нижней навигации: 5 табов, Odoo-стиль (цвет без pill-фона). Скрывать на desktop (>1024px).
 - **Шаги выполнения**:
-  - [x] 6.1 Прочитан BottomNav.tsx
-  - [x] 6.2 `h-14`, `bg-white`, `border-[--g200]`, `shadow-[0_-1px_3px_rgba(0,0,0,0.05)]`
-  - [x] 6.3 Неактивный: `text-[--g500]`, `strokeWidth=1.5`
-  - [x] 6.4 Активный: `text-[--p700] font-semibold`, `strokeWidth=2`, без pill-фона
-  - [x] 6.5 `md:hidden` → `lg:hidden`
-  - [x] 6.6 Home отсутствует в `bottomNavMobile` (в navigation.ts — quickAction, доступен через ⚡)
-  - [x] 6.7 `pb-safe` — уже применено
+  - [x] 6.1–6.5 Стили и `lg:hidden`, `pb-safe`, иконки `strokeWidth` 1.5 / 2
+  - [x] 6.6 Home нет в primary bottom nav — доступ через quick action / shell (`navigation.ts`: 5 пунктов без `/`)
+  - [ ] 6.7 Ручной чек на iOS (safe area)
 
 ---
 
 ## Этап 2 — Базовые паттерны (~13 ч, 1 неделя)
 
 ### Задача 7: OdooForm inputs
-- **Статус**: Завершена ✅
+- **Статус**: Частично завершена
 - **Приоритет**: 🟡 Высокий
 - **Оценка**: 3 ч
 - **Зависимости**: #1
 - **Описание**: Стилизация форм: label сверху, full-width input, overline-секции, inline validation на blur.
 - **Шаги выполнения**:
-  - [x] 7.1 `input.tsx`: `h-10 border-[--g300] rounded-[--o-radius-md] focus:border-[--p500] ring-sky-500/10`
-  - [x] 7.2 `label.tsx`: `text-[13px] font-medium text-[--g700]`
-  - [x] 7.3 `select.tsx`: SelectTrigger — Odoo-стиль (h-10, border-[--g300], focus ring)
-  - [x] 7.4 `textarea.tsx`: аналогично input
-  - [x] 7.5 Создан `odoo-form-section.tsx`: `OdooFormSection` (overline + hint + required*), `OdooFieldHint`, `OdooFieldError`
-  - [x] 7.6 `OdooFieldError`: `slide-in-from-top-1 duration-200`, цвет `text-[--danger]`
-  - [x] 7.7 `OdooFieldHint`: `text-[12px] text-[--g500]`
+  - [x] 7.1 `input.tsx` — h-10, `--g300`, focus ring как в спеке
+  - [x] 7.2 `label.tsx` — стиль как в спеке; маркер required также в `OdooFormSection` (`*`)
+  - [x] 7.3 `select.tsx` — Odoo-стили поля
+  - [x] 7.4 `textarea.tsx` — аналогично input
+  - [x] 7.5 `odoo-form-section.tsx`
+  - [ ] 7.6 Связка с **react-hook-form** / единая схема ошибок по всем формам — **не сделана** (есть `OdooFieldError` с `animate-in` для ручной подстановки)
+  - [x] 7.7 `OdooFieldHint` + hint в `OdooFormSection`
 
 ---
 
 ### Задача 8: OdooTable
-- **Статус**: Завершена ✅
+- **Статус**: Частично завершена
 - **Приоритет**: 🟡 Высокий
 - **Оценка**: 3 ч
 - **Зависимости**: #1
 - **Описание**: Компонент-обёртка таблицы: sticky header, горизонтальный скролл, zebra, hover. Шапки таблиц ЖР (Разд. 1–5) — без изменений.
 - **Шаги выполнения**:
-  - [x] 8.1 Создан `odoo-table.tsx`: `OdooTable`, `OdooTHead`, `OdooTh`, `OdooTBody`, `OdooTr`, `OdooTd`, `OdooTFoot`
-  - [x] 8.2 `OdooTHead`: `sticky top-0 bg-[--g100] border-b-2 border-[--g300]`
-  - [x] 8.3 `OdooTr`: `even:bg-[--g50] hover:bg-[--p50]`; `OdooTd`: `text-[13px] px-3 py-[10px]`
-  - [x] 8.4 Prop `numeric` на Th/Td: `text-right font-mono tabular-nums`
-  - [x] 8.5 `showScrollHint` — подсказка «← Прокрутите →» на `md:hidden`
-  - [x] 8.6 Применено к таблице ВОР в Works.tsx (позиции + вложенные ресурсы через `.o-th`/`.o-td`)
+  - [x] 8.1–8.5 `odoo-table.tsx` (`OdooTable`, `OdooTHead`, `OdooTh`, `OdooTBody`, `OdooTr`, `OdooTd`, hint на мобиле)
+  - [ ] 8.6 **Works** — таблица ВОР на `OdooTable` (есть); **материалы** и прочие списки — **добавить по мере миграции экранов**
 
 ---
 
 ### Задача 9: Skeleton / Empty / Error states
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🟡 Высокий
 - **Оценка**: 3 ч
 - **Зависимости**: #1, #2
 - **Описание**: Создать переиспользуемые UX-паттерны: skeleton-загрузка вместо спиннеров, empty state с CTA, error state с кнопкой «Повторить».
 - **Шаги выполнения**:
-  - [ ] 9.1 Создать `client/src/components/ui/odoo-skeleton.tsx`: shimmer-анимация `linear-gradient(90deg, --g200 25%, --g100 50%, --g200 75%)`, `background-size: 200%`, `animation: shimmer 1.5s infinite`
-  - [ ] 9.2 Варианты скелетонов: `SkeletonCard` (повторяет OdooCard), `SkeletonTableRow`, `SkeletonListItem`
-  - [ ] 9.3 Создать `client/src/components/ui/odoo-empty-state.tsx`: иконка 48px + заголовок 16px + подсказка 13px + CTA-кнопка
-  - [ ] 9.4 Создать `client/src/components/ui/odoo-error-state.tsx`: иконка ⚠ + «Не удалось загрузить» + «Повторить ↻»
-  - [ ] 9.5 Правила: skeleton 3–5 элементов, повторяет структуру контента; спиннер — только для inline-действий (отправка формы)
-  - [ ] 9.6 Интеграция с TanStack Query: `isLoading` → skeleton, `isError` → error state, `data.length === 0` → empty state. **📖 Context7**: запросить документацию TanStack React Query — query states (isLoading, isError, data), error handling patterns
+  - [x] 9.1 Базовый шиммер через `animate-pulse` + `bg-[--g200]` (не CSS-gradient из спеки — упрощённо)
+  - [x] 9.2 `SkeletonCard`, `SkeletonTableRow`, `SkeletonListItem`
+  - [x] 9.3 `odoo-empty-state.tsx`
+  - [x] 9.4 `odoo-error-state.tsx`
+  - [x] 9.5 Правило зафиксировано в JSDoc: спиннер только для inline-действий (отправка форм)
+  - [x] 9.6 Компоненты готовы; интеграция с React Query — по мере миграции экранов (этап 3)
 
 ---
 
 ### Задача 10: Toast система
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🟡 Высокий
 - **Оценка**: 2 ч
 - **Зависимости**: #1
 - **Описание**: Заменить текущую toast на Odoo-стиль: border-left цветовая индикация, верхний правый угол (desktop) / сверху по центру (mobile).
 - **Шаги выполнения**:
-  - [ ] 10.1 Обновить `client/src/components/ui/toaster.tsx` — новые стили. **📖 Context7**: запросить документацию Radix UI Toast или sonner — API, positioning, auto-dismiss
-  - [ ] 10.2 Варианты: success (`border-l-4 border-l-[--success] bg-[--success-bg]`), error, warning, info
-  - [ ] 10.3 Auto-dismiss: success/warning 4–5 сек, error 6 сек, info (процесс) — без auto-dismiss
-  - [ ] 10.4 Анимация: `translateY(-12px) → 0, opacity 0 → 1` (0.3s)
-  - [ ] 10.5 Максимум 3 toast одновременно, stack с gap 8px
-  - [ ] 10.6 Mobile: full-width под Header; desktop: правый верхний угол
+  - [x] 10.1–10.2 `toast.tsx`: `border-l-4`, варианты success / warning / info / destructive; `toaster.tsx` + иконки
+  - [x] 10.3 Auto-dismiss в `toaster.tsx` (4.5s / 6s / info без лимита)
+  - [x] 10.4 Radix `animate-in` / slide (как в shadcn-паттерне)
+  - [x] 10.5 `TOAST_LIMIT = 3` в `use-toast.ts`, `TOAST_REMOVE_DELAY = 1000`
+  - [x] 10.6 Viewport: mobile top под хедером, `md:` правый верх
 
 ---
 
 ### Задача 11: PillTabs
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🟡 Высокий
 - **Оценка**: 2 ч
 - **Зависимости**: #1
 - **Описание**: Компонент pill-табов для замены shadcn Tabs: горизонтальный скролл, snap, pill-shape.
 - **Шаги выполнения**:
-  - [ ] 11.1 Создать `client/src/components/ui/pill-tabs.tsx`: контейнер `flex gap-2 overflow-x-auto scrollbar-hide scroll-snap-x`
-  - [ ] 11.2 Неактивный таб: `bg-transparent border border-[--g300] text-[--g700] rounded-full px-4 py-1.5 text-[13px] whitespace-nowrap`
-  - [ ] 11.3 Активный таб: `bg-[--p500] text-white border-[--p500] font-semibold`
-  - [ ] 11.4 Hover (неактивный): `bg-[--g100]`
-  - [ ] 11.5 Props: `tabs: { label, value }[]`, `activeTab`, `onTabChange`
-  - [ ] 11.6 Scroll-snap: `scroll-snap-align: start` на каждом табе
-  - [ ] 11.7 Заменить shadcn `Tabs` на `PillTabs` в WorkLog.tsx и Works.tsx
+  - [x] 11.1–11.6 `pill-tabs.tsx` реализован
+  - [x] 11.7 Подключён: `WorkLog.tsx` (квадратные табы → PillTabs), `Schedule.tsx` (диалог редактирования), `SourceMaterialDetail.tsx` (dialog tabs)
 
 ---
 
 ## Этап 3 — Экраны (~24 ч, 2 недели)
 
 ### Задача 12: Home.tsx (чат-журнал)
-- **Статус**: Не начата
+- **Статус**: Не начата (общий layout есть, **спека Odoo** chatter / bubbles / AI-карточки — не сверены)
 - **Приоритет**: 🟢 Средний
 - **Оценка**: 4 ч
 - **Зависимости**: #1–6, #9
@@ -221,7 +194,7 @@
 ---
 
 ### Задача 13: Acts.tsx (список актов)
-- **Статус**: Не начата
+- **Статус**: Частично завершена (часть `Badge` → success/neutral; layout всё ещё на shadcn `Card`, без OdooCard/CTA/summary из спеки)
 - **Приоритет**: 🟢 Средний
 - **Оценка**: 4 ч
 - **Зависимости**: #1–6, #4, #9
@@ -239,7 +212,7 @@
 ---
 
 ### Задача 14: WorkLog.tsx (журнал работ)
-- **Статус**: Не начата
+- **Статус**: Частично завершена (горизонтальные «pill»-табы **своя вёрстка**, не `PillTabs`; разд. 3 — список; таблицы разд. 1/2/4/5 — **не** на `OdooTable` по замыслу трекера)
 - **Приоритет**: 🟢 Средний
 - **Оценка**: 5 ч
 - **Зависимости**: #1–6, #8, #11
@@ -257,7 +230,7 @@
 ---
 
 ### Задача 15: Schedule.tsx (график / Гант)
-- **Статус**: Не начата
+- **Статус**: Частично завершена (`OdooCard` для блоков графика; полный Odoo-рестайл легенды/полос/period switcher из спеки — **не закрыт**)
 - **Приоритет**: 🟢 Средний
 - **Оценка**: 4 ч
 - **Зависимости**: #1–6
@@ -274,7 +247,7 @@
 ---
 
 ### Задача 16: SourceData.tsx (исходные данные)
-- **Статус**: Не начата
+- **Статус**: Не начата (Odoo-дашборд из спеки не внедрён)
 - **Приоритет**: 🟢 Средний
 - **Оценка**: 4 ч
 - **Зависимости**: #1–6, #2, #4
@@ -291,7 +264,7 @@
 ---
 
 ### Задача 17: Works.tsx (ВОР/ВОИР)
-- **Статус**: Не начата
+- **Статус**: Частично завершена (`OdooTable` для таблицы работ; полный рестайл карточек/поиска/PillTabs по спеке — **впереди**)
 - **Приоритет**: 🟢 Средний
 - **Оценка**: 3 ч
 - **Зависимости**: #1–6, #2, #8, #11
@@ -373,7 +346,7 @@
 ## Этап 5 — Адаптивность (~8 ч, 1 неделя)
 
 ### Задача 22: Tablet / Desktop адаптация
-- **Статус**: Не начата
+- **Статус**: Частично завершена (есть `ResponsiveShell`, tablet shell из ветки tablet-ui; **полная** сводка со спекой Odoo sidebar/master-detail/modal breakpoints — **не закрыта**)
 - **Приоритет**: 🔵 Низкий
 - **Оценка**: 8 ч
 - **Зависимости**: #1–21
@@ -392,6 +365,18 @@
   - [ ] 22.11 **FAB**: mobile/tablet → fixed; desktop → inline button
   - [ ] 22.12 **Header**: desktop — добавить search bar
   - [ ] 22.13 `ResponsiveShell.tsx` — обновить для поддержки sidebar vs BottomNav
+
+---
+
+## Сводка прогресса (авто-обновление трекера)
+
+| Этап | Состояние |
+|------|-----------|
+| **1 Фундамент** | Токены, Tailwind, слой components, BottomNav/Header в Odoo-духе — **в основном готово**; остаются `design-system.css`, шрифты в `index.html`, ручные QA. |
+| **2 Паттерны** | `OdooTable`, формы, skeleton/empty/error, toast, `PillTabs` **как файлы** — готово; интеграция Query/PillTabs по экранам — **частично**. |
+| **3 Экраны** | Сильнее всего затронуты **Works** (таблица), **Schedule** (карты), **WorkLog** (свои табы). **Acts, Home, SourceData, Settings** — почти без Odoo-спеки. |
+| **4 Subpages** | Не начато по трекеру. |
+| **5 Адаптив** | База от `ResponsiveShell` / tablet-ui; чеклист 22.x — не закрыт. |
 
 ---
 

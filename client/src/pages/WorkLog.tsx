@@ -13,6 +13,7 @@ import { useLanguageStore, translations } from "@/lib/i18n";
 import { useCurrentObject } from "@/hooks/use-source-data";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { PillTabs } from "@/components/ui/pill-tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2,
@@ -175,30 +176,14 @@ export default function WorkLog() {
       showObjectSelector
     >
 
-      {/* Pill-табы (как в референсе) */}
-      <div className="sticky top-14 z-20 border-b border-border/40 bg-background md:top-28" data-testid="worklog-tabs">
-        <div className="relative">
-          <div className="flex gap-2.5 overflow-x-auto px-4 py-3 scrollbar-hide snap-x snap-mandatory">
-            {TABS.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setActiveTab(tab.value)}
-                className={cn(
-                  "shrink-0 w-20 h-20 lg:w-24 lg:h-24 lg:text-base flex items-center justify-center rounded-lg text-[14px] font-medium transition-colors snap-start",
-                  activeTab === tab.value
-                    ? "bg-primary text-white"
-                    : "bg-muted/60 text-muted-foreground hover:text-foreground",
-                )}
-                data-testid={`tab-${tab.value}`}
-              >
-                {TAB_SHORT[tab.value]}
-              </button>
-            ))}
-          </div>
-          {/* Edge fade for horizontal scroll */}
-          <div className="pointer-events-none absolute top-[2px] bottom-[2px] left-[2px] w-10 bg-gradient-to-r from-background to-transparent" />
-          <div className="pointer-events-none absolute top-[2px] bottom-[2px] right-[2px] w-10 bg-gradient-to-l from-background to-transparent" />
-        </div>
+      {/* Pill-табы */}
+      <div className="sticky top-14 z-20 border-b border-[--g200] bg-white md:top-[4rem]" data-testid="worklog-tabs">
+        <PillTabs
+          className="px-4 py-2"
+          activeTab={activeTab}
+          onTabChange={(v) => setActiveTab(v as TabValue)}
+          tabs={TABS.map((tab) => ({ label: TAB_SHORT[tab.value], value: tab.value }))}
+        />
       </div>
 
       {/* Контент */}

@@ -13,7 +13,8 @@ import { Drawer, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PillTabs } from "@/components/ui/pill-tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentObject } from "@/hooks/use-source-data";
 import { useCreateBatch, useProjectMaterial, useSaveProjectMaterialToCatalog } from "@/hooks/use-materials";
@@ -355,14 +356,15 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
             </div>
 
             <Tabs value={bindTab} onValueChange={(v) => setBindTab(v as any)}>
-              <TabsList className="w-full">
-                <TabsTrigger value="registry" className="flex-1">
-                  Из реестра
-                </TabsTrigger>
-                <TabsTrigger value="new" className="flex-1">
-                  Новый
-                </TabsTrigger>
-              </TabsList>
+              <PillTabs
+                activeTab={bindTab}
+                onTabChange={(v) => setBindTab(v as any)}
+                tabs={[
+                  { label: "Из реестра", value: "registry" },
+                  { label: "Новый",      value: "new" },
+                ]}
+                className="mb-1"
+              />
 
               <TabsContent value="registry" className="mt-4">
                 <div className="grid gap-2">

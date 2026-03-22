@@ -46,7 +46,8 @@ import { ExecutiveSchemesEditor, type ExecutiveSchemeItem } from "@/components/s
 import { SplitTaskDialog } from "@/components/schedule/SplitTaskDialog";
 import type { ScheduleTask, Work } from "@shared/schema";
 import { Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, RotateCcw, AlertTriangle, ChevronsUpDown, Check, MoreVertical, Package, Scissors, ZoomIn, ZoomOut, Search } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PillTabs } from "@/components/ui/pill-tabs";
 import { cn } from "@/lib/utils";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
@@ -1578,18 +1579,20 @@ export default function Schedule() {
 
           {/* Task editor tabs (Task 4.3) */}
           <Tabs value={editTab} onValueChange={(v) => setEditTab(v as "basic" | "materials" | "docs")} className="flex-1 min-h-0 flex flex-col">
-            <TabsList className="grid grid-cols-3 shrink-0">
-              <TabsTrigger value="basic">{language === "ru" ? "Основное" : "Basic"}</TabsTrigger>
-              <TabsTrigger value="materials">
-                {language === "ru" ? "Материалы" : "Materials"}
-                {(taskMaterialsQuery.data?.length ?? 0) > 0 && (
-                  <span className="ml-1.5 text-[10px] bg-primary/20 text-primary rounded-full px-1.5 py-0.5 font-medium">
-                    {taskMaterialsQuery.data!.length}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="docs">{language === "ru" ? "Документация" : "Docs"}</TabsTrigger>
-            </TabsList>
+            <PillTabs
+              className="shrink-0 px-1 mb-2"
+              activeTab={editTab}
+              onTabChange={(v) => setEditTab(v as "basic" | "materials" | "docs")}
+              tabs={[
+                { label: language === "ru" ? "Основное" : "Basic", value: "basic" },
+                {
+                  label: language === "ru" ? "Материалы" : "Materials",
+                  value: "materials",
+                  count: (taskMaterialsQuery.data?.length ?? 0) > 0 ? taskMaterialsQuery.data!.length : undefined,
+                },
+                { label: language === "ru" ? "Документация" : "Docs", value: "docs" },
+              ]}
+            />
 
             {/* Tab: Основное */}
             <TabsContent value="basic" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y mt-0 pr-1">
