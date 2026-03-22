@@ -1,5 +1,52 @@
 # Changelog
 
+## [2026-03-22] - Odoo UI: компоненты таблиц, форм, навигации (Задачи 3–8)
+
+### Добавлено
+- `client/src/components/ui/odoo-table.tsx` — `OdooTable`, `OdooTHead`, `OdooTh`, `OdooTBody`, `OdooTr`, `OdooTd`, `OdooTFoot`: sticky header, zebra, hover, scroll hint
+- `client/src/components/ui/odoo-form-section.tsx` — `OdooFormSection` (overline + required), `OdooFieldHint`, `OdooFieldError` (slide-in анимация)
+- `client/src/components/ui/button.tsx` — варианты `odoo-primary`, `odoo-secondary`, `odoo-ghost`, `odoo-icon`, `odoo-fab`; размеры `cta`, `std`, `compact`
+- `client/src/components/ui/badge.tsx` — варианты `success`, `warning`, `danger`, `info`, `neutral` (pill-shaped)
+
+### Изменено
+- `client/src/components/Header.tsx` — `bg-white`, `border-[--g200]`, тонкая тень; icon-кнопки → `odoo-icon`; ⚡ → `odoo-primary`; tab-nav активный цвет `text-[--p700]`
+- `client/src/components/BottomNav.tsx` — `bg-white`, `h-14`, `border-[--g200]`, `shadow`; активный `text-[--p700] font-semibold`; `md:hidden` → `lg:hidden`
+- `client/src/components/ui/input.tsx` — `h-10`, `border-[--g300]`, `rounded-[--o-radius-md]`, focus ring sky-500/10
+- `client/src/components/ui/label.tsx` — `text-[13px] font-medium text-[--g700]`
+- `client/src/components/ui/textarea.tsx` — Odoo-стиль (аналогично input)
+- `client/src/components/ui/select.tsx` — SelectTrigger: `h-10`, `border-[--g300]`, focus ring
+- `client/src/pages/Acts.tsx` — статус акта: `default/secondary` → `success/neutral`; счётчик шаблонов `outline` → `neutral`
+- `client/src/pages/Works.tsx` — таблица ВОР переведена на `OdooTable` (позиции + вложенные ресурсы)
+
+---
+
+## [2026-03-22] - Odoo UI: OdooCard (Задача 2)
+
+### Добавлено
+- `client/src/components/ui/odoo-card.tsx` — `OdooCard` (CVA: default/stat/status, hoverable, padding), `OdooCardHeader`, `OdooCardFooter`, `OdooStatCard` (overline + value + delta + progress bar + actions)
+- `client/src/components/ui/card.tsx` — помечен `@deprecated`
+
+### Изменено
+- `client/src/pages/Schedule.tsx` — 3 вхождения `.glass-card` заменены на `<OdooCard>`
+
+---
+
+## [2026-03-22] - Odoo UI: CSS-токены + Tailwind config (Задача 1)
+
+### Добавлено
+- `client/src/index.css` — Odoo TJR цветовая палитра: `--p50`–`--p900` (brand sky), `--g50`–`--g900` (stone neutrals), семантические (`--success/warning/danger/info` + `*-bg`), поверхностная система (`--o-card-bg`, `--o-view-bg`, etc.)
+- `client/src/index.css` — spacing (`--o-spacing-xs/sm/md/lg/xl/2xl/3xl`), radius (`--o-radius-sm/md/lg/xl/pill`), shadows (`--o-shadow-sm/md/lg`)
+- `client/src/index.css` — базовые компонентные классы: `.o-card`, `.o-overline`, `.o-field-label`, `.o-th`, `.o-td`, `.o-numeric`
+- `tailwind.config.ts` — `colors.status` (success/warning/danger/info + online/away/busy/offline), `colors.stripe`
+- `tailwind.config.ts` — `borderRadius`: sm=4px, md=8px, lg=12px, xl=16px, pill=9999px
+
+### Изменено
+- `client/src/design-system.css` — заменён: удалён весь makeui.dev контент, оставлены только motion-токены (`--duration-*`, `--ease-*`)
+- `client/src/index.css` — удалён Outfit из Google Fonts, удалён `.dark` блок (заглушка), обновлены shadcn HSL-токены под Odoo-палитру, заголовки теперь используют Inter вместо Outfit
+- `tailwind.config.ts` — удалён `fontFamily.display` (Outfit), обновлён `borderRadius`
+
+---
+
 ## [2026-03-21] - Синхронизация трекера ISS-002 (`tasktreckerroutes.md`)
 
 ### Изменено
