@@ -2,6 +2,20 @@
 
 ---
 
+## Задача: Исправление dev-regression в `pdfGenerator`
+- **Статус**: Завершена
+- **Дата начала**: 2026-03-22
+- **Дата завершения**: 2026-03-22
+- **Описание**: После переноса CJS-фикса `createRequire(__filename)` production build работал, но `npm run dev` падал в ESM runtime (`tsx`). Исправление возвращает совместимость dev и build без отката полезного CJS-фикса.
+- **Шаги выполнения**:
+  - [x] Воспроизвести падение `npm run dev` в `rebuild/routes-without-tablet-ui`
+  - [x] Локализовать проблему в `server/pdfGenerator.ts`
+  - [x] Убрать зависимость `createRequire()` от `__filename`
+  - [x] Проверить `npm run dev`, `npm run check`, `npm run build`
+- **Зависимости**: `server/pdfGenerator.ts`
+
+---
+
 ## Задача: ISS-002 — декомпозиция `server/routes.ts` (модульные `server/routes/*`)
 - **Статус**: Завершена
 - **Дата начала**: (миграция в рамках ветки `refactor/routes-modularization`)

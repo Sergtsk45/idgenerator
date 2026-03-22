@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-03-22] - Исправление dev-regression в `pdfGenerator`
+
+### Исправлено
+- `server/pdfGenerator.ts` — `createRequire()` больше не зависит от `__filename`; модуль `pdfmake` теперь резолвится через путь от `process.cwd()`, поэтому `npm run dev` снова работает в ESM runtime (`tsx`) и не ломает CJS build.
+
+---
+
 ## [2026-03-21] - Синхронизация трекера ISS-002 (`tasktreckerroutes.md`)
 
 ### Изменено
