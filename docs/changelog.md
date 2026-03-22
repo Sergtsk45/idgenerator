@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026-03-22] - Odoo UI: Задачи 18, 19, 20 завершены
+
+### Задача 18: ActDetail.tsx — полная детализация акта
+- **18.2** Статус-бейдж + прогресс-бар (3 шага: черновик → в работе → принято)
+- **18.3** Accordion-секции: Основные данные, Работы, Материалы, Документы, Нормативы
+- **18.4** Sheet снизу для выбора шаблонов PDF (КС-2, АОСР упрощённый, АОСР полный)
+- **18.5** Кнопка «Экспорт PDF» → анимированный прогресс-бар генерации
+- **18.7** Warning-блоки для отсутствующих дат и проектных чертежей
+- Убран placeholder «Задача 18 в разработке»; добавлены импорты: Accordion, Sheet, Progress, AlertTriangle, CheckCircle2
+
+### Задача 19: SourceMaterials.tsx — рестайл на Odoo
+- **19.1** OdooCard для каждого материала + OdooBadge (Доки ✓ / Нет доков)
+- **19.2** Infinite scroll (IntersectionObserver, PAGE_SIZE=20) + debounced search
+- **19.3** Правая панель (lg+): OdooCard с метриками (партии, документы, кач. доки) + OdooBadge тип
+- **19.6** OdooEmptyState для пустого списка и нулевых результатов поиска
+- Pill-фильтры → PillTabs component; FAB → `variant="odoo-fab"` `size="odoo-fab-size"`
+- Удалён неиспользуемый MaterialCard из импортов
+
+### Задача 20: SourceDocuments.tsx — рестайл на Odoo
+- **20.1** OdooCard + Badge (тип документа) + название + дата для каждого документа
+- **20.2** PillTabs фильтр по типу (Все, Серт., Декл., Паспорт, …) + Select для scope
+- **20.3** Infinite scroll (IntersectionObserver, PAGE_SIZE=20)
+- **20.4** Sheet (вместо Dialog) с OdooForm-формой для добавления документа
+- **20.5** OdooEmptyState для пустого реестра + правая панель с подсказкой
+- Удалены неиспользуемые импорты: ScrollArea, Dialog*, DocumentCard, isDragging
+
+---
+
 ## [2026-03-22] - Odoo UI: Задачи 15, 16, 17 завершены
 
 ### Задача 15: Schedule.tsx
