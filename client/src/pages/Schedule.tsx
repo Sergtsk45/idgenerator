@@ -1144,6 +1144,20 @@ export default function Schedule() {
                 </div>
               </div>
 
+              {/* Легенда цветов (task 15.5) */}
+              <div className="flex flex-wrap items-center gap-3 px-1 mb-2">
+                {[
+                  { color: "var(--success)", label: language === "ru" ? "Завершено" : "Done" },
+                  { color: "var(--p500)",    label: language === "ru" ? "В работе" : "In progress" },
+                  { color: "var(--danger)",  label: language === "ru" ? "Просрочено" : "Overdue" },
+                ].map(({ color, label }) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-[11px] text-[--g600]">{label}</span>
+                  </div>
+                ))}
+              </div>
+
               {/* Таблица Ганта */}
               <OdooCard className="overflow-hidden" padding="none">
                 <CardContent className="p-0">
@@ -1424,25 +1438,34 @@ export default function Schedule() {
                         
                         const splitGroupId = task.splitGroupId;
                         const splitColor = getSplitTaskColor(splitGroupId);
-                        const barStyle: React.CSSProperties = { 
-                          left, 
-                          top, 
+
+                        // Odoo-style bar color by status (task 15.3)
+                        const taskEndDate = task.startDate
+                          ? addDays(parseISO(String(task.startDate)), Number(task.durationDays || 1) - 1)
+                          : null;
+                        const isOverdue = !task.actNumber && taskEndDate && taskEndDate < new Date();
+                        const ganttBarColor = task.actNumber != null
+                          ? "var(--success)"
+                          : isOverdue
+                            ? "var(--danger)"
+                            : "var(--p500)";
+
+                        const barStyle: React.CSSProperties = {
+                          left,
+                          top,
                           width,
-                          ...(splitColor ? { 
-                            backgroundColor: splitColor,
-                            borderLeft: '3px solid',
-                            borderColor: splitColor,
-                          } : {})
+                          ...(splitColor
+                            ? { backgroundColor: splitColor, borderLeft: '3px solid', borderColor: splitColor }
+                            : { backgroundColor: ganttBarColor }),
                         };
-                        
+
                         return (
                           <button
                             key={task.id}
                             type="button"
                             className={cn(
                               buttonVariants({ variant: "default", size: "sm" }),
-                              "absolute h-6 min-h-0 px-2 py-0 rounded-md border-0 text-[10px] leading-none truncate",
-                              splitColor ? "text-white" : "bg-primary/80 hover:bg-primary"
+                              "absolute h-6 min-h-0 px-2 py-0 rounded-md border-0 text-[10px] leading-none truncate text-white hover:opacity-90"
                             )}
                             style={barStyle}
                             onClick={() => openEdit(task)}

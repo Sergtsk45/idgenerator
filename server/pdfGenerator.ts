@@ -2,10 +2,11 @@ import type { TDocumentDefinitions } from "pdfmake/interfaces";
 import * as fs from "fs";
 import * as path from "path";
 import { createRequire } from "module";
+import { fileURLToPath } from "url";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
 import { storage } from "./storage";
 
-const require = createRequire(__filename);
+const require = createRequire(import.meta.url);
 const PdfPrinter = require("pdfmake/js/Printer.js").default;
 
 const fontsDir = path.join(process.cwd(), "server/fonts");

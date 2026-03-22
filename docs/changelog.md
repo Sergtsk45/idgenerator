@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-03-22] - Odoo UI: Задача 13 Acts.tsx завершена
+
+### Добавлено
+- `client/src/pages/ActDetail.tsx` — placeholder страница детали акта (`/acts/:id`), готова к наполнению в Задаче 18
+- `client/src/App.tsx` — маршрут `/acts/:id` → `ActDetail`
+
+### Изменено
+- `client/src/pages/Acts.tsx`:
+  - **Summary row** — строка статистики `N актов · X принято · Y в работе · Z черновик` после CTA
+  - **Warning block** — предупреждение (AlertTriangle + border-warning) для актов без дат
+  - **Infinite scroll** — IntersectionObserver, 10 актов за загрузку, sentinel с Loader2
+  - **Drill-down** — OdooCard кликабелен, navigate к `/acts/:id`; ChevronRight в заголовке
+  - **Badge** — локализованные метки (принято / в работе / черновик) вместо raw status; вариант `info` для generated
+  - Download кнопка: `e.stopPropagation()` чтобы не триггерить drill-down
+
+---
+
 ## [2026-03-22] - Синхронизация трекера Odoo UI (`tasktrecker_odoo_style.md`)
 
 ### Изменено

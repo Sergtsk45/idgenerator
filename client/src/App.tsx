@@ -11,6 +11,7 @@ import Home from "@/pages/Home";
 import Works from "@/pages/Works";
 import WorkLog from "@/pages/WorkLog";
 import Acts from "@/pages/Acts";
+import ActDetail from "@/pages/ActDetail";
 import Schedule from "@/pages/Schedule";
 import Settings from "@/pages/Settings";
 import Login from "@/pages/Login";
@@ -54,6 +55,13 @@ function Router() {
         <AuthGuard>
           <Acts />
         </AuthGuard>
+      </Route>
+      <Route path="/acts/:id">
+        {(params) => (
+          <AuthGuard>
+            <ActDetail params={params} />
+          </AuthGuard>
+        )}
       </Route>
       <Route path="/schedule">
         <AuthGuard>

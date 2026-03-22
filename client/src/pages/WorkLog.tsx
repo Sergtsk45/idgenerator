@@ -14,6 +14,7 @@ import { useCurrentObject } from "@/hooks/use-source-data";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { PillTabs } from "@/components/ui/pill-tabs";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2,
@@ -193,12 +194,22 @@ export default function WorkLog() {
         {activeTab === "section3" && (
           <ScrollArea className="h-full px-2 py-2">
             <div className="max-w-6xl mx-auto">
-              <div className="text-center mb-4">
-                <h2 className="text-lg font-bold mb-2">{t.section3.title}</h2>
-                <p className="text-sm text-muted-foreground leading-tight px-2">
-                  {t.section3.subtitle}
-                </p>
+              {/* Info badge */}
+              <div className="flex items-center justify-between bg-[--p50] border border-[--p300] rounded-[--o-radius-lg] px-3 py-2 mb-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[--p700]">
+                    {t.section3.title}
+                  </p>
+                  <p className="text-[11px] text-[--g500] leading-tight mt-0.5">{t.section3.subtitle}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[10px] uppercase tracking-wider text-[--g500]">
+                    {language === "ru" ? "ПРОГРЕСС" : "PROGRESS"}
+                  </p>
+                  <p className="text-[18px] font-bold text-[--p700] leading-tight">{progress}%</p>
+                </div>
               </div>
+              <Progress value={progress} className="h-1 mb-3 bg-[--g200] [&>div]:bg-[--p500]" />
               <SectionActionBar actions={t.actions} sectionId="section3" />
               
               {/* Кнопка обновить */}

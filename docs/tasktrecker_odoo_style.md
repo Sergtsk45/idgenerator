@@ -177,37 +177,37 @@
 ## Этап 3 — Экраны (~24 ч, 2 недели)
 
 ### Задача 12: Home.tsx (чат-журнал)
-- **Статус**: Не начата (общий layout есть, **спека Odoo** chatter / bubbles / AI-карточки — не сверены)
+- **Статус**: Частично завершена ✅ (пузыри, AI-карточка, shimmer, input bar; date separators и infinite scroll — впереди)
 - **Приоритет**: 🟢 Средний
 - **Оценка**: 4 ч
 - **Зависимости**: #1–6, #9
 - **Описание**: Рестайл главного экрана: чат-интерфейс с date separators, user bubbles, AI-карточками, input bar.
 - **Шаги выполнения**:
   - [ ] 12.1 Date separator: Odoo chatter стиль — `flex items-center gap-2`, линии по бокам, `text-[11px] text-[--g500]`
-  - [ ] 12.2 User bubble: `bg-[--p100] rounded-[16px_16px_4px_16px] p-[10px_14px] max-w-[85%] ml-auto`, timestamp внизу
-  - [ ] 12.3 AI card (сопоставлено): `bg-white border border-[--success] border-l-4 rounded-[--o-radius-lg] p-4`; header `text-[11px] font-semibold text-[--success]`; key-value строки
-  - [ ] 12.4 AI card кнопки: «Принять ✓» (OdooButton primary compact) + «Изменить ✎» (secondary compact)
-  - [ ] 12.5 Processing state: shimmer-полоса + текст «⏳ Обрабатывается...»
-  - [ ] 12.6 Input bar: `sticky bottom-[56px]` (над BottomNav), `bg-white border rounded-[--o-radius-lg] shadow-[--o-shadow-sm]`, input + 📎 + кнопка «Отпр»
-  - [ ] 12.7 Reverse infinite scroll для подгрузки старых сообщений. **📖 Context7**: запросить документацию TanStack React Query — useInfiniteQuery, reverse infinite scroll pattern
+  - [x] 12.2 User bubble: `bg-[--p100] rounded-[16px_16px_4px_16px]` timestamp `text-[--g500]`
+  - [x] 12.3 AI card (WorkMatchCard): `bg-white border-l-4 border-[--success] rounded-[--o-radius-lg]`
+  - [x] 12.4 AI card кнопки: Button variant="odoo-secondary" size="compact"
+  - [x] 12.5 Processing state: shimmer `animate-pulse` вместо Loader2
+  - [x] 12.6 Input bar: `bg-white border-[--g200] shadow-[0_-1px_3px] rounded-[--o-radius-lg]`
+  - [ ] 12.7 Reverse infinite scroll для подгрузки старых сообщений
 
 ---
 
 ### Задача 13: Acts.tsx (список актов)
-- **Статус**: Частично завершена (часть `Badge` → success/neutral; layout всё ещё на shadcn `Card`, без OdooCard/CTA/summary из спеки)
+- **Статус**: Завершена ✅
 - **Приоритет**: 🟢 Средний
 - **Оценка**: 4 ч
 - **Зависимости**: #1–6, #4, #9
 - **Описание**: Рестайл экрана актов: primary CTA «Сформировать из графика», summary row, карточки актов с progress bar, infinite scroll.
 - **Шаги выполнения**:
-  - [ ] 13.1 Primary CTA кнопка full-width: «Сформировать / обновить из графика ↻»
-  - [ ] 13.2 Summary row: `14 актов · 8 принято · 3 в работе · 3 черновик` — `text-[11px] text-[--g500]` с цветными числами
-  - [ ] 13.3 Карточка акта: OdooCard + OdooBadge (статус в правом верхнем углу) + описание + progress bar + action buttons
-  - [ ] 13.4 Warning block (нехватка документов): `bg-[--warning-bg] rounded-[--o-radius-md] text-[10px] text-[#713F12]`
-  - [ ] 13.5 Progress bar: `h-1 bg-[--g200] rounded-full`, fill по статусу (success/primary/neutral)
-  - [ ] 13.6 Infinite scroll по 10 актов. **📖 Context7**: запросить документацию TanStack React Query — useInfiniteQuery, getNextPageParam, IntersectionObserver
-  - [ ] 13.7 Drill-down: нажатие → `/acts/:id` (full-page)
-  - [ ] 13.8 Empty state: «Пока нет актов» + CTA «Сформировать акты»
+  - [x] 13.1 Primary CTA кнопка full-width: variant="odoo-primary" size="cta" с иконкой RefreshCw
+  - [x] 13.2 Summary row: `14 актов · 8 принято · 3 в работе · 3 черновик`
+  - [x] 13.3 Карточка акта: OdooCard + Badge success/info/neutral (локализованные метки) + download button odoo-secondary
+  - [x] 13.4 Warning block: предупреждение об актах без дат (AlertTriangle + border-warning)
+  - [x] 13.5 Progress bar в карточке (экспорт)
+  - [x] 13.6 Infinite scroll: IntersectionObserver, порция 10 актов, sentinel-div с Loader2
+  - [x] 13.7 Drill-down: OdooCard кликабелен → navigate(`/acts/:id`); ChevronRight в заголовке; новый маршрут `/acts/:id` → ActDetail.tsx (placeholder для Task 18)
+  - [x] 13.8 Empty state: OdooEmptyState
 
 ---
 

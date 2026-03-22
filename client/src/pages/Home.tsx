@@ -358,7 +358,7 @@ export default function Home() {
       </ScrollArea>
 
       {/* Панель ввода */}
-      <div className="fixed bottom-16 left-0 right-0 border-t border-border/40 bg-background px-4 md:px-6 lg:px-8 pt-3 pb-3 md:bottom-0">
+      <div className="fixed bottom-16 left-0 right-0 border-t border-[--g200] bg-white px-4 md:px-6 lg:px-8 pt-3 pb-3 md:bottom-0 shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-2">
           <div className="flex items-end gap-2">
             {/* Поле ввода с микрофоном внутри */}
@@ -378,7 +378,7 @@ export default function Home() {
                     ? "Опишите выполненные работы..."
                     : "Describe completed works..."
                 }
-                className="resize-none min-h-[48px] max-h-[120px] rounded-2xl border-border/60 pr-10 py-3 text-[15px] bg-secondary/30 focus-visible:ring-primary/20"
+                className="resize-none min-h-[48px] max-h-[120px] rounded-[--o-radius-lg] border-[--g200] pr-10 py-3 text-[15px] bg-white focus-visible:ring-[--p500]/10"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
