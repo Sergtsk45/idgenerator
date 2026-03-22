@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-03-22] - Odoo UI: Задача 14 WorkLog.tsx завершена
+
+### Добавлено
+- `TableWrapper` компонент (локальный) — scroll-обёртка для таблиц ЖР: scroll hint + `border-[--g200] rounded-[--o-radius-lg]`
+- `TablePagination` компонент (локальный) — кнопки Назад/Далее для таблиц разд. 1/2/4/5
+- FAB кнопка «+» (`variant="odoo-fab"`) — только на Разд. 3, `fixed bottom-24 right-4`
+- Ghost card «+ Добавить новую запись» (dashed border) в конце списка Разд. 3
+
+### Изменено
+- `client/src/pages/WorkLog.tsx`:
+  - **Разд. 3**: таблица → Odoo card list: дата (число/день/месяц) + OdooBadge (принято/в работе) + kebab ⋮ + текст с inline-редактированием
+  - **Info badge** (14.2): добавлена дата последней записи; overline «ОБЩИЙ ПРОГРЕСС» (14.3)
+  - **Infinite scroll** (14.8): IntersectionObserver, 15 записей/порция для Разд. 3
+  - **Разд. 1/2/4/5** (14.7): обёрнуты в `TableWrapper`, шапки без изменений; пагинация кнопками
+
+---
+
 ## [2026-03-22] - Odoo UI: Задача 13 Acts.tsx завершена
 
 ### Добавлено
