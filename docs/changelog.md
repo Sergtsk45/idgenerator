@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-03-22] - Odoo UI: Задачи 21, 22 завершены
+
+### Задача 21: Settings.tsx — рестайл на Odoo
+- **21.1** Все секции-карточки → `OdooCard` (убраны `bg-card border border-border/60 rounded-2xl`)
+- **21.2** Кнопки → `variant="odoo-primary"/"odoo-secondary"/"odoo-ghost"`; язык → `PillTabs`; sidebar nav — Odoo active `bg-[--p50] text-[--p700]`
+- **21.3** Заголовки секций → `o-overline` (убраны inline `text-[11px] font-semibold uppercase tracking-widest`)
+- **21.4** `Switch` — оставлен shadcn без изменений
+- Десктопный sidebar: `w-56 bg-white border-[--g200]`, nav item active `bg-[--p50] text-[--p700]`
+- Фон правой панели desktop → `bg-[--g50]`
+
+### Задача 22: ResponsiveShell.tsx + BottomNav — Odoo адаптивность
+- **22.2** `ShellSidebar`: `w-72 bg-muted/20 border-border/50` → `w-[220px] bg-white border-[--g200]`; quick action кнопка → `odoo-primary/odoo-secondary`
+- **22.2** Nav heading → `text-[--g500] tracking-[0.2em]`
+- **22.13** `ShellSidebarLink`: `variant="secondary"/"ghost"` → cn с `bg-[--p50] text-[--p700]` / `text-[--g700] hover:bg-[--g100]`; `strokeWidth=1.5` на иконках
+- **22.13** `ShellTextLink` / `ShellCompactLink`: аналогичный рестайл, `h-8` (вместо `h-9`)
+- **22.13** `ShellTopNav`: `border-border/50 bg-background/95 backdrop-blur` → `border-[--g200] bg-white`, `h-12`
+- `BottomNav` уже имел `lg:hidden` — подтверждено, не менялось
+
+---
+
 ## [2026-03-22] - Odoo UI: Задачи 18, 19, 20 завершены
 
 ### Задача 18: ActDetail.tsx — полная детализация акта

@@ -330,41 +330,41 @@
 ---
 
 ### Задача 21: Settings.tsx
-- **Статус**: Не начата
+- **Статус**: Завершена ✅
 - **Приоритет**: 🔵 Низкий
 - **Оценка**: 2 ч
 - **Зависимости**: #1, #3
 - **Описание**: Минимальные правки настроек под Odoo-стиль.
 - **Шаги выполнения**:
-  - [ ] 21.1 Обновить фон и карточки на OdooCard
-  - [ ] 21.2 Обновить кнопки на OdooButton
-  - [ ] 21.3 Секции: overline-разделители
-  - [ ] 21.4 Toggle/Switch — оставить shadcn (стилизовать цвета)
+  - [x] 21.1 Все карточки секций → OdooCard
+  - [x] 21.2 Кнопки → odoo-primary/secondary/ghost; язык → PillTabs; sidebar nav → Odoo active
+  - [x] 21.3 Заголовки секций → o-overline
+  - [x] 21.4 Switch — оставлен shadcn без изменений
 
 ---
 
 ## Этап 5 — Адаптивность (~8 ч, 1 неделя)
 
 ### Задача 22: Tablet / Desktop адаптация
-- **Статус**: Частично завершена (есть `ResponsiveShell`, tablet shell из ветки tablet-ui; **полная** сводка со спекой Odoo sidebar/master-detail/modal breakpoints — **не закрыта**)
+- **Статус**: Частично завершена ✅ (базовый рестайл sidebar/topnav выполнен; grid-layouts, master-detail на всех экранах — отложено)
 - **Приоритет**: 🔵 Низкий
 - **Оценка**: 8 ч
 - **Зависимости**: #1–21
 - **Описание**: Адаптация всех экранов под планшет (768–1024px) и десктоп (>1024px). Sidebar навигация, master-detail, grid layouts.
 - **Шаги выполнения**:
-  - [ ] 22.1 **Breakpoints**: Mobile <768, Tablet 768–1024, Desktop >1024
-  - [ ] 22.2 **Desktop sidebar**: `w-[220px] fixed top-14 bottom-0 bg-white border-r`, nav items с hover/active states. Скрыть BottomNav
-  - [ ] 22.3 **Tablet — Материалы**: master-detail split (sidebar 280px + main flex-1)
-  - [ ] 22.4 **Tablet — Акты**: master-detail (список + детали)
-  - [ ] 22.5 **Desktop — Акты**: 2-column grid для карточек
-  - [ ] 22.6 **Desktop — Материалы**: 3-column grid + detail modal
-  - [ ] 22.7 **Таблицы ЖР**: tablet — полная ширина без hint; desktop — полная ширина
-  - [ ] 22.8 **Гант**: tablet — задачи 280px + Гант без скролла; desktop — задачи 400px
-  - [ ] 22.9 **Формы**: tablet/desktop — 2 колонки, max-width 800px
-  - [ ] 22.10 **Модалки**: mobile → Sheet; tablet → Dialog 560px; desktop → Dialog 640px. **📖 Context7**: запросить документацию Radix UI Dialog — responsive rendering, size customization
-  - [ ] 22.11 **FAB**: mobile/tablet → fixed; desktop → inline button
-  - [ ] 22.12 **Header**: desktop — добавить search bar
-  - [ ] 22.13 `ResponsiveShell.tsx` — обновить для поддержки sidebar vs BottomNav
+  - [x] 22.1 Breakpoints зафиксированы: Mobile <768 (md), Tablet md–lg, Desktop >1024 (lg)
+  - [x] 22.2 Desktop sidebar: `w-[220px] bg-white border-[--g200]`, Odoo active nav items, BottomNav `lg:hidden` (уже было)
+  - [ ] 22.3 Tablet — Материалы: master-detail split (уже есть lg panel, tablet не закрыт)
+  - [ ] 22.4 Tablet — Акты: master-detail
+  - [ ] 22.5 Desktop — Акты: 2-column grid
+  - [ ] 22.6 Desktop — Материалы: 3-column grid
+  - [ ] 22.7 Таблицы ЖР: tablet hint убрать
+  - [ ] 22.8 Гант: tablet/desktop ширина колонок
+  - [ ] 22.9 Формы: 2 колонки tablet/desktop
+  - [ ] 22.10 Модалки: Sheet→Dialog responsive
+  - [ ] 22.11 FAB: desktop → inline button
+  - [ ] 22.12 Header: desktop search bar
+  - [x] 22.13 ResponsiveShell.tsx: ShellSidebar, ShellTopNav, ShellSidebarLink, ShellTextLink, ShellCompactLink — рестайл на Odoo токены
 
 ---
 
