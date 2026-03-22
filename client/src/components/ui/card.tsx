@@ -1,3 +1,7 @@
+/**
+ * @deprecated Use OdooCard from "@/components/ui/odoo-card" for new code.
+ * This file is kept for backwards compatibility with existing usages.
+ */
 import * as React from "react"
 
 import { cn } from "@/lib/utils"

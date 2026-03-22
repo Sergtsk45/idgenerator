@@ -11,6 +11,7 @@ import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { TariffGuard } from "@/components/TariffGuard";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { OdooCard } from "@/components/ui/odoo-card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -1016,15 +1017,15 @@ export default function Schedule() {
           </div>
 
           {defaultError || scheduleError ? (
-            <div className="glass-card rounded-2xl p-4 text-sm text-destructive">
+            <OdooCard className="text-sm text-destructive">
               {t.errorLoad}
-            </div>
+            </OdooCard>
           ) : isLoadingDefault || isLoadingSchedule ? (
             <div className="flex justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : tasks.length === 0 ? (
-            <div className="glass-card rounded-2xl p-4">
+            <OdooCard>
               <div className="text-base font-semibold mb-1">{t.emptyTitle}</div>
               <div className="text-sm text-muted-foreground mb-4">
                 {sourceType === "estimate"
@@ -1048,7 +1049,7 @@ export default function Schedule() {
                 )}
                 {t.bootstrap}
               </Button>
-            </div>
+            </OdooCard>
           ) : (
             <>
               {/* Навигация по месяцу */}
@@ -1143,7 +1144,7 @@ export default function Schedule() {
               </div>
 
               {/* Таблица Ганта */}
-              <Card className="glass-card overflow-hidden">
+              <OdooCard className="overflow-hidden" padding="none">
                 <CardContent className="p-0">
                 <div className="overflow-x-auto">
                 {/* Header */}
@@ -1461,7 +1462,7 @@ export default function Schedule() {
                 </div>
                 </div>
                 </CardContent>
-              </Card>
+              </OdooCard>
             </>
           )}
         </div>
