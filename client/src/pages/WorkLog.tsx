@@ -5,7 +5,7 @@
  * @created: 2026-02-23
  */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { useSection3 } from "@/hooks/use-section3";
 import { usePatchMessage } from "@/hooks/use-messages";
@@ -13,11 +13,7 @@ import { useLanguageStore, translations } from "@/lib/i18n";
 import { useCurrentObject } from "@/hooks/use-source-data";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { OdooCard } from "@/components/ui/odoo-card";
-import { OdooEmptyState } from "@/components/ui/odoo-empty-state";
 import { PillTabs } from "@/components/ui/pill-tabs";
-import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2,
@@ -29,8 +25,6 @@ import {
   Search,
   Check,
   X,
-  MoreVertical,
-  Plus,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -40,7 +34,6 @@ import { cn } from "@/lib/utils";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 
-const S3_PAGE_SIZE = 15;
 const TABLE_PAGE_SIZE = 10;
 
 /* ─── вспомогательные компоненты ──────────────────────────────────── */
@@ -170,10 +163,6 @@ export default function WorkLog() {
     isProcessed: boolean;
   } | null>(null);
 
-  // 14.8 infinite scroll for section3
-  const [s3Visible, setS3Visible] = useState(S3_PAGE_SIZE);
-  const s3SentinelRef = useRef<HTMLDivElement>(null);
-
   // 14.8 pagination for tables
   const [s1Page, setS1Page] = useState(0);
   const [s2Page, setS2Page] = useState(0);
@@ -183,19 +172,6 @@ export default function WorkLog() {
   const { data: rows = [], isLoading, refetch } = useSection3({ enablePolling: !editingSegment });
   const patchMessage = usePatchMessage();
 
-  useEffect(() => {
-    const el = s3SentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) setS3Visible((p) => Math.min(p + S3_PAGE_SIZE, rows.length));
-      },
-      { threshold: 0.1 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [rows.length]);
-
   const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return "";
     try {
@@ -204,22 +180,6 @@ export default function WorkLog() {
       return dateStr;
     }
   };
-
-  /** Разбивает ISO-дату на части для отображения в list-view */
-  const parseDateParts = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      return {
-        day: format(d, "d", { locale }),
-        weekday: format(d, "EEE", { locale }),
-        month: format(d, "MMM", { locale }),
-      };
-    } catch {
-      return { day: "—", weekday: "", month: "" };
-    }
-  };
-
-  const lastEntryDate = rows.length > 0 ? formatDate(rows[rows.length - 1].date) : null;
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: [api.worklog.section3.path] });
@@ -251,14 +211,6 @@ export default function WorkLog() {
 
   const handleCancelEdit = () => setEditingSegment(null);
 
-  /* прогресс */
-  const totalSegs = rows.reduce((acc, r) => acc + r.segments.length, 0);
-  const processedSegs = rows.reduce(
-    (acc, r) => acc + r.segments.filter((s) => !s.isPending).length,
-    0,
-  );
-  const progress = totalSegs > 0 ? Math.round((processedSegs / totalSegs) * 100) : 0;
-
   return (
     <ResponsiveShell
       title={t.title}
@@ -280,153 +232,164 @@ export default function WorkLog() {
       {/* Контент */}
       <div className="flex-1 pb-28 overflow-y-auto">
 
-        {/* ── РАЗДЕЛ 3 — Odoo card list (14.4) ───────────────────────── */}
+        {/* ── РАЗДЕЛ 3 (табличный формат) ─────────────────────────────── */}
         {activeTab === "section3" && (
-          <div className="px-4 py-3 space-y-3 pb-28" data-testid="section3-list">
-            {/* 14.2 Info badge + 14.3 Прогресс */}
-            <div className="flex items-center justify-between bg-[--p50] border border-[--p300] rounded-[--o-radius-lg] px-3 py-2">
-              <div>
-                <p className="o-overline text-[--p700]">{t.section3.title}</p>
-                <p className="text-[11px] text-[--g500] leading-tight mt-0.5">
-                  {lastEntryDate
-                    ? (language === "ru" ? `Последняя запись: ${lastEntryDate}` : `Last entry: ${lastEntryDate}`)
-                    : t.section3.subtitle}
+          <ScrollArea className="h-full px-2 py-2">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-4">
+                <h2 className="text-lg font-bold mb-2">{t.section3.title}</h2>
+                <p className="text-sm text-muted-foreground leading-tight px-2">
+                  {t.section3.subtitle}
                 </p>
               </div>
-              <div className="shrink-0 text-right">
-                <p className="o-overline text-[--g500]">
-                  {language === "ru" ? "ОБЩИЙ ПРОГРЕСС" : "TOTAL PROGRESS"}
-                </p>
-                <p className="text-[20px] font-bold text-[--p700] leading-tight">{progress}%</p>
+              <SectionActionBar actions={t.actions} sectionId="section3" />
+
+              {/* Кнопка обновить */}
+              <div className="flex justify-end mb-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  className="shrink-0"
+                  data-testid="button-refresh-log"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {t.refreshLog}
+                </Button>
+              </div>
+
+              <div className="overflow-x-auto border-2 border-foreground">
+                <table className="w-full border-collapse text-[10px]" data-testid="section3-table">
+                  <thead>
+                    <tr>
+                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top w-6 italic">
+                        {t.section3.rowNumber}
+                      </th>
+                      <th className="border border-foreground px-0.5 py-1 text-[8px] font-normal text-center align-top italic">
+                        {t.section3.date}
+                      </th>
+                      <th className="border border-foreground px-1 py-1 text-[8px] font-normal text-center align-top italic">
+                        {t.section3.workConditions}
+                      </th>
+                      <th className="border border-foreground px-1 py-1 text-[8px] font-normal text-center align-top italic">
+                        {t.section3.workDescription}
+                      </th>
+                      <th className="border border-foreground px-1 py-1 text-[8px] font-normal text-center align-top italic">
+                        {t.section3.representative}
+                      </th>
+                    </tr>
+                    <tr>
+                      {["1", "2", "3", "4", "5"].map((n) => (
+                        <th key={n} className="border border-foreground px-0.5 py-0.5 text-[8px] font-bold text-center">{n}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Загрузка */}
+                    {isLoading && (
+                      <tr>
+                        <td colSpan={5} className="border border-foreground px-2 py-20 text-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary/50 inline-block" />
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Пусто */}
+                    {!isLoading && rows.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="border border-foreground px-6 py-16 text-center">
+                          <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <FileText className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                          <h3 className="font-semibold text-lg mb-1">{t.noRecords}</h3>
+                          <p className="text-sm text-muted-foreground">{t.noRecordsHint}</p>
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Записи */}
+                    {!isLoading && rows.length > 0 && rows.map((row, rowIndex) => (
+                      <tr key={row.date} data-testid={`worklog-row-${row.date}`}>
+                        <td className="border border-foreground px-0.5 py-3 text-center align-top font-bold text-[9px]">
+                          {rowIndex + 1}
+                        </td>
+                        <td className="border border-foreground px-1 py-3 align-top text-[9px]">
+                          {formatDate(row.date)}
+                        </td>
+                        <td className="border border-foreground px-1 py-3 align-top text-[9px]">
+                          {/* Условия производства работ */}
+                          &nbsp;
+                        </td>
+                        <td className="border border-foreground px-1 py-3 align-top text-[9px]">
+                          {/* Наименование работ */}
+                          {row.segments.map((seg, segIdx) => {
+                            const isEditing = editingSegment?.sourceId === seg.sourceId;
+
+                            if (isEditing) {
+                              return (
+                                <div key={`${seg.sourceType}-${seg.sourceId}-${segIdx}`} className="space-y-2 mb-2">
+                                  <Textarea
+                                    value={editingSegment.text}
+                                    onChange={(e) =>
+                                      setEditingSegment({ ...editingSegment, text: e.target.value })
+                                    }
+                                    className="min-h-[60px] text-[11px] rounded-xl"
+                                    autoFocus
+                                  />
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={handleSaveEdit}
+                                      disabled={patchMessage.isPending}
+                                      className="h-7 rounded-lg text-[10px]"
+                                    >
+                                      <Check className="h-3 w-3 mr-1" />
+                                      {language === "ru" ? "Сохранить" : "Save"}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={handleCancelEdit}
+                                      disabled={patchMessage.isPending}
+                                      className="h-7 rounded-lg text-[10px]"
+                                    >
+                                      <X className="h-3 w-3 mr-1" />
+                                      {language === "ru" ? "Отмена" : "Cancel"}
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <p
+                                key={`${seg.sourceType}-${seg.sourceId}-${segIdx}`}
+                                className={cn(
+                                  "mb-1 last:mb-0",
+                                  seg.sourceType === "message" &&
+                                    "cursor-pointer hover:text-primary transition-colors",
+                                  seg.isPending && "italic text-muted-foreground",
+                                )}
+                                onClick={() =>
+                                  handleSegmentClick(seg.sourceId, seg.text, !seg.isPending, seg.sourceType)
+                                }
+                              >
+                                {seg.text}
+                              </p>
+                            );
+                          })}
+                        </td>
+                        <td className="border border-foreground px-1 py-3 align-top text-[9px]">
+                          {/* Подпись представителя */}
+                          &nbsp;
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-            <Progress value={progress} className="h-1.5 bg-[--g200] [&>div]:bg-[--p500]" />
-
-            {/* Кнопка обновить */}
-            <div className="flex justify-end">
-              <Button
-                variant="odoo-ghost"
-                size="compact"
-                onClick={handleRefresh}
-                data-testid="button-refresh-log"
-              >
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                {t.refreshLog}
-              </Button>
-            </div>
-
-            {/* Загрузка */}
-            {isLoading && (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[--p400]" />
-              </div>
-            )}
-
-            {/* Пусто */}
-            {!isLoading && rows.length === 0 && (
-              <OdooEmptyState
-                icon={<FileText />}
-                title={t.noRecords}
-                hint={t.noRecordsHint}
-              />
-            )}
-
-            {/* 14.4 Список записей */}
-            {!isLoading && rows.slice(0, s3Visible).map((row) => {
-              const { day, weekday, month } = parseDateParts(row.date);
-              const allProcessed = row.segments.every((s) => !s.isPending);
-
-              return (
-                <div key={row.date} className="flex gap-3 items-start" data-testid={`worklog-row-${row.date}`}>
-                  {/* Дата */}
-                  <div className="shrink-0 w-10 pt-2 text-center">
-                    <p className="text-[22px] font-bold text-[--g900] leading-none">{day}</p>
-                    <p className="text-[10px] text-[--g500] capitalize">{weekday}</p>
-                    <p className="text-[10px] text-[--g500] capitalize">{month}</p>
-                  </div>
-
-                  {/* Карточка */}
-                  <OdooCard className="flex-1">
-                    <div className="px-3 pt-2 pb-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge variant={allProcessed ? "success" : "warning"}>
-                          {allProcessed
-                            ? (language === "ru" ? "принято" : "accepted")
-                            : (language === "ru" ? "в работе" : "in progress")}
-                        </Badge>
-                        <button
-                          className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-[--g100] transition-colors"
-                          aria-label="Меню"
-                          data-testid={`kebab-${row.date}`}
-                        >
-                          <MoreVertical className="h-4 w-4 text-[--g400]" strokeWidth={1.5} />
-                        </button>
-                      </div>
-
-                      {row.segments.map((seg, segIdx) => {
-                        const isEditing = editingSegment?.sourceId === seg.sourceId;
-                        const key = `${seg.sourceType}-${seg.sourceId}-${segIdx}`;
-
-                        if (isEditing) {
-                          return (
-                            <div key={key} className="space-y-2">
-                              <Textarea
-                                value={editingSegment.text}
-                                onChange={(e) => setEditingSegment({ ...editingSegment, text: e.target.value })}
-                                className="min-h-[60px] text-[12px]"
-                                autoFocus
-                              />
-                              <div className="flex gap-2">
-                                <Button size="compact" onClick={handleSaveEdit} disabled={patchMessage.isPending}>
-                                  <Check className="h-3 w-3 mr-1" />
-                                  {language === "ru" ? "Сохранить" : "Save"}
-                                </Button>
-                                <Button size="compact" variant="odoo-secondary" onClick={handleCancelEdit} disabled={patchMessage.isPending}>
-                                  <X className="h-3 w-3 mr-1" />
-                                  {language === "ru" ? "Отмена" : "Cancel"}
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <p
-                            key={key}
-                            className={cn(
-                              "text-[13px] text-[--g800] mb-1 last:mb-0 leading-snug",
-                              seg.sourceType === "message" && "cursor-pointer hover:text-[--p600] transition-colors",
-                              seg.isPending && "italic text-[--g500]",
-                            )}
-                            onClick={() => handleSegmentClick(seg.sourceId, seg.text, !seg.isPending, seg.sourceType)}
-                          >
-                            {seg.text}
-                          </p>
-                        );
-                      })}
-                    </div>
-                  </OdooCard>
-                </div>
-              );
-            })}
-
-            {/* 14.8 Infinite scroll sentinel */}
-            {!isLoading && s3Visible < rows.length && (
-              <div ref={s3SentinelRef} className="flex justify-center py-3">
-                <Loader2 className="h-5 w-5 animate-spin text-[--g400]" />
-              </div>
-            )}
-
-            {/* 14.5 Ghost card «+ Добавить» */}
-            {!isLoading && (
-              <button
-                className="w-full border border-dashed border-[--p300] rounded-[--o-radius-lg] py-4 text-[13px] text-[--p500] hover:bg-[--p50] transition-colors"
-                data-testid="button-add-entry"
-              >
-                + {language === "ru" ? "Добавить новую запись" : "Add new entry"}
-              </button>
-            )}
-          </div>
+          </ScrollArea>
         )}
 
 
@@ -615,18 +578,6 @@ export default function WorkLog() {
         )}
       </div>
 
-      {/* 14.6 FAB «+» — только на Разд. 3 */}
-      {activeTab === "section3" && (
-        <Button
-          variant="odoo-fab"
-          size="odoo-fab-size"
-          className="fixed bottom-24 right-4 z-50 lg:bottom-8"
-          aria-label={language === "ru" ? "Добавить запись" : "Add entry"}
-          data-testid="fab-add-entry"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2} />
-        </Button>
-      )}
     </ResponsiveShell>
   );
 }
