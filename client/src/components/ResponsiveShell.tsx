@@ -67,7 +67,11 @@ function ShellTopNav() {
     // 22.2 Odoo-style top nav: white bg, border-[--g200]
     <div className="sticky top-14 z-30 hidden border-b border-[--g200] bg-white md:block">
       <div className="flex h-12 items-center gap-3 px-4">
-        <nav aria-label={shellT.primaryNavigation} className="min-w-0 flex-1 overflow-x-auto">
+        <nav
+          aria-label={shellT.primaryNavigation}
+          className="min-w-0 flex-1 overflow-x-auto"
+          data-testid="header-tab-nav"
+        >
           <div className="flex min-w-max items-center gap-1">
             {primaryItems.map((item) => (
               <ShellTextLink

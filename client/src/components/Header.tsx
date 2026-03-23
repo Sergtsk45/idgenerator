@@ -1,7 +1,8 @@
 /**
  * @file: Header.tsx
  * @description: Вариативный хедер приложения с hamburger-меню (Sheet), кнопкой назад, subtitle, быстрой ссылкой на чат (молния), поиском и аватаром.
- *   На md+ показывает горизонтальный tab bar (primary nav) и secondary dropdown в правом слоте.
+ *   Primary navigation (ВОР, график, акты и т.д.) на md+ рендерит только ResponsiveShell (ShellTopNav), здесь дублирования нет.
+ *   На md+ в правом слоте — secondary dropdown (Объекты, Настройки).
  * @dependencies: lucide-react, @/components/ui/avatar, @/components/ui/button, @/components/ui/sheet, @/components/ui/dropdown-menu, wouter
  * @created: 2026-02-23
  * @updated: 2026-03-13
@@ -60,11 +61,8 @@ export function Header({
   showObjectSelector = false,
 }: HeaderProps) {
   const [objectSelectorOpen, setObjectSelectorOpen] = useState(false);
-  const [location] = useLocation();
   const { language } = useLanguageStore();
   const shellT = translations[language].shell;
-  const t: NavigationLabels = translations[language].nav;
-  const primaryNavItems = getNavigationItemsForSurface("shellPrimaryMdUp", { groups: "primary" });
 
   return (
     <>
@@ -105,36 +103,6 @@ export function Header({
             showAvatar={showAvatar}
             showZapLink={showZapLink && !showBack}
           />
-        </div>
-
-        {/* md+ horizontal primary nav tab bar */}
-        <div
-          className="hidden md:flex border-t border-[--g200] overflow-x-auto scrollbar-hide"
-          data-testid="header-tab-nav"
-        >
-          <div className="flex items-stretch mx-auto w-full md:max-w-none px-2">
-            {primaryNavItems.map((item) => {
-              const isActive = isNavigationItemActive(item, location);
-              const label = getNavigationLabel(item, t);
-              const Icon = item.icon;
-
-              return (
-                <Link key={item.id} href={item.href}>
-                  <div
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors duration-150 min-h-[44px]",
-                      isActive
-                        ? "border-[--p500] text-[--p700]"
-                        : "border-transparent text-[--g500] hover:text-[--g900] hover:border-[--g300]"
-                    )}
-                  >
-                    {Icon && <Icon size={16} />}
-                    <span>{label}</span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
         </div>
       </header>
 
