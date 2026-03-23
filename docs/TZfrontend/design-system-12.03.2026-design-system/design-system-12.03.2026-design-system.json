@@ -1,0 +1,994 @@
+{
+  "metadata": {
+    "name": "Design System 12.03.2026",
+    "prompt": "\u041f\u043b\u0430\u043d\u0448\u0435\u0442\u043d\u043e\u0435 \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 \u0441\u0438\u0441\u0442\u0435\u043c\u044b \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438 \u0438\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0439 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430\u0446\u0438\u0438 \u0441\u0442\u0440\u043e\u0438\u0442\u0441\u044f \u043d\u0430 \u043f\u0440\u0438\u043d\u0446\u0438\u043f\u0430\u0445 \u043c\u0438\u043d\u0438\u043c\u0430\u043b\u0438\u0437\u043c\u0430, \u0444\u0443\u043d\u043a\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u0438 \u0438 \u0432\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u043e\u0439 \u0438\u0435\u0440\u0430\u0440\u0445\u0438\u0438. \u0414\u0438\u0437\u0430\u0439\u043d \u043e\u0440\u0438\u0435\u043d\u0442\u0438\u0440\u043e\u0432\u0430\u043d \u043d\u0430 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f: \u0432\u0441\u044f \u043a\u043b\u044e\u0447\u0435\u0432\u0430\u044f \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0431\u0435\u0437 \u043b\u0438\u0448\u043d\u0438\u0445 \u043f\u0435\u0440\u0435\u0445\u043e\u0434\u043e\u0432, \u043d\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u044f \u0438\u043d\u0442\u0443\u0438\u0442\u0438\u0432\u043d\u0430, \u0430 \u0440\u0430\u0431\u043e\u0447\u0435\u0435 \u043f\u0440\u043e\u0441\u0442\u0440\u0430\u043d\u0441\u0442\u0432\u043e \u0441\u0444\u043e\u043a\u0443\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043e \u043d\u0430 \u0441\u043e\u0434\u0435\u0440\u0436\u0438\u043c\u043e\u043c.\r\n\u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u043f\u0440\u0438\u043d\u0446\u0438\u043f\u044b:\r\n\u2022\t\u0427\u0438\u0441\u0442\u043e\u0442\u0430 \u0438 \u0432\u043e\u0437\u0434\u0443\u0448\u043d\u043e\u0441\u0442\u044c \u2014 \u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u044b\u0435 \u043e\u0442\u0441\u0442\u0443\u043f\u044b, \u043e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0438\u0435 \u0432\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u043e\u0433\u043e \u0448\u0443\u043c\u0430\r\n\u2022\t\u0424\u0443\u043d\u043a\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u044b\u0439 \u043c\u0438\u043d\u0438\u043c\u0430\u043b\u0438\u0437\u043c \u2014 \u0442\u043e\u043b\u044c\u043a\u043e \u043d\u0435\u043e\u0431\u0445\u043e\u0434\u0438\u043c\u044b\u0435 \u044d\u043b\u0435\u043c\u0435\u043d\u0442\u044b \u0432 \u0440\u0430\u0431\u043e\u0447\u0435\u043c \u043f\u0440\u043e\u0441\u0442\u0440\u0430\u043d\u0441\u0442\u0432\u0435\r\n\u2022\t\u0418\u0435\u0440\u0430\u0440\u0445\u0438\u0447\u043d\u043e\u0441\u0442\u044c \u2014 \u0447\u0451\u0442\u043a\u043e\u0435 \u0440\u0430\u0437\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u043d\u0430 \u0437\u043e\u043d\u044b \u043d\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u0438, \u0441\u043f\u0438\u0441\u043a\u0430 \u0438 \u0434\u0435\u0442\u0430\u043b\u0435\u0439\r\n\u2022\t\u041a\u043e\u043d\u0441\u0438\u0441\u0442\u0435\u043d\u0442\u043d\u043e\u0441\u0442\u044c \u2014 \u0435\u0434\u0438\u043d\u043e\u043e\u0431\u0440\u0430\u0437\u0438\u0435 \u044d\u043b\u0435\u043c\u0435\u043d\u0442\u043e\u0432 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f \u043f\u043e \u0432\u0441\u0435\u043c\u0443 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044e\r\n\u2022\t\u041f\u043b\u043e\u0442\u043d\u043e\u0441\u0442\u044c \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u0438 \u2014 \u043c\u0430\u043a\u0441\u0438\u043c\u0443\u043c \u0434\u0430\u043d\u043d\u044b\u0445 \u043f\u0440\u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0438 \u0447\u0438\u0442\u0430\u0435\u043c\u043e\u0441\u0442\u0438",
+    "version": "1.0.0",
+    "created_at": "2026-03-12T07:47:39.760148+00:00",
+    "updated_at": "2026-03-12T07:54:30.259347+00:00",
+    "extracted_from": "makeui.dev Design Extractor",
+    "tool": "makeui.dev"
+  },
+  "colors": {
+    "brand": {},
+    "semantic": {},
+    "neutral": {}
+  },
+  "typography": {
+    "fonts": [],
+    "scale": {
+      "lg": "16px",
+      "md": "15px",
+      "sm": "13px",
+      "xl": "18px",
+      "xs": "11px",
+      "2xl": "20px",
+      "3xl": "24px",
+      "4xl": "28px",
+      "base": "14px"
+    },
+    "line_heights": {},
+    "font_weights": {},
+    "letter_spacing": {}
+  },
+  "spacing": {
+    "base_unit": "8px",
+    "scale": {
+      "0": "0px",
+      "1": "4px",
+      "2": "8px",
+      "3": "12px",
+      "4": "16px",
+      "5": "20px",
+      "6": "24px",
+      "8": "32px",
+      "10": "40px",
+      "12": "48px",
+      "16": "64px",
+      "20": "80px",
+      "24": "96px"
+    }
+  },
+  "components": {
+    "button": {},
+    "card": {},
+    "input": {},
+    "select": {},
+    "navigation": {
+      "header": {
+        "color": "#374151",
+        "usage": "Top navigation bar",
+        "height": "64px",
+        "padding": "0 24px",
+        "background": "#FFFFFF",
+        "box_shadow": "0 1px 2px rgba(0, 0, 0, 0.05)",
+        "color_dark": "#F9FAFB",
+        "border_bottom": "1px solid #E5E7EB",
+        "background_dark": "#1F2937",
+        "border_bottom_dark": "1px solid #374151"
+      },
+      "sidebar": {
+        "usage": "Main navigation sidebar",
+        "width": "240px",
+        "padding": "16px",
+        "background": "#FFFFFF",
+        "item_color": "#6B7280",
+        "item_height": "40px",
+        "border_right": "1px solid #E5E7EB",
+        "item_padding": "10px 12px",
+        "item_font_size": "14px",
+        "item_icon_size": "20px",
+        "background_dark": "#1F2937",
+        "section_spacing": "24px",
+        "item_color_hover": "#374151",
+        "item_font_weight": 500,
+        "border_right_dark": "1px solid #374151",
+        "item_color_active": "#3B82F6",
+        "item_icon_spacing": "10px",
+        "item_border_radius": "6px",
+        "item_background_hover": "#F3F4F6",
+        "item_background_active": "#EFF6FF",
+        "item_font_weight_active": 600
+      },
+      "breadcrumb": {
+        "color": "#6B7280",
+        "usage": "Breadcrumb navigation",
+        "font_size": "13px",
+        "separator": "/",
+        "color_hover": "#1F2937",
+        "font_weight": 400,
+        "color_active": "#374151",
+        "item_spacing": "8px",
+        "separator_color": "#D1D5DB"
+      }
+    },
+    "other": {
+      "cards": {
+        "flat": {
+          "color": "#374151",
+          "usage": "Nested content, secondary containers, list backgrounds",
+          "border": "1px solid #E5E7EB",
+          "padding": "12px",
+          "background": "#F9FAFB",
+          "box_shadow": "none",
+          "color_dark": "#E5E7EB",
+          "border_dark": "1px solid #374151",
+          "border_radius": "6px",
+          "background_dark": "#111827"
+        },
+        "elevated": {
+          "color": "#374151",
+          "usage": "Interactive cards, clickable items, important content",
+          "border": "none",
+          "padding": "16px",
+          "background": "#FFFFFF",
+          "box_shadow": "0 4px 6px rgba(0, 0, 0, 0.07)",
+          "color_dark": "#F9FAFB",
+          "transition": "all 200ms ease-out",
+          "border_radius": "8px",
+          "background_dark": "#1F2937",
+          "hover_transform": "translateY(-2px)",
+          "box_shadow_hover": "0 8px 12px rgba(0, 0, 0, 0.1)"
+        },
+        "standard": {
+          "color": "#374151",
+          "usage": "Standard content containers, panels",
+          "border": "1px solid #E5E7EB",
+          "padding": "16px",
+          "background": "#FFFFFF",
+          "box_shadow": "0 1px 3px rgba(0, 0, 0, 0.05)",
+          "color_dark": "#F9FAFB",
+          "transition": "all 200ms ease-out",
+          "border_dark": "1px solid #374151",
+          "border_radius": "8px",
+          "background_dark": "#1F2937",
+          "padding_compact": "12px",
+          "box_shadow_hover": "0 2px 4px rgba(0, 0, 0, 0.08)"
+        }
+      },
+      "badges": {
+        "info": {
+          "color": "#2563EB",
+          "usage": "Info status, neutral notifications",
+          "border": "none",
+          "height": "24px",
+          "padding": "4px 10px",
+          "font_size": "13px",
+          "background": "#DBEAFE",
+          "color_dark": "#BFDBFE",
+          "font_weight": 500,
+          "border_radius": "16px",
+          "background_dark": "#1E40AF"
+        },
+        "error": {
+          "color": "#DC2626",
+          "usage": "Error status, failed states",
+          "border": "none",
+          "height": "24px",
+          "padding": "4px 10px",
+          "font_size": "13px",
+          "background": "#FEE2E2",
+          "color_dark": "#FCA5A5",
+          "font_weight": 500,
+          "border_radius": "16px",
+          "background_dark": "#991B1B"
+        },
+        "neutral": {
+          "color": "#374151",
+          "usage": "Neutral status, default badges",
+          "border": "1px solid #E5E7EB",
+          "height": "24px",
+          "padding": "4px 10px",
+          "font_size": "13px",
+          "background": "#F3F4F6",
+          "color_dark": "#E5E7EB",
+          "border_dark": "1px solid #4B5563",
+          "font_weight": 500,
+          "border_radius": "16px",
+          "background_dark": "#374151"
+        },
+        "success": {
+          "color": "#16A34A",
+          "usage": "Success status, completed states",
+          "border": "none",
+          "height": "24px",
+          "padding": "4px 10px",
+          "font_size": "13px",
+          "background": "#DCFCE7",
+          "color_dark": "#D1FAE5",
+          "font_weight": 500,
+          "border_radius": "16px",
+          "background_dark": "#065F46"
+        },
+        "warning": {
+          "color": "#D97706",
+          "usage": "Warning status, caution states",
+          "border": "none",
+          "height": "24px",
+          "padding": "4px 10px",
+          "font_size": "13px",
+          "background": "#FEF3C7",
+          "color_dark": "#FCD34D",
+          "font_weight": 500,
+          "border_radius": "16px",
+          "background_dark": "#92400E"
+        }
+      },
+      "inputs": {
+        "text": {
+          "color": "#374151",
+          "usage": "Single-line text input fields",
+          "border": "1px solid #D1D5DB",
+          "height": "40px",
+          "padding": "10px 12px",
+          "font_size": "14px",
+          "background": "#FFFFFF",
+          "error_ring": "0 0 0 3px rgba(239, 68, 68, 0.1)",
+          "focus_ring": "0 0 0 3px rgba(59, 130, 246, 0.1)",
+          "transition": "all 150ms ease-out",
+          "font_weight": 400,
+          "border_error": "2px solid #EF4444",
+          "border_focus": "2px solid #3B82F6",
+          "border_radius": "6px",
+          "color_disabled": "#9CA3AF",
+          "height_compact": "36px",
+          "border_disabled": "1px solid #E5E7EB",
+          "disabled_cursor": "not-allowed",
+          "padding_compact": "8px 12px",
+          "disabled_opacity": 1,
+          "placeholder_color": "#9CA3AF",
+          "background_disabled": "#F9FAFB"
+        },
+        "search": {
+          "color": "#374151",
+          "usage": "Search input fields",
+          "border": "1px solid #E5E7EB",
+          "height": "40px",
+          "padding": "10px 12px 10px 40px",
+          "font_size": "14px",
+          "icon_left": "12px",
+          "icon_size": "20px",
+          "background": "#FFFFFF",
+          "focus_ring": "0 0 0 3px rgba(59, 130, 246, 0.1)",
+          "icon_color": "#9CA3AF",
+          "transition": "all 150ms ease-out",
+          "border_focus": "1px solid #3B82F6",
+          "border_radius": "8px",
+          "background_focus": "#FFFFFF",
+          "placeholder_color": "#9CA3AF"
+        },
+        "select": {
+          "color": "#374151",
+          "usage": "Dropdown select inputs",
+          "border": "1px solid #D1D5DB",
+          "height": "40px",
+          "padding": "10px 36px 10px 12px",
+          "font_size": "14px",
+          "background": "#FFFFFF",
+          "focus_ring": "0 0 0 3px rgba(59, 130, 246, 0.1)",
+          "icon_color": "#6B7280",
+          "transition": "all 150ms ease-out",
+          "font_weight": 400,
+          "border_focus": "2px solid #3B82F6",
+          "border_radius": "6px",
+          "color_disabled": "#9CA3AF",
+          "height_compact": "36px",
+          "border_disabled": "1px solid #E5E7EB",
+          "disabled_cursor": "not-allowed",
+          "padding_compact": "8px 36px 8px 12px",
+          "background_disabled": "#F9FAFB"
+        },
+        "textarea": {
+          "color": "#374151",
+          "usage": "Multi-line text input",
+          "border": "1px solid #D1D5DB",
+          "resize": "vertical",
+          "padding": "10px 12px",
+          "font_size": "14px",
+          "background": "#FFFFFF",
+          "error_ring": "0 0 0 3px rgba(239, 68, 68, 0.1)",
+          "focus_ring": "0 0 0 3px rgba(59, 130, 246, 0.1)",
+          "min_height": "80px",
+          "transition": "all 150ms ease-out",
+          "font_weight": 400,
+          "line_height": 1.5,
+          "border_error": "2px solid #EF4444",
+          "border_focus": "2px solid #3B82F6",
+          "border_radius": "6px",
+          "color_disabled": "#9CA3AF",
+          "border_disabled": "1px solid #E5E7EB",
+          "placeholder_color": "#9CA3AF",
+          "background_disabled": "#F9FAFB"
+        }
+      },
+      "avatars": {
+        "large": {
+          "color": "#6B7280",
+          "usage": "Large user avatars",
+          "width": "48px",
+          "border": "none",
+          "height": "48px",
+          "font_size": "20px",
+          "background": "#E5E7EB",
+          "font_weight": 600,
+          "border_radius": "9999px"
+        },
+        "small": {
+          "color": "#6B7280",
+          "usage": "Small user avatars",
+          "width": "24px",
+          "border": "none",
+          "height": "24px",
+          "font_size": "11px",
+          "background": "#E5E7EB",
+          "font_weight": 600,
+          "border_radius": "9999px"
+        },
+        "default": {
+          "color": "#6B7280",
+          "usage": "User avatars",
+          "width": "32px",
+          "border": "none",
+          "height": "32px",
+          "font_size": "14px",
+          "background": "#E5E7EB",
+          "font_weight": 600,
+          "border_radius": "9999px"
+        }
+      },
+      "buttons": {
+        "ghost": {
+          "color": "#6B7280",
+          "usage": "Tertiary actions, less prominent options",
+          "border": "none",
+          "height": "40px",
+          "padding": "10px 12px",
+          "font_size": "14px",
+          "background": "transparent",
+          "transition": "all 150ms ease-out",
+          "color_hover": "#374151",
+          "font_weight": 500,
+          "icon_spacing": "8px",
+          "border_radius": "6px",
+          "color_disabled": "#D1D5DB",
+          "height_compact": "36px",
+          "letter_spacing": "0em",
+          "disabled_cursor": "not-allowed",
+          "padding_compact": "8px 10px",
+          "background_hover": "#F3F4F6",
+          "disabled_opacity": 0.5,
+          "background_active": "#E5E7EB",
+          "background_disabled": "transparent"
+        },
+        "primary": {
+          "color": "#FFFFFF",
+          "usage": "Primary actions, CTAs, submit buttons (1 per section)",
+          "border": "none",
+          "height": "40px",
+          "padding": "10px 16px",
+          "font_size": "14px",
+          "min_width": "100px",
+          "background": "#3B82F6",
+          "box_shadow": "0 1px 2px rgba(0, 0, 0, 0.05)",
+          "transition": "all 150ms ease-out",
+          "font_weight": 500,
+          "icon_spacing": "8px",
+          "border_radius": "6px",
+          "color_disabled": "#FFFFFF",
+          "height_compact": "36px",
+          "letter_spacing": "0em",
+          "disabled_cursor": "not-allowed",
+          "padding_compact": "8px 14px",
+          "background_hover": "#2563EB",
+          "box_shadow_hover": "0 2px 4px rgba(0, 0, 0, 0.1)",
+          "disabled_opacity": 0.6,
+          "background_active": "#1E40AF",
+          "background_disabled": "#93C5FD"
+        },
+        "icon_only": {
+          "color": "#6B7280",
+          "usage": "Icon-only actions, toolbar buttons, row actions",
+          "width": "32px",
+          "border": "none",
+          "height": "32px",
+          "padding": "6px",
+          "background": "transparent",
+          "transition": "all 150ms ease-out",
+          "color_hover": "#374151",
+          "border_radius": "6px",
+          "background_hover": "#F3F4F6",
+          "background_active": "#E5E7EB"
+        },
+        "secondary": {
+          "color": "#374151",
+          "usage": "Secondary actions, cancel buttons",
+          "border": "1px solid #E5E7EB",
+          "height": "40px",
+          "padding": "10px 16px",
+          "font_size": "14px",
+          "min_width": "100px",
+          "background": "#F3F4F6",
+          "transition": "all 150ms ease-out",
+          "color_hover": "#1F2937",
+          "font_weight": 500,
+          "border_hover": "1px solid #D1D5DB",
+          "icon_spacing": "8px",
+          "border_radius": "6px",
+          "color_disabled": "#9CA3AF",
+          "height_compact": "36px",
+          "letter_spacing": "0em",
+          "border_disabled": "1px solid #E5E7EB",
+          "disabled_cursor": "not-allowed",
+          "padding_compact": "8px 14px",
+          "background_hover": "#E5E7EB",
+          "disabled_opacity": 0.6,
+          "background_active": "#D1D5DB",
+          "background_disabled": "#F9FAFB"
+        }
+      },
+      "dividers": {
+        "vertical": {
+          "usage": "Vertical dividers",
+          "width": "1px",
+          "margin": "0px",
+          "background": "#E5E7EB",
+          "background_dark": "#374151"
+        },
+        "horizontal": {
+          "usage": "Horizontal dividers, list separators",
+          "height": "1px",
+          "margin": "0px",
+          "background": "#E5E7EB",
+          "background_dark": "#374151"
+        }
+      },
+      "checkboxes": {
+        "default": {
+          "usage": "Checkbox inputs",
+          "width": "16px",
+          "border": "1.5px solid #D1D5DB",
+          "height": "16px",
+          "background": "#FFFFFF",
+          "focus_ring": "0 0 0 3px rgba(59, 130, 246, 0.1)",
+          "transition": "all 150ms ease-out",
+          "border_radius": "3px",
+          "border_checked": "1.5px solid #3B82F6",
+          "border_disabled": "1.5px solid #E5E7EB",
+          "checkmark_color": "#FFFFFF",
+          "disabled_cursor": "not-allowed",
+          "background_checked": "#3B82F6",
+          "background_disabled": "#F9FAFB"
+        }
+      },
+      "list_items": {
+        "default": {
+          "color": "#374151",
+          "usage": "List item rows, table rows",
+          "states": {
+            "hover": {
+              "background": "#F9FAFB",
+              "background_dark": "#374151"
+            },
+            "active": {
+              "background": "#EFF6FF",
+              "background_dark": "#1E40AF"
+            }
+          },
+          "padding": "16px 20px",
+          "background": "#FFFFFF",
+          "color_dark": "#E5E7EB",
+          "min_height": "56px",
+          "transition": "all 150ms ease-out",
+          "border_bottom": "1px solid #F3F4F6",
+          "border_radius": "0px",
+          "background_dark": "#1F2937",
+          "border_bottom_dark": "1px solid #374151"
+        }
+      }
+    }
+  },
+  "interactive_components": {
+    "tabs": {
+      "count": 4,
+      "items": [
+        {
+          "id": "tab-overview",
+          "label": "\u041e\u0431\u0437\u043e\u0440",
+          "disabled": false
+        },
+        {
+          "id": "tab-documents",
+          "label": "\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b",
+          "disabled": false
+        },
+        {
+          "id": "tab-history",
+          "label": "\u0418\u0441\u0442\u043e\u0440\u0438\u044f",
+          "disabled": false
+        },
+        {
+          "id": "tab-settings",
+          "label": "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438",
+          "disabled": false
+        }
+      ],
+      "usage": "Navigation between content sections, document categories, settings panels",
+      "styles": {
+        "tab": {
+          "color": "#6B7280",
+          "cursor": "pointer",
+          "padding": "12px 20px",
+          "font_size": "14px",
+          "background": "transparent",
+          "color_dark": "#9CA3AF",
+          "transition": "all 150ms ease-out",
+          "font_weight": 500,
+          "border_bottom": "2px solid transparent"
+        },
+        "container": {
+          "gap": "0px",
+          "display": "flex",
+          "padding": "0px",
+          "background": "#FFFFFF",
+          "border_bottom": "1px solid #E5E7EB",
+          "background_dark": "#1F2937",
+          "border_bottom_dark": "1px solid #374151"
+        },
+        "tab_hover": {
+          "color": "#374151",
+          "background": "#F9FAFB",
+          "color_dark": "#E5E7EB",
+          "background_dark": "#374151"
+        },
+        "tab_active": {
+          "color": "#3B82F6",
+          "color_dark": "#60A5FA",
+          "font_weight": 600,
+          "border_bottom": "2px solid #3B82F6",
+          "border_bottom_dark": "2px solid #60A5FA"
+        },
+        "content_area": {
+          "padding": "24px",
+          "background": "#FFFFFF",
+          "background_dark": "#1F2937"
+        },
+        "tab_disabled": {
+          "color": "#D1D5DB",
+          "cursor": "not-allowed",
+          "opacity": 0.5,
+          "color_dark": "#4B5563"
+        }
+      },
+      "animation": {
+        "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "duration_ms": 200,
+        "indicator_transition": "all 200ms cubic-bezier(0.4, 0, 0.2, 1)"
+      },
+      "accessibility": {
+        "role": "tablist",
+        "focus_visible": "0 0 0 3px rgba(59, 130, 246, 0.1)",
+        "keyboard_support": [
+          "ArrowLeft",
+          "ArrowRight",
+          "Home",
+          "End",
+          "Enter",
+          "Space"
+        ]
+      }
+    },
+    "tooltips": {
+      "usage": "Contextual help, field descriptions, icon explanations, additional information",
+      "styles": {
+        "arrow": {
+          "width": "8px",
+          "height": "8px",
+          "transform": "rotate(45deg)",
+          "background": "#1F2937",
+          "background_dark": "#374151"
+        },
+        "tooltip": {
+          "color": "#FFFFFF",
+          "padding": "8px 12px",
+          "z_index": 1000,
+          "font_size": "13px",
+          "max_width": "240px",
+          "background": "#1F2937",
+          "box_shadow": "0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)",
+          "color_dark": "#F9FAFB",
+          "font_weight": 400,
+          "line_height": 1.4,
+          "border_radius": "6px",
+          "background_dark": "#374151"
+        },
+        "trigger": {
+          "cursor": "help",
+          "display": "inline-flex",
+          "align_items": "center"
+        }
+      },
+      "position": "top",
+      "animation": {
+        "easing": "cubic-bezier(0, 0, 0.2, 1)",
+        "delay_ms": 300,
+        "entrance": "fade",
+        "duration_ms": 150
+      },
+      "positioning": {
+        "offset": "8px",
+        "arrow_offset": "12px"
+      },
+      "trigger_type": "hover",
+      "accessibility": {
+        "role": "tooltip",
+        "aria_describedby": true,
+        "keyboard_support": [
+          "Escape"
+        ]
+      },
+      "position_fallback": [
+        "bottom",
+        "left",
+        "right"
+      ]
+    },
+    "modals": {
+      "sizes": {
+        "large": {
+          "usage": "Complex forms, detailed content",
+          "width": "800px",
+          "max_width": "95vw"
+        },
+        "small": {
+          "usage": "Confirmations, simple forms",
+          "width": "400px",
+          "max_width": "90vw"
+        },
+        "medium": {
+          "usage": "Standard dialogs, medium forms",
+          "width": "600px",
+          "max_width": "90vw"
+        },
+        "fullscreen": {
+          "usage": "Document preview, full content view",
+          "width": "100vw",
+          "height": "100vh"
+        }
+      },
+      "usage": "Confirmations, forms, document details, settings dialogs, alerts",
+      "styles": {
+        "modal": {
+          "color": "#374151",
+          "display": "flex",
+          "overflow": "hidden",
+          "background": "#FFFFFF",
+          "box_shadow": "0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04)",
+          "color_dark": "#E5E7EB",
+          "max_height": "90vh",
+          "border_radius": "12px",
+          "flex_direction": "column",
+          "background_dark": "#1F2937"
+        },
+        "title": {
+          "color": "#1F2937",
+          "font_size": "18px",
+          "color_dark": "#F9FAFB",
+          "font_weight": 600,
+          "line_height": 1.4
+        },
+        "footer": {
+          "gap": "12px",
+          "display": "flex",
+          "padding": "16px 24px",
+          "border_top": "1px solid #E5E7EB",
+          "align_items": "center",
+          "border_top_dark": "1px solid #374151",
+          "justify_content": "flex-end"
+        },
+        "header": {
+          "display": "flex",
+          "padding": "20px 24px",
+          "align_items": "center",
+          "border_bottom": "1px solid #E5E7EB",
+          "justify_content": "space-between",
+          "border_bottom_dark": "1px solid #374151"
+        },
+        "content": {
+          "flex": "1",
+          "padding": "24px",
+          "overflow_y": "auto"
+        },
+        "overlay": {
+          "display": "flex",
+          "z_index": 999,
+          "background": "rgba(17, 24, 39, 0.6)",
+          "align_items": "center",
+          "backdrop_filter": "blur(4px)",
+          "justify_content": "center"
+        },
+        "close_button": {
+          "color": "#6B7280",
+          "width": "32px",
+          "border": "none",
+          "cursor": "pointer",
+          "height": "32px",
+          "padding": "6px",
+          "background": "transparent",
+          "color_hover": "#374151",
+          "border_radius": "6px",
+          "background_hover": "#F3F4F6",
+          "background_hover_dark": "#374151"
+        }
+      },
+      "animation": {
+        "exit": "fade-scale",
+        "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "entrance": "fade-scale",
+        "scale_to": 1,
+        "scale_from": 0.95,
+        "duration_ms": 250,
+        "overlay_duration_ms": 200
+      },
+      "structure": {
+        "has_footer": true,
+        "has_header": true,
+        "close_button": true,
+        "escape_dismissible": true,
+        "overlay_dismissible": true
+      },
+      "accessibility": {
+        "role": "dialog",
+        "aria_modal": true,
+        "focus_trap": true,
+        "return_focus": true,
+        "initial_focus": "first_focusable",
+        "keyboard_support": [
+          "Escape",
+          "Tab"
+        ]
+      }
+    },
+    "dropdowns": {
+      "items": [
+        {
+          "id": "option-edit",
+          "icon": "edit",
+          "label": "\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c",
+          "disabled": false
+        },
+        {
+          "id": "option-duplicate",
+          "icon": "copy",
+          "label": "\u0414\u0443\u0431\u043b\u0438\u0440\u043e\u0432\u0430\u0442\u044c",
+          "disabled": false
+        },
+        {
+          "id": "option-separator",
+          "type": "separator"
+        },
+        {
+          "id": "option-delete",
+          "icon": "trash",
+          "label": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c",
+          "variant": "danger",
+          "disabled": false
+        }
+      ],
+      "usage": "Context menus, action menus, select dropdowns, more options",
+      "width": {
+        "behavior": "auto",
+        "max_width": "320px",
+        "min_width": "180px"
+      },
+      "styles": {
+        "icon": {
+          "color": "currentColor",
+          "width": "16px",
+          "height": "16px"
+        },
+        "item": {
+          "gap": "10px",
+          "color": "#374151",
+          "cursor": "pointer",
+          "display": "flex",
+          "padding": "10px 12px",
+          "font_size": "14px",
+          "background": "transparent",
+          "color_dark": "#E5E7EB",
+          "transition": "all 100ms ease-out",
+          "align_items": "center",
+          "font_weight": 400,
+          "border_radius": "4px"
+        },
+        "menu": {
+          "border": "1px solid #E5E7EB",
+          "padding": "4px",
+          "z_index": 1000,
+          "background": "#FFFFFF",
+          "box_shadow": "0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05)",
+          "border_dark": "1px solid #374151",
+          "border_radius": "8px",
+          "background_dark": "#1F2937"
+        },
+        "trigger": {
+          "color": "#6B7280",
+          "border": "1px solid #E5E7EB",
+          "cursor": "pointer",
+          "padding": "8px 12px",
+          "font_size": "14px",
+          "background": "transparent",
+          "transition": "all 150ms ease-out",
+          "color_hover": "#374151",
+          "border_radius": "6px",
+          "background_hover": "#F3F4F6",
+          "background_active": "#E5E7EB"
+        },
+        "separator": {
+          "height": "1px",
+          "margin": "4px 0",
+          "background": "#E5E7EB",
+          "background_dark": "#374151"
+        },
+        "item_hover": {
+          "color": "#1F2937",
+          "background": "#F3F4F6",
+          "color_dark": "#F9FAFB",
+          "background_dark": "#374151"
+        },
+        "item_active": {
+          "background": "#E5E7EB",
+          "background_dark": "#4B5563"
+        },
+        "item_danger": {
+          "color": "#EF4444",
+          "color_hover": "#DC2626"
+        },
+        "item_disabled": {
+          "color": "#D1D5DB",
+          "cursor": "not-allowed",
+          "opacity": 0.5,
+          "color_dark": "#6B7280"
+        }
+      },
+      "animation": {
+        "exit": "fade",
+        "easing": "cubic-bezier(0, 0, 0.2, 1)",
+        "entrance": "fade-slide",
+        "duration_ms": 150,
+        "slide_distance": "8px"
+      },
+      "positioning": {
+        "flip": true,
+        "shift": true,
+        "offset": "4px",
+        "fallback": [
+          "bottom-end",
+          "top-start",
+          "top-end"
+        ],
+        "position": "bottom-start"
+      },
+      "accessibility": {
+        "role": "menu",
+        "aria_expanded": true,
+        "focus_visible": "outline: 2px solid #3B82F6; outline-offset: -2px",
+        "keyboard_support": [
+          "ArrowUp",
+          "ArrowDown",
+          "Enter",
+          "Space",
+          "Escape",
+          "Home",
+          "End"
+        ]
+      }
+    },
+    "other": {}
+  },
+  "layout": {
+    "grid": {
+      "gap": "24px",
+      "columns": 12,
+      "gap_mobile": "16px"
+    },
+    "header": {
+      "height": "64px",
+      "height_mobile": "56px"
+    },
+    "sidebar": {
+      "width": "240px",
+      "width_collapsed": "64px"
+    },
+    "containers": {
+      "padding": "24px",
+      "max_width": "1440px",
+      "padding_mobile": "16px"
+    },
+    "breakpoints": {
+      "lg": "1024px",
+      "md": "768px",
+      "sm": "640px",
+      "xl": "1280px",
+      "2xl": "1536px"
+    }
+  },
+  "effects": {
+    "borders": {
+      "thin": "1px",
+      "thick": "3px",
+      "medium": "2px"
+    },
+    "shadows": [
+      {
+        "name": "none",
+        "value": "none"
+      },
+      {
+        "name": "xs",
+        "value": "0 1px 2px rgba(0, 0, 0, 0.05)"
+      },
+      {
+        "name": "sm",
+        "value": "0 1px 3px rgba(0, 0, 0, 0.1)"
+      },
+      {
+        "name": "md",
+        "value": "0 4px 6px rgba(0, 0, 0, 0.07)"
+      },
+      {
+        "name": "lg",
+        "value": "0 10px 15px rgba(0, 0, 0, 0.1)"
+      },
+      {
+        "name": "xl",
+        "value": "0 20px 25px rgba(0, 0, 0, 0.15)"
+      },
+      {
+        "name": "2xl",
+        "value": "0 25px 50px rgba(0, 0, 0, 0.25)"
+      }
+    ],
+    "border_radius": {
+      "lg": "8px",
+      "md": "6px",
+      "sm": "3px",
+      "xl": "12px",
+      "2xl": "16px",
+      "3xl": "24px",
+      "base": "4px",
+      "full": "9999px",
+      "none": "0px"
+    }
+  },
+  "motion": {
+    "duration": {
+      "fast": "150ms",
+      "slow": "300ms",
+      "normal": "200ms",
+      "slower": "400ms",
+      "instant": "100ms"
+    },
+    "easing": {
+      "spring": "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+      "ease_in": "cubic-bezier(0.4, 0, 1, 1)",
+      "ease_out": "cubic-bezier(0, 0, 0.2, 1)",
+      "ease_in_out": "cubic-bezier(0.4, 0, 0.2, 1)"
+    },
+    "transitions": {}
+  },
+  "dark_mode": {
+    "colors": {
+      "text": "#F9FAFB",
+      "border": "#374151",
+      "primary": "#60A5FA",
+      "surface": "#1F2937",
+      "elevated": "#374151",
+      "background": "#0F172A",
+      "text_tertiary": "#9CA3AF",
+      "text_secondary": "#E5E7EB"
+    },
+    "enabled": true,
+    "strategy": "class-based",
+    "class_name": "dark",
+    "adjustments": "Increased contrast for WCAG AA compliance in dark mode. Lightened primary blue for better visibility on dark backgrounds."
+  }
+}

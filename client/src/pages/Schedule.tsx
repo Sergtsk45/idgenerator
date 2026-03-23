@@ -7,11 +7,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { BottomNav } from "@/components/BottomNav";
-import { Header } from "@/components/Header";
+import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { TariffGuard } from "@/components/TariffGuard";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { OdooCard } from "@/components/ui/odoo-card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -45,7 +45,9 @@ import { useProjectMaterials } from "@/hooks/use-materials";
 import { ExecutiveSchemesEditor, type ExecutiveSchemeItem } from "@/components/schedule/ExecutiveSchemesEditor";
 import { SplitTaskDialog } from "@/components/schedule/SplitTaskDialog";
 import type { ScheduleTask, Work } from "@shared/schema";
-import { Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, RotateCcw, AlertTriangle, ChevronsUpDown, Check, MoreVertical, Package, Scissors } from "lucide-react";
+import { Loader2, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, RotateCcw, AlertTriangle, ChevronsUpDown, Check, MoreVertical, Package, Scissors, ZoomIn, ZoomOut, Search, BarChart2 } from "lucide-react";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PillTabs } from "@/components/ui/pill-tabs";
 import { cn } from "@/lib/utils";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
@@ -171,14 +173,6 @@ export default function Schedule() {
   const [pendingSourceType, setPendingSourceType] = useState<'works' | 'estimate' | null>(null);
   const [pendingEstimateId, setPendingEstimateId] = useState<number | null>(null);
 
-  const [isPortrait, setIsPortrait] = useState(false);
-  useEffect(() => {
-    const update = () => setIsPortrait(window.innerHeight > window.innerWidth);
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
   const [editOpen, setEditOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<ScheduleTask | null>(null);
   const [editStartDate, setEditStartDate] = useState<string>("");
@@ -206,6 +200,13 @@ export default function Schedule() {
   // Split task dialog state
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [taskToSplit, setTaskToSplit] = useState<ScheduleTask | null>(null);
+
+  // Inline act template picker (tablet modal stacking, Task 4.4)
+  const [actTemplatePickerOpen, setActTemplatePickerOpen] = useState(false);
+  const [actTemplateSearch, setActTemplateSearch] = useState("");
+
+  // Task editor active tab (Task 4.3)
+  const [editTab, setEditTab] = useState<"basic" | "materials" | "docs">("basic");
 
   const { data: estimates = [] } = useEstimates();
   const activeEstimateId = scheduleEstimateId;
@@ -436,8 +437,14 @@ export default function Schedule() {
     return min ? String(min) : format(new Date(), "yyyy-MM-dd");
   }, [schedule?.calendarStart, tasks]);
 
-  const dayWidth = 24;
-  const visibleDays = 60;
+  const ZOOM_CONFIGS = [
+    { dayWidth: 18, visibleDays: 84, label: language === "ru" ? "3М" : "3M" },
+    { dayWidth: 24, visibleDays: 60, label: language === "ru" ? "2М" : "2M" },
+    { dayWidth: 32, visibleDays: 42, label: language === "ru" ? "6Н" : "6W" },
+    { dayWidth: 48, visibleDays: 28, label: language === "ru" ? "4Н" : "4W" },
+  ] as const;
+  const [zoomLevel, setZoomLevel] = useState<0 | 1 | 2 | 3>(1);
+  const { dayWidth, visibleDays } = ZOOM_CONFIGS[zoomLevel];
   const timelineWidth = visibleDays * dayWidth;
   const rowHeight = 88;
 
@@ -557,6 +564,7 @@ export default function Schedule() {
     setEditIndependentMaterials(
       saved?.independentMaterials != null ? Boolean(saved.independentMaterials) : Boolean(task.independentMaterials)
     );
+    setEditTab("basic");
     setEditOpen(true);
   };
 
@@ -932,25 +940,29 @@ export default function Schedule() {
   };
 
   const [viewOffsetDays, setViewOffsetDays] = useState(0);
+  // 15.2 Period switcher: шаг навигации
+  const [viewPeriod, setViewPeriod] = useState<"week" | "month">("month");
+  const navStep = viewPeriod === "week" ? 7 : 30;
+
   const viewCalendarStart = useMemo(
     () => format(addDays(parseISO(calendarStart), viewOffsetDays), "yyyy-MM-dd"),
     [calendarStart, viewOffsetDays],
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-background bg-grain">
-      <Header
-        title={t.title}
-        subtitle={
-          currentObject?.title
-            ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.title}`
-            : undefined
-        }
-        showObjectSelector
-      />
+    <ResponsiveShell
+      className="bg-background bg-grain"
+      title={t.title}
+      subtitle={
+        currentObject?.title
+          ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.title}`
+          : undefined
+      }
+      showObjectSelector
+    >
 
-      <div className="flex-1 px-3 py-4 pb-24 w-full max-w-none">
-        <div className="max-w-5xl mx-auto w-full space-y-3">
+      <div className="flex-1 px-3 py-4 pb-24 lg:px-6 w-full max-w-none">
+        <div className="max-w-5xl lg:max-w-none mx-auto w-full space-y-3">
           {/* Управляющий блок */}
           <div className="mx-0 bg-card border border-border/60 rounded-2xl p-4 space-y-3">
             <div>
@@ -1009,16 +1021,45 @@ export default function Schedule() {
             </div>
           </div>
 
+          {/* 15.1 Info-card «График сформирован» */}
+          {!isLoadingSchedule && schedule && tasks.length > 0 && (
+            <OdooCard>
+              <div className="px-4 py-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-[--o-radius-md] bg-[--p50] flex items-center justify-center text-[--p500] shrink-0">
+                    <BarChart2 className="h-4 w-4" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold text-[--g900]">
+                      {language === "ru" ? "График сформирован" : "Schedule ready"}
+                    </p>
+                    <p className="text-[11px] text-[--g500]">
+                      {tasks.length} {language === "ru" ? "задач" : "tasks"} ·{" "}
+                      {sourceType === "estimate"
+                        ? (language === "ru" ? "источник: смета" : "source: estimate")
+                        : (language === "ru" ? "источник: ВОР" : "source: BoQ")}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-[--g500] tabular-nums shrink-0">
+                  {calendarStart && format(parseISO(calendarStart), "d MMM", { locale: language === "ru" ? ru : enUS })}
+                  {" — "}
+                  {(schedule as any)?.calendarEnd && format(parseISO(String((schedule as any).calendarEnd)), "d MMM yyyy", { locale: language === "ru" ? ru : enUS })}
+                </p>
+              </div>
+            </OdooCard>
+          )}
+
           {defaultError || scheduleError ? (
-            <div className="glass-card rounded-2xl p-4 text-sm text-destructive">
+            <OdooCard className="text-sm text-destructive">
               {t.errorLoad}
-            </div>
+            </OdooCard>
           ) : isLoadingDefault || isLoadingSchedule ? (
             <div className="flex justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : tasks.length === 0 ? (
-            <div className="glass-card rounded-2xl p-4">
+            <OdooCard>
               <div className="text-base font-semibold mb-1">{t.emptyTitle}</div>
               <div className="text-sm text-muted-foreground mb-4">
                 {sourceType === "estimate"
@@ -1042,7 +1083,7 @@ export default function Schedule() {
                 )}
                 {t.bootstrap}
               </Button>
-            </div>
+            </OdooCard>
           ) : (
             <>
               {/* Навигация по месяцу */}
@@ -1052,7 +1093,7 @@ export default function Schedule() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => setViewOffsetDays((d) => d - 30)}
+                    onClick={() => setViewOffsetDays((d) => d - navStep)}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -1072,40 +1113,103 @@ export default function Schedule() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => setViewOffsetDays((d) => d + 30)}
+                    onClick={() => setViewOffsetDays((d) => d + navStep)}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="flex items-center gap-1 bg-muted/40 rounded-full p-0.5">
-                  {(["all", "with-act", "without-act"] as TaskFilter[]).map((f) => {
-                    const labels: Record<TaskFilter, { ru: string; en: string }> = {
-                      all: { ru: "Все", en: "All" },
-                      "with-act": { ru: "С актом", en: "W/ act" },
-                      "without-act": { ru: "Без акта", en: "No act" },
-                    };
-                    return (
+                <div className="flex items-center gap-2">
+                  {/* Zoom controls (Task 4.2) */}
+                  <div className="flex items-center gap-0.5 bg-muted/40 rounded-full p-0.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 min-h-0 rounded-full"
+                      disabled={zoomLevel === 0}
+                      onClick={() => setZoomLevel((z) => Math.max(0, z - 1) as 0 | 1 | 2 | 3)}
+                      aria-label={language === "ru" ? "Уменьшить масштаб" : "Zoom out"}
+                    >
+                      <ZoomOut className="h-3 w-3" />
+                    </Button>
+                    <span className="text-[11px] font-medium px-1 min-w-[28px] text-center tabular-nums">
+                      {ZOOM_CONFIGS[zoomLevel].label}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 min-h-0 rounded-full"
+                      disabled={zoomLevel === 3}
+                      onClick={() => setZoomLevel((z) => Math.min(3, z + 1) as 0 | 1 | 2 | 3)}
+                      aria-label={language === "ru" ? "Увеличить масштаб" : "Zoom in"}
+                    >
+                      <ZoomIn className="h-3 w-3" />
+                    </Button>
+                  </div>
+
+                  {/* 15.2 Period switcher */}
+                  <div className="flex items-center gap-0.5 bg-muted/40 rounded-full p-0.5">
+                    {(["week", "month"] as const).map((p) => (
                       <Button
-                        key={f}
+                        key={p}
                         type="button"
-                        variant={taskFilter === f ? "default" : "ghost"}
-                        onClick={() => setTaskFilter(f)}
-                        className={cn(
-                          "h-6 min-h-0 px-2.5 py-0 rounded-full text-[11px] font-medium transition-all",
-                          taskFilter === f
-                            ? "shadow-sm border-0"
-                            : "bg-transparent text-muted-foreground hover:bg-background/60 hover:text-foreground"
-                        )}
+                        variant={viewPeriod === p ? "default" : "ghost"}
+                        onClick={() => setViewPeriod(p)}
+                        className="h-6 min-h-0 px-2.5 py-0 rounded-full text-[11px] font-medium"
                       >
-                        {language === "ru" ? labels[f].ru : labels[f].en}
+                        {p === "week"
+                          ? (language === "ru" ? "Нед." : "Wk")
+                          : (language === "ru" ? "Мес." : "Mo")}
                       </Button>
-                    );
-                  })}
+                    ))}
+                  </div>
+
+                  {/* Task filter pills */}
+                  <div className="flex items-center gap-1 bg-muted/40 rounded-full p-0.5">
+                    {(["all", "with-act", "without-act"] as TaskFilter[]).map((f) => {
+                      const labels: Record<TaskFilter, { ru: string; en: string }> = {
+                        all: { ru: "Все", en: "All" },
+                        "with-act": { ru: "С актом", en: "W/ act" },
+                        "without-act": { ru: "Без акта", en: "No act" },
+                      };
+                      return (
+                        <Button
+                          key={f}
+                          type="button"
+                          variant={taskFilter === f ? "default" : "ghost"}
+                          onClick={() => setTaskFilter(f)}
+                          className={cn(
+                            "h-6 min-h-0 px-2.5 py-0 rounded-full text-[11px] font-medium transition-all",
+                            taskFilter === f
+                              ? "shadow-sm border-0"
+                              : "bg-transparent text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                          )}
+                        >
+                          {language === "ru" ? labels[f].ru : labels[f].en}
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
+              {/* Легенда цветов (task 15.5) */}
+              <div className="flex flex-wrap items-center gap-3 px-1 mb-2">
+                {[
+                  { color: "var(--success)", label: language === "ru" ? "Завершено" : "Done" },
+                  { color: "var(--p500)",    label: language === "ru" ? "В работе" : "In progress" },
+                  { color: "var(--danger)",  label: language === "ru" ? "Просрочено" : "Overdue" },
+                ].map(({ color, label }) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-[11px] text-[--g600]">{label}</span>
+                  </div>
+                ))}
+              </div>
+
               {/* Таблица Ганта */}
-              <Card className="glass-card overflow-hidden">
+              <OdooCard className="overflow-hidden" padding="none">
                 <CardContent className="p-0">
                 <div className="overflow-x-auto">
                 {/* Header */}
@@ -1384,25 +1488,34 @@ export default function Schedule() {
                         
                         const splitGroupId = task.splitGroupId;
                         const splitColor = getSplitTaskColor(splitGroupId);
-                        const barStyle: React.CSSProperties = { 
-                          left, 
-                          top, 
+
+                        // Odoo-style bar color by status (task 15.3)
+                        const taskEndDate = task.startDate
+                          ? addDays(parseISO(String(task.startDate)), Number(task.durationDays || 1) - 1)
+                          : null;
+                        const isOverdue = !task.actNumber && taskEndDate && taskEndDate < new Date();
+                        const ganttBarColor = task.actNumber != null
+                          ? "var(--success)"
+                          : isOverdue
+                            ? "var(--danger)"
+                            : "var(--p500)";
+
+                        const barStyle: React.CSSProperties = {
+                          left,
+                          top,
                           width,
-                          ...(splitColor ? { 
-                            backgroundColor: splitColor,
-                            borderLeft: '3px solid',
-                            borderColor: splitColor,
-                          } : {})
+                          ...(splitColor
+                            ? { backgroundColor: splitColor, borderLeft: '3px solid', borderColor: splitColor }
+                            : { backgroundColor: ganttBarColor }),
                         };
-                        
+
                         return (
                           <button
                             key={task.id}
                             type="button"
                             className={cn(
                               buttonVariants({ variant: "default", size: "sm" }),
-                              "absolute h-6 min-h-0 px-2 py-0 rounded-md border-0 text-[10px] leading-none truncate",
-                              splitColor ? "text-white" : "bg-primary/80 hover:bg-primary"
+                              "absolute h-6 min-h-0 px-2 py-0 rounded-md border-0 text-[10px] leading-none truncate text-white hover:opacity-90"
                             )}
                             style={barStyle}
                             onClick={() => openEdit(task)}
@@ -1423,13 +1536,11 @@ export default function Schedule() {
                 </div>
                 </div>
                 </CardContent>
-              </Card>
+              </OdooCard>
             </>
           )}
         </div>
       </div>
-
-      <BottomNav />
 
       <Dialog open={changeSourceDialogOpen} onOpenChange={setChangeSourceDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -1532,229 +1643,251 @@ export default function Schedule() {
         }}
       >
         <DialogContent
-          className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col touch-pan-y overscroll-contain overflow-x-hidden"
+          className="sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col touch-pan-y overscroll-contain overflow-x-hidden"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
             <DialogTitle>{t.edit}</DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y pr-1">
-            <div className="grid gap-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">{language === "ru" ? "Номер акта" : "Act number"}</label>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={editActNumber}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const digitsOnly = raw.replace(/[^\d]/g, "");
-                      setEditActNumber(digitsOnly);
-                    }}
-                    placeholder={language === "ru" ? "Напр.: 5" : "e.g. 5"}
-                  />
-                </div>
+          {/* Task editor tabs (Task 4.3) */}
+          <Tabs value={editTab} onValueChange={(v) => setEditTab(v as "basic" | "materials" | "docs")} className="flex-1 min-h-0 flex flex-col">
+            <PillTabs
+              className="shrink-0 px-1 mb-2"
+              activeTab={editTab}
+              onTabChange={(v) => setEditTab(v as "basic" | "materials" | "docs")}
+              tabs={[
+                { label: language === "ru" ? "Основное" : "Basic", value: "basic" },
+                {
+                  label: language === "ru" ? "Материалы" : "Materials",
+                  value: "materials",
+                  count: (taskMaterialsQuery.data?.length ?? 0) > 0 ? taskMaterialsQuery.data!.length : undefined,
+                },
+                { label: language === "ru" ? "Документация" : "Docs", value: "docs" },
+              ]}
+            />
 
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">{t.startDate}</label>
-                  <Input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">{t.durationDays}</label>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={editDurationDays}
-                    onChange={(e) => {
-                      const digitsOnly = e.target.value.replace(/[^\d]/g, "");
-                      setEditDurationDays(digitsOnly);
-                    }}
-                    placeholder="1"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">{language === "ru" ? "Тип акта (шаблон)" : "Act type (template)"}</label>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (selectedTask) {
-                      sessionStorage.setItem("scheduleEditTaskId", String(selectedTask.id));
-                      saveEditFormState();
-                    }
-                    navigate("/select-act-template", { 
-                      state: { currentTemplateId: editActTemplateId } 
-                    });
-                  }}
-                  className="w-full justify-between font-normal h-9 px-3 text-sm"
-                >
-                  <span className={cn("truncate", !selectedActTemplate && "text-muted-foreground")}>
-                    {selectedActTemplate
-                      ? `${String(selectedActTemplate.code ?? "")} — ${language === "ru" ? String(selectedActTemplate.title ?? "") : String((selectedActTemplate as any).titleEn ?? selectedActTemplate.title ?? "")}`
-                      : (language === "ru" ? "Выбрать тип акта" : "Select act type")}
-                  </span>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-                <div className="text-xs text-muted-foreground">
-                  {language === "ru"
-                    ? "При смене типа акта он будет применён ко всем задачам с тем же номером акта."
-                    : "When changing act type, it will be applied to all tasks with the same act number."}
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">{language === "ru" ? "Объём работ" : "Work quantity"}</label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    className="flex-1"
-                    value={editQuantity}
-                    onChange={(e) => setEditQuantity(e.target.value)}
-                    placeholder={language === "ru" ? "Напр.: 120.5" : "e.g. 120.5"}
-                  />
-                  <Input
-                    className="w-28"
-                    value={editUnit}
-                    onChange={(e) => setEditUnit(e.target.value)}
-                    placeholder={language === "ru" ? "Ед. изм." : "Unit"}
-                  />
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {language === "ru"
-                    ? "Объём независим от справочника ВОР/сметы и попадёт в акт."
-                    : "Quantity is independent from the source and will be included in the act."}
-                </div>
-                {quantityExceedWarning && (
-                  <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 p-2 text-xs text-amber-800 dark:text-amber-200">
-                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
-                    <span>
-                      {language === "ru"
-                        ? `Суммарный объём по задачам (${quantityExceedWarning.totalNew.toLocaleString("ru-RU")}) превышает объём в справочнике (${quantityExceedWarning.sourceQty.toLocaleString("ru-RU")}) на ${quantityExceedWarning.excess.toLocaleString("ru-RU")}.`
-                        : `Total quantity across tasks (${quantityExceedWarning.totalNew.toLocaleString()}) exceeds the source reference (${quantityExceedWarning.sourceQty.toLocaleString()}) by ${quantityExceedWarning.excess.toLocaleString()}.`}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">{language === "ru" ? "Материалы задачи (п.3 АОСР)" : "Task materials (AOSR p.3)"}</label>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (selectedTask) {
-                      sessionStorage.setItem("scheduleEditTaskId", String(selectedTask.id));
-                      saveEditFormState();
-                      navigate("/select-task-materials", {
-                        state: { taskId: selectedTask.id }
-                      });
-                    }
-                  }}
-                  className="w-full justify-start h-auto py-3 px-4"
-                >
-                  <Package className="h-4 w-4 mr-2 shrink-0" />
-                  <div className="flex-1 text-left">
-                    <div className="text-sm font-medium">
-                      {language === "ru" ? "Управление материалами" : "Manage Materials"}
-                    </div>
-                    {taskMaterialsQuery.isLoading ? (
-                      <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        {language === "ru" ? "Загрузка..." : "Loading..."}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {taskMaterialsQuery.data?.length ?? 0}{" "}
-                        {language === "ru" ? "материалов" : "materials"}
-                      </div>
-                    )}
-                  </div>
-                </Button>
-
-                {/* Independent Materials Toggle (only for split tasks) */}
-                {selectedTask && selectedTask.splitGroupId && (
-                  <div className="flex items-center justify-between rounded-md border p-3 bg-muted/20">
-                    <div className="flex-1 space-y-0.5">
-                      <Label htmlFor="independent-materials" className="text-sm font-medium cursor-pointer">
-                        {language === "ru" ? "Независимые материалы" : "Independent Materials"}
-                      </Label>
-                      <div className="text-xs text-muted-foreground">
-                        {editIndependentMaterials
-                          ? (language === "ru" 
-                              ? "Материалы только для этой задачи" 
-                              : "Materials only for this task")
-                          : (language === "ru" 
-                              ? "Материалы синхронизируются между разделёнными задачами" 
-                              : "Materials sync across split tasks")}
-                      </div>
-                    </div>
-                    <Switch
-                      id="independent-materials"
-                      checked={editIndependentMaterials}
-                      onCheckedChange={setEditIndependentMaterials}
+            {/* Tab: Основное */}
+            <TabsContent value="basic" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y mt-0 pr-1">
+              <div className="grid gap-4 pt-2">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">{language === "ru" ? "Номер акта" : "Act number"}</label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={editActNumber}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const digitsOnly = raw.replace(/[^\d]/g, "");
+                        setEditActNumber(digitsOnly);
+                      }}
+                      placeholder={language === "ru" ? "Напр.: 5" : "e.g. 5"}
                     />
                   </div>
-                )}
-              </div>
 
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">{language === "ru" ? "Исполнительные схемы" : "Executive schemes"}</label>
-                {selectedTask && selectedTask.splitGroupId && !editIndependentMaterials && (
-                  <div className="text-xs text-muted-foreground bg-muted/20 rounded-md p-2 border">
-                    {language === "ru" 
-                      ? `Синхронизация: Изменения синхронизируются между ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} разделёнными задачами` 
-                      : `Sync: Changes sync across ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} split tasks`}
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">{t.startDate}</label>
+                    <Input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
                   </div>
-                )}
-                <ExecutiveSchemesEditor
-                  items={editExecutiveSchemes}
-                  onChange={setEditExecutiveSchemes}
-                  disabled={patchTask.isPending}
-                />
-              </div>
 
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">{language === "ru" ? "Номера чертежей проекта" : "Project drawings"}</label>
-                {selectedTask && selectedTask.splitGroupId && !editIndependentMaterials && (
-                  <div className="text-xs text-muted-foreground bg-muted/20 rounded-md p-2 border">
-                    {language === "ru" 
-                      ? `Синхронизация: Изменения синхронизируются между ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} разделёнными задачами` 
-                      : `Sync: Changes sync across ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} split tasks`}
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">{t.durationDays}</label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={editDurationDays}
+                      onChange={(e) => {
+                        const digitsOnly = e.target.value.replace(/[^\d]/g, "");
+                        setEditDurationDays(digitsOnly);
+                      }}
+                      placeholder="1"
+                    />
                   </div>
-                )}
-                <Textarea
-                  value={editProjectDrawings}
-                  onChange={(e) => setEditProjectDrawings(e.target.value)}
-                  placeholder={language === "ru" ? "например: КЖ-12, КЖ-13, КЖ-14" : "e.g. KZh-12, KZh-13"}
-                />
-              </div>
+                </div>
 
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">{language === "ru" ? "СНиП/ГОСТ/РД" : "Normative references"}</label>
-                {selectedTask && selectedTask.splitGroupId && !editIndependentMaterials && (
-                  <div className="text-xs text-muted-foreground bg-muted/20 rounded-md p-2 border">
-                    {language === "ru" 
-                      ? `Синхронизация: Изменения синхронизируются между ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} разделёнными задачами` 
-                      : `Sync: Changes sync across ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} split tasks`}
+                {/* Act type — inline picker on tablet (Task 4.4) */}
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">{language === "ru" ? "Тип акта (шаблон)" : "Act type (template)"}</label>
+                  <Button
+                    variant="outline"
+                    onClick={() => setActTemplatePickerOpen(true)}
+                    className="w-full justify-between font-normal h-9 px-3 text-sm"
+                  >
+                    <span className={cn("truncate", !selectedActTemplate && "text-muted-foreground")}>
+                      {selectedActTemplate
+                        ? `${String(selectedActTemplate.code ?? "")} — ${language === "ru" ? String(selectedActTemplate.title ?? "") : String((selectedActTemplate as any).titleEn ?? selectedActTemplate.title ?? "")}`
+                        : (language === "ru" ? "Выбрать тип акта" : "Select act type")}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                  <div className="text-xs text-muted-foreground">
+                    {language === "ru"
+                      ? "При смене типа акта он будет применён ко всем задачам с тем же номером акта."
+                      : "When changing act type, it will be applied to all tasks with the same act number."}
                   </div>
-                )}
-                <Textarea
-                  value={editNormativeRefs}
-                  onChange={(e) => setEditNormativeRefs(e.target.value)}
-                  placeholder={language === "ru" ? "например: СП 70.13330.2012, СП 63.13330" : "e.g. SP 70.13330.2012"}
-                />
-              </div>
-            </div>
-          </div>
+                </div>
 
-          <div className="flex flex-row gap-2 pt-2">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">{language === "ru" ? "Объём работ" : "Work quantity"}</label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      className="flex-1"
+                      value={editQuantity}
+                      onChange={(e) => setEditQuantity(e.target.value)}
+                      placeholder={language === "ru" ? "Напр.: 120.5" : "e.g. 120.5"}
+                    />
+                    <Input
+                      className="w-28"
+                      value={editUnit}
+                      onChange={(e) => setEditUnit(e.target.value)}
+                      placeholder={language === "ru" ? "Ед. изм." : "Unit"}
+                    />
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {language === "ru"
+                      ? "Объём независим от справочника ВОР/сметы и попадёт в акт."
+                      : "Quantity is independent from the source and will be included in the act."}
+                  </div>
+                  {quantityExceedWarning && (
+                    <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 p-2 text-xs text-amber-800 dark:text-amber-200">
+                      <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
+                      <span>
+                        {language === "ru"
+                          ? `Суммарный объём по задачам (${quantityExceedWarning.totalNew.toLocaleString("ru-RU")}) превышает объём в справочнике (${quantityExceedWarning.sourceQty.toLocaleString("ru-RU")}) на ${quantityExceedWarning.excess.toLocaleString("ru-RU")}.`
+                          : `Total quantity across tasks (${quantityExceedWarning.totalNew.toLocaleString()}) exceeds the source reference (${quantityExceedWarning.sourceQty.toLocaleString()}) by ${quantityExceedWarning.excess.toLocaleString()}.`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Tab: Материалы */}
+            <TabsContent value="materials" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y mt-0 pr-1">
+              <div className="grid gap-4 pt-2">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">{language === "ru" ? "Материалы задачи (п.3 АОСР)" : "Task materials (AOSR p.3)"}</label>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedTask) {
+                        sessionStorage.setItem("scheduleEditTaskId", String(selectedTask.id));
+                        saveEditFormState();
+                        navigate("/select-task-materials", {
+                          state: { taskId: selectedTask.id }
+                        });
+                      }
+                    }}
+                    className="w-full justify-start h-auto py-3 px-4"
+                  >
+                    <Package className="h-4 w-4 mr-2 shrink-0" />
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-medium">
+                        {language === "ru" ? "Управление материалами" : "Manage Materials"}
+                      </div>
+                      {taskMaterialsQuery.isLoading ? (
+                        <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          {language === "ru" ? "Загрузка..." : "Loading..."}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {taskMaterialsQuery.data?.length ?? 0}{" "}
+                          {language === "ru" ? "материалов" : "materials"}
+                        </div>
+                      )}
+                    </div>
+                  </Button>
+
+                  {/* Independent Materials Toggle (only for split tasks) */}
+                  {selectedTask && selectedTask.splitGroupId && (
+                    <div className="flex items-center justify-between rounded-md border p-3 bg-muted/20">
+                      <div className="flex-1 space-y-0.5">
+                        <Label htmlFor="independent-materials" className="text-sm font-medium cursor-pointer">
+                          {language === "ru" ? "Независимые материалы" : "Independent Materials"}
+                        </Label>
+                        <div className="text-xs text-muted-foreground">
+                          {editIndependentMaterials
+                            ? (language === "ru"
+                                ? "Материалы только для этой задачи"
+                                : "Materials only for this task")
+                            : (language === "ru"
+                                ? "Материалы синхронизируются между разделёнными задачами"
+                                : "Materials sync across split tasks")}
+                        </div>
+                      </div>
+                      <Switch
+                        id="independent-materials"
+                        checked={editIndependentMaterials}
+                        onCheckedChange={setEditIndependentMaterials}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Tab: Документация */}
+            <TabsContent value="docs" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y mt-0 pr-1">
+              <div className="grid gap-4 pt-2">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">{language === "ru" ? "Исполнительные схемы" : "Executive schemes"}</label>
+                  {selectedTask && selectedTask.splitGroupId && !editIndependentMaterials && (
+                    <div className="text-xs text-muted-foreground bg-muted/20 rounded-md p-2 border">
+                      {language === "ru"
+                        ? `Синхронизация: Изменения синхронизируются между ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} разделёнными задачами`
+                        : `Sync: Changes sync across ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} split tasks`}
+                    </div>
+                  )}
+                  <ExecutiveSchemesEditor
+                    items={editExecutiveSchemes}
+                    onChange={setEditExecutiveSchemes}
+                    disabled={patchTask.isPending}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">{language === "ru" ? "Номера чертежей проекта" : "Project drawings"}</label>
+                  {selectedTask && selectedTask.splitGroupId && !editIndependentMaterials && (
+                    <div className="text-xs text-muted-foreground bg-muted/20 rounded-md p-2 border">
+                      {language === "ru"
+                        ? `Синхронизация: Изменения синхронизируются между ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} разделёнными задачами`
+                        : `Sync: Changes sync across ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} split tasks`}
+                    </div>
+                  )}
+                  <Textarea
+                    value={editProjectDrawings}
+                    onChange={(e) => setEditProjectDrawings(e.target.value)}
+                    placeholder={language === "ru" ? "например: КЖ-12, КЖ-13, КЖ-14" : "e.g. KZh-12, KZh-13"}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">{language === "ru" ? "СНиП/ГОСТ/РД" : "Normative references"}</label>
+                  {selectedTask && selectedTask.splitGroupId && !editIndependentMaterials && (
+                    <div className="text-xs text-muted-foreground bg-muted/20 rounded-md p-2 border">
+                      {language === "ru"
+                        ? `Синхронизация: Изменения синхронизируются между ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} разделёнными задачами`
+                        : `Sync: Changes sync across ${splitTasksInfo.get(selectedTask.id)?.total ?? 2} split tasks`}
+                    </div>
+                  )}
+                  <Textarea
+                    value={editNormativeRefs}
+                    onChange={(e) => setEditNormativeRefs(e.target.value)}
+                    placeholder={language === "ru" ? "например: СП 70.13330.2012, СП 63.13330" : "e.g. SP 70.13330.2012"}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex flex-row gap-2 pt-2 shrink-0">
             <Button variant="outline" className="flex-1" onClick={() => {
               setEditOpen(false);
               setSelectedTask(null);
@@ -1765,6 +1898,81 @@ export default function Schedule() {
               {patchTask.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {t.save}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inline act template picker (Task 4.4 — modal stacking) */}
+      <Dialog open={actTemplatePickerOpen} onOpenChange={(open) => {
+        setActTemplatePickerOpen(open);
+        if (!open) setActTemplateSearch("");
+      }}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>{language === "ru" ? "Выбрать тип акта" : "Select act type"}</DialogTitle>
+          </DialogHeader>
+          <div className="relative shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              className="pl-9 h-9"
+              placeholder={language === "ru" ? "Поиск шаблона..." : "Search template..."}
+              value={actTemplateSearch}
+              onChange={(e) => setActTemplateSearch(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+            {Object.entries(groupedActTemplates).map(([category, tpls]) => {
+              const filtered = actTemplateSearch.trim()
+                ? tpls.filter((t) =>
+                    `${t.code} ${t.title} ${(t as any).titleEn ?? ""}`.toLowerCase().includes(actTemplateSearch.toLowerCase())
+                  )
+                : tpls;
+              if (filtered.length === 0) return null;
+              return (
+                <div key={category} className="mb-2">
+                  <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground bg-muted/30 sticky top-0">
+                    {category}
+                  </div>
+                  {filtered.map((tpl) => {
+                    const isSelected = String(tpl.id) === editActTemplateId;
+                    const label = language === "ru" ? tpl.title : (tpl as any).titleEn ?? tpl.title;
+                    return (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        className={cn(
+                          "w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-accent transition-colors min-h-[44px]",
+                          isSelected && "bg-primary/10"
+                        )}
+                        onClick={() => {
+                          setEditActTemplateId(String(tpl.id));
+                          setActTemplatePickerOpen(false);
+                          setActTemplateSearch("");
+                        }}
+                      >
+                        <span className="text-xs font-mono text-muted-foreground shrink-0 w-14">{tpl.code}</span>
+                        <span className="flex-1 text-sm">{label}</span>
+                        {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            {editActTemplateId && (
+              <button
+                type="button"
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-accent transition-colors min-h-[44px] border-t text-muted-foreground"
+                onClick={() => {
+                  setEditActTemplateId("");
+                  setActTemplatePickerOpen(false);
+                  setActTemplateSearch("");
+                }}
+              >
+                <span className="text-sm">{language === "ru" ? "Снять выбор" : "Clear selection"}</span>
+              </button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -2001,7 +2209,7 @@ export default function Schedule() {
         onSplit={handleSplitTask}
         isSubmitting={splitTask.isPending}
       />
-    </div>
+    </ResponsiveShell>
   );
 }
 

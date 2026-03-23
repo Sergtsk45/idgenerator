@@ -4,7 +4,6 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  // Whitespace-nowrap: Badges should never wrap.
   "whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" +
   " hover-elevate " ,
   {
@@ -15,8 +14,14 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground",
         destructive:
           "border-transparent bg-destructive text-destructive-foreground shadow-xs",
-
         outline: " border [border-color:var(--badge-outline)] shadow-xs",
+        // ─── Odoo semantic badges ─────────────────────────────────────
+        // pill-shaped, no border, uppercase tracking
+        success: "border-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.03em] bg-[--success-bg] text-[--success]",
+        warning: "border-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.03em] bg-[--warning-bg] text-[--warning]",
+        danger:  "border-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.03em] bg-[--danger-bg]  text-[--danger]",
+        info:    "border-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.03em] bg-[--info-bg]    text-[--info]",
+        neutral: "border-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.03em] bg-[--g200]       text-[--g700]",
       },
     },
     defaultVariants: {

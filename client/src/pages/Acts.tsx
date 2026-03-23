@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { BottomNav } from "@/components/BottomNav";
-import { Header } from "@/components/Header";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "wouter";
+import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { useActs } from "@/hooks/use-acts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { OdooCard } from "@/components/ui/odoo-card";
+import { OdooEmptyState } from "@/components/ui/odoo-empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
@@ -10,7 +12,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { FileText, CalendarIcon, Download, Loader2, ChevronRight, Check, FileDown } from "lucide-react";
+import { FileText, CalendarIcon, Download, Loader2, ChevronRight, Check, FileDown, RefreshCw, AlertTriangle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -78,11 +81,14 @@ interface TemplatesResponse {
   categories: Record<string, Category>;
 }
 
+const PAGE_SIZE = 10;
+
 export default function Acts() {
   const { language } = useLanguageStore();
   const t = translations[language].acts;
   const { data: acts = [], isLoading } = useActs();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const { data: defaultSchedule } = useDefaultSchedule();
   const scheduleId = defaultSchedule?.id;
   const currentObject = useCurrentObject();
@@ -96,6 +102,26 @@ export default function Acts() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [exportActId, setExportActId] = useState<number | null>(null);
   const [exportingActId, setExportingActId] = useState<number | null>(null);
+  // Export progress indicator (Task 4.7)
+  const [exportProgress, setExportProgress] = useState(0);
+
+  // Infinite scroll
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, acts.length));
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [acts.length]);
 
   // Эталонный АОСР (005_АОСР 4): данные, которые пойдут в formData при экспорте PDF
   const [aosrForm, setAosrForm] = useState({
@@ -290,11 +316,17 @@ export default function Acts() {
 
   const handleDownloadAct = async (actId: number) => {
     setExportingActId(actId);
+    setExportProgress(10);
+    // Simulate progress while waiting for PDF generation (Task 4.7)
+    const progressTimer = setInterval(() => {
+      setExportProgress((p) => (p < 85 ? p + 15 : p));
+    }, 600);
     try {
       const exportResult = await exportAct.mutateAsync({
         actId,
         templateIds: [],
       });
+      setExportProgress(100);
       if (exportResult.files && exportResult.files.length > 0) {
         toast({
           title: language === "ru" ? "Успех" : "Success",
@@ -311,7 +343,9 @@ export default function Acts() {
         variant: "destructive",
       });
     } finally {
+      clearInterval(progressTimer);
       setExportingActId(null);
+      setExportProgress(0);
     }
   };
 
@@ -382,23 +416,41 @@ export default function Acts() {
 
   const handleGenerate = handleExport;
 
-  return (
-    <div className="flex flex-col min-h-screen bg-background bg-grain">
-      <Header
-        title={t.title}
-        subtitle={
-          currentObject.data?.title
-            ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.data.title}`
-            : undefined
-        }
-        showObjectSelector
-      />
+  // 13.2 Summary stats
+  const summaryStats = useMemo(() => {
+    const signed = acts.filter((a) => a.status === "signed").length;
+    const inProgress = acts.filter((a) => a.status === "generated").length;
+    const draft = acts.filter((a) => a.status === "draft").length;
+    return { total: acts.length, signed, inProgress, draft };
+  }, [acts]);
 
-      <div className="flex-1 px-4 py-6 pb-24 max-w-md mx-auto w-full">
+  // 13.4 Acts with missing required data (no dates)
+  const incompleteActs = useMemo(
+    () => acts.filter((a) => !a.dateStart && !a.dateEnd),
+    [acts],
+  );
+
+  // Paginated slice for 13.6
+  const displayedActs = acts.slice(0, visibleCount);
+
+  return (
+    <ResponsiveShell
+      className="bg-background bg-grain"
+      title={t.title}
+      subtitle={
+        currentObject.data?.title
+          ? `${language === "ru" ? "ОБЪЕКТ" : "OBJECT"}: ${currentObject.data.title}`
+          : undefined
+      }
+      showObjectSelector
+    >
+
+      <div className="flex-1 px-4 py-6 pb-24 w-full max-w-md lg:max-w-4xl mx-auto">
         <div className="mb-3">
           <Button
-            variant="outline"
-            className="w-full h-11 rounded-xl"
+            variant="odoo-primary"
+            size="cta"
+            className="w-full"
             disabled={!scheduleId || generateActsFromSchedule.isPending}
             onClick={async () => {
               toast({
@@ -415,78 +467,129 @@ export default function Acts() {
                 {language === "ru" ? "Формирование..." : "Generating..."}
               </>
             ) : (
-              <>{language === "ru" ? "Сформировать/обновить из графика" : "Generate/update from schedule"}</>
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                {language === "ru" ? "Сформировать / обновить из графика" : "Generate / update from schedule"}
+              </>
             )}
           </Button>
         </div>
+
+        {/* 13.2 Summary row */}
+        {!isLoading && acts.length > 0 && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[--g500] mb-3 px-1">
+            <span className="font-medium text-[--g700]">
+              {summaryStats.total} {language === "ru" ? "актов" : "acts"}
+            </span>
+            {summaryStats.signed > 0 && (
+              <span className="text-[--success]">
+                · {summaryStats.signed} {language === "ru" ? "принято" : "accepted"}
+              </span>
+            )}
+            {summaryStats.inProgress > 0 && (
+              <span className="text-[--p500]">
+                · {summaryStats.inProgress} {language === "ru" ? "в работе" : "in progress"}
+              </span>
+            )}
+            {summaryStats.draft > 0 && (
+              <span>· {summaryStats.draft} {language === "ru" ? "черновик" : "draft"}</span>
+            )}
+          </div>
+        )}
+
+        {/* 13.4 Warning block */}
+        {!isLoading && incompleteActs.length > 0 && (
+          <div className="mb-4 flex items-start gap-3 rounded-[--o-radius-lg] border border-[--warning] bg-[#fffbeb] px-4 py-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[--warning]" strokeWidth={1.5} />
+            <div>
+              <p className="text-[13px] font-medium text-[--g800]">
+                {language === "ru" ? "Незаполненные акты" : "Incomplete acts"}
+              </p>
+              <p className="text-[12px] text-[--g500]">
+                {language === "ru"
+                  ? `${incompleteActs.length} акт(а/ов) без дат — укажите период работ`
+                  : `${incompleteActs.length} act(s) missing date range — set work period`}
+              </p>
+            </div>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">{/* 2-col on lg+ (Task 4.5) */}
             {acts.length === 0 ? (
-              <div className="text-center py-16 space-y-4">
-                <div className="bg-muted/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
-                  <FileText className="h-10 w-10 text-muted-foreground/50" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-semibold text-lg">{language === "ru" ? "Нет актов" : "No Acts Yet"}</h3>
-                  <p className="text-sm text-muted-foreground max-w-[200px] mx-auto">
-                    {language === "ru" ? "Создайте первый АОСР на основе шаблонов." : "Generate your first AOSR document from templates."}
-                  </p>
-                </div>
+              <div className="lg:col-span-2">
+                <OdooEmptyState
+                  icon={<FileText />}
+                  title={language === "ru" ? "Нет актов" : "No Acts Yet"}
+                  hint={language === "ru" ? "Создайте первый АОСР на основе шаблонов." : "Generate your first AOSR document from templates."}
+                />
               </div>
             ) : (
-              acts.map((act, idx) => (
+              displayedActs.map((act, idx) => (
                 <motion.div key={act.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: idx * 0.1 }}>
-                  <Card className="overflow-hidden group hover:border-primary/50 transition-all cursor-pointer" data-testid={`card-act-${act.id}`}>
-                    <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between gap-2 space-y-0">
+                  <OdooCard
+                    hoverable
+                    onClick={() => navigate(`/acts/${act.id}`)}
+                    className="cursor-pointer"
+                    data-testid={`card-act-${act.id}`}
+                  >
+                    <div className="p-4 pb-2 flex flex-row items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                        <div className="h-10 w-10 rounded-[--o-radius-md] bg-[--p50] flex items-center justify-center text-[--p500] shrink-0">
                           <FileText className="h-5 w-5" />
                         </div>
                         <div>
-                          <CardTitle className="text-base">
+                          <p className="text-[15px] font-semibold text-[--g900]">
                             {language === "ru" ? "Акт №" : "Act #"}
                             {act.actNumber ?? act.id}
-                          </CardTitle>
-                          <CardDescription className="text-xs">
-                            <div>
-                              {act.dateEnd
-                                ? format(new Date(act.dateEnd), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
-                                : act.dateStart
-                                  ? format(new Date(act.dateStart), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
-                                  : language === "ru"
-                                    ? "Без даты"
-                                    : "No date"}
-                            </div>
-                            <div className="text-muted-foreground">
-                              {(() => {
-                                const tpl = templatesById.get(Number((act as any).actTemplateId ?? -1));
-                                if (!tpl) return language === "ru" ? "Тип: не выбран" : "Type: not set";
-                                const title = language === "ru" ? tpl.title : tpl.titleEn ?? tpl.title;
-                                return `Тип: ${tpl.code} — ${title}`;
-                              })()}
-                            </div>
-                          </CardDescription>
+                          </p>
+                          <p className="text-[12px] text-[--g500]">
+                            {act.dateEnd
+                              ? format(new Date(act.dateEnd), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
+                              : act.dateStart
+                                ? format(new Date(act.dateStart), "MMM d, yyyy", { locale: language === "ru" ? ru : enUS })
+                                : language === "ru"
+                                  ? "Без даты"
+                                  : "No date"}
+                          </p>
+                          <p className="text-[11px] text-[--g400]">
+                            {(() => {
+                              const tpl = templatesById.get(Number((act as any).actTemplateId ?? -1));
+                              if (!tpl) return language === "ru" ? "Тип: не выбран" : "Type: not set";
+                              const title = language === "ru" ? tpl.title : tpl.titleEn ?? tpl.title;
+                              return `${tpl.code} — ${title}`;
+                            })()}
+                          </p>
                         </div>
                       </div>
-                      <Badge variant={act.status === "signed" ? "default" : "secondary"} className="capitalize">
-                        {act.status}
-                      </Badge>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-2">
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge
+                          variant={act.status === "signed" ? "success" : act.status === "generated" ? "info" : "neutral"}
+                          className="capitalize"
+                        >
+                          {act.status === "signed"
+                            ? language === "ru" ? "принято" : "accepted"
+                            : act.status === "generated"
+                            ? language === "ru" ? "в работе" : "in progress"
+                            : language === "ru" ? "черновик" : "draft"}
+                        </Badge>
+                        <ChevronRight className="h-4 w-4 text-[--g400]" strokeWidth={1.5} />
+                      </div>
+                    </div>
+                    <div className="px-4 pb-4 pt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-[--g500]">
                           {act.worksData?.length || 0} {language === "ru" ? "работ" : "work items"}
                         </span>
                         <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 text-xs gap-1 group-hover:text-primary"
-                          onClick={() => handleDownloadAct(act.id)}
+                          variant="odoo-secondary"
+                          size="compact"
+                          className="gap-1"
+                          onClick={(e) => { e.stopPropagation(); handleDownloadAct(act.id); }}
                           disabled={exportingActId !== null}
                           data-testid={`button-download-act-${act.id}`}
                         >
@@ -499,27 +602,44 @@ export default function Acts() {
                           )}
                         </Button>
                       </div>
-                    </CardContent>
-                  </Card>
+                      {/* Export progress bar */}
+                      {exportingActId === act.id && exportProgress > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <Progress value={exportProgress} className="h-1 bg-[--g200] [&>div]:bg-[--p500]" />
+                          <p className="text-[10px] text-[--g500] text-right">
+                            {language === "ru" ? "Генерация PDF..." : "Generating PDF..."}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </OdooCard>
                 </motion.div>
               ))
             )}
           </div>
         )}
+
+        {/* 13.6 Infinite scroll sentinel */}
+        {!isLoading && visibleCount < acts.length && (
+          <div ref={sentinelRef} className="flex justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-[--g400]" />
+          </div>
+        )}
       </div>
 
-      <div className="fixed bottom-20 right-4 z-40 md:right-[max(1rem,calc(50vw-220px))]">
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) setExportActId(null);
-          }}
-        >
-          <DialogContent className="sm:max-w-lg max-h-[90vh] rounded-2xl flex flex-col overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>{language === "ru" ? "Экспорт АОСР" : "Export AOSR"}</DialogTitle>
-            </DialogHeader>
+      <div className="fixed inset-x-0 bottom-20 z-40 md:bottom-6 lg:left-72">
+        <div className="mx-auto flex w-full max-w-md justify-end px-4">
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) setExportActId(null);
+            }}
+          >
+            <DialogContent className="sm:max-w-lg lg:max-w-2xl max-h-[90vh] rounded-2xl flex flex-col overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>{language === "ru" ? "Экспорт АОСР" : "Export AOSR"}</DialogTitle>
+              </DialogHeader>
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="py-4 space-y-4 pr-4">
                 <div className="grid gap-4 grid-cols-2">
@@ -588,7 +708,7 @@ export default function Acts() {
                                     data-testid={`checkbox-category-${category}`}
                                   />
                                   <span className="text-sm font-medium">{categoryName}</span>
-                                  <Badge variant="outline" className="ml-auto mr-2 text-xs">
+                                  <Badge variant="neutral" className="ml-auto mr-2">
                                     {templates.filter((t) => selectedTemplates.has(t.templateId)).length}/{templates.length}
                                   </Badge>
                                 </div>
@@ -1005,8 +1125,9 @@ export default function Acts() {
                 )}
               </Button>
             </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Материалы для п.3 (picker) */}
@@ -1141,7 +1262,6 @@ export default function Acts() {
         </DialogContent>
       </Dialog>
 
-      <BottomNav />
-    </div>
+    </ResponsiveShell>
   );
 }

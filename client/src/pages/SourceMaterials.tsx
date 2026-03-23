@@ -5,24 +5,28 @@
  * @created: 2026-02-01
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Header } from "@/components/Header";
-import { BottomNav } from "@/components/BottomNav";
+import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, Search } from "lucide-react";
+import { OdooCard } from "@/components/ui/odoo-card";
+import { OdooEmptyState } from "@/components/ui/odoo-empty-state";
+import { Badge } from "@/components/ui/badge";
+import { PillTabs } from "@/components/ui/pill-tabs";
+import { AlertTriangle, ChevronRight, Package, Plus, Search } from "lucide-react";
 import { useCurrentObject } from "@/hooks/use-source-data";
 import { useProjectMaterials } from "@/hooks/use-materials";
-import { MaterialCard, type ProjectMaterialListItem } from "@/components/materials/MaterialCard";
+import { type ProjectMaterialListItem } from "@/components/materials/MaterialCard";
 import { MaterialWizard } from "@/components/materials/MaterialWizard";
 import { InvoiceImportButton } from "@/components/materials/InvoiceImportButton";
 import { InvoicePreviewDialog } from "@/components/materials/InvoicePreviewDialog";
 import { TariffGuard } from "@/components/TariffGuard";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { useLanguageStore } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+
+const PAGE_SIZE = 20;
 
 type Filter = "all" | "catalog" | "local" | "attention";
 
@@ -40,6 +44,9 @@ export default function SourceMaterials() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [parsedInvoice, setParsedInvoice] = useState<any>(null);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const list = (materialsQuery.data ?? []) as any[];
   const canAddMaterial = Number.isFinite(objectId) && (objectId as number) > 0;
@@ -80,108 +87,222 @@ export default function SourceMaterials() {
       });
   }, [filter, list, search]);
 
-  const filterLabels: Record<Filter, string> = {
-    all: language === "ru" ? "Все" : "All",
-    catalog: language === "ru" ? "Справочник" : "Catalog",
-    local: language === "ru" ? "Локальные" : "Local",
-    attention: "⚠",
-  };
+  // Reset visible count when filter/search changes
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filter, search]);
+
+  // Infinite scroll sentinel
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisibleCount((c) => c + PAGE_SIZE); },
+      { rootMargin: "120px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const filterTabs = [
+    { value: "all", label: language === "ru" ? "Все" : "All" },
+    { value: "catalog", label: language === "ru" ? "Справочник" : "Catalog" },
+    { value: "local", label: language === "ru" ? "Локальные" : "Local" },
+    { value: "attention", label: "⚠" },
+  ];
 
   return (
-    <div className="flex flex-col min-h-screen h-[100dvh] bg-background bg-grain">
-      <Header
-        title={language === "ru" ? "Материалы" : "Materials"}
-        subtitle={
-          currentObject.data?.title
-            ? `${language === "ru" ? "ПРОЕКТ" : "PROJECT"}: ${currentObject.data.title}`
-            : undefined
-        }
-        showObjectSelector
-      />
+    <ResponsiveShell
+      className="min-h-screen h-[100dvh] bg-background bg-grain"
+      title={language === "ru" ? "Материалы" : "Materials"}
+      subtitle={
+        currentObject.data?.title
+          ? `${language === "ru" ? "ПРОЕКТ" : "PROJECT"}: ${currentObject.data.title}`
+          : undefined
+      }
+      showObjectSelector
+    >
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28">
-        {/* Поиск */}
-        <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-          <Input
-            placeholder={language === "ru" ? "Поиск по названию..." : "Search by name..."}
-            className="pl-9 rounded-xl bg-muted/40 border-transparent focus:border-border focus:bg-background h-11 text-[14px]"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
+        {/* LEFT PANEL: list */}
+        <div className="lg:w-[380px] lg:border-r lg:border-[--g200] lg:overflow-y-auto flex-1 px-4 py-4 pb-28 lg:pb-4">
+          {/* Поиск */}
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[--g400]" />
+            <Input
+              placeholder={language === "ru" ? "Поиск по названию..." : "Search by name..."}
+              className="pl-9 h-10 text-[14px]"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* PillTabs фильтры */}
+          <PillTabs
+            tabs={filterTabs}
+            activeTab={filter}
+            onTabChange={(v) => setFilter(v as Filter)}
+            className="mb-3"
           />
+
+          {/* Строка счётчик + сброс */}
+          <div className="flex items-center justify-between py-1 mb-2">
+            <p className="o-overline">
+              {language === "ru" ? "позиций" : "positions"}: {filtered.length}
+            </p>
+            {(search || filter !== "all") && (
+              <button
+                type="button"
+                className="text-[12px] text-[--p500]"
+                onClick={() => { setSearch(""); setFilter("all"); }}
+              >
+                {language === "ru" ? "Сбросить" : "Reset"}
+              </button>
+            )}
+          </div>
+
+          {/* Список карточек (OdooCard) */}
+          <div className="space-y-2">
+            {materialsQuery.isLoading ? (
+              <OdooEmptyState
+                icon={<Package />}
+                title={language === "ru" ? "Загрузка..." : "Loading..."}
+              />
+            ) : filtered.length === 0 ? (
+              <OdooEmptyState
+                icon={<Package />}
+                title={language === "ru" ? "Материалы не найдены" : "No materials found"}
+                hint={language === "ru" ? "Добавьте первый материал." : "Add your first material."}
+                action={
+                  <Button variant="odoo-primary" size="compact" onClick={openWizard}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    {language === "ru" ? "Добавить" : "Add"}
+                  </Button>
+                }
+              />
+            ) : (
+              <>
+                {filtered.slice(0, visibleCount).map((m: any) => (
+                  <OdooCard
+                    key={m.id}
+                    hoverable
+                    onClick={() => {
+                      if (window.innerWidth >= 1024) {
+                        setSelectedMaterial(m);
+                      } else {
+                        setLocation(`/source/materials/${m.id}`);
+                      }
+                    }}
+                  >
+                    <div className="p-3 flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-[--o-radius-sm] bg-[--p50] flex items-center justify-center text-[--p500] shrink-0">
+                        <Package className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium text-[--g900] truncate">
+                          {m.nameOverride ?? `Материал #${m.id}`}
+                        </p>
+                        <p className="text-[11px] text-[--g500]">
+                          {m.baseUnitOverride ?? m.unit ?? ""}
+                          {m.catalogMaterialId != null ? (language === "ru" ? " · Справочник" : " · Catalog") : (language === "ru" ? " · Локальный" : " · Local")}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <Badge
+                          variant={m.hasUseInActsQualityDoc ? "success" : "warning"}
+                          className="text-[10px] px-1.5"
+                        >
+                          {m.hasUseInActsQualityDoc
+                            ? (language === "ru" ? "Доки ✓" : "Docs ✓")
+                            : (language === "ru" ? "Нет доков" : "No docs")}
+                        </Badge>
+                        {!m.hasUseInActsQualityDoc && (
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                        )}
+                      </div>
+                    </div>
+                  </OdooCard>
+                ))}
+                {/* Infinite scroll sentinel */}
+                {visibleCount < filtered.length && (
+                  <div ref={sentinelRef} className="h-8 flex items-center justify-center">
+                    <span className="text-[11px] text-[--g400]">
+                      {language === "ru" ? "Загрузка..." : "Loading..."}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Pill-фильтры */}
-        <div className="flex gap-2 overflow-x-auto mb-3 pb-0.5">
-          {(["all", "catalog", "local", "attention"] as Filter[]).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={cn(
-                "shrink-0 px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors",
-                filter === f
-                  ? "bg-primary text-white"
-                  : "bg-muted/60 text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {filterLabels[f]}
-            </button>
-          ))}
-        </div>
-
-        {/* Строка "список позиций (N) Сбросить" */}
-        <div className="flex items-center justify-between py-1 mb-2">
-          <p className="text-[12px] text-muted-foreground">
-            {language === "ru" ? "список позиций" : "positions"} ({filtered.length})
-          </p>
-          {(search || filter !== "all") && (
-            <button
-              type="button"
-              className="text-[12px] text-primary"
-              onClick={() => {
-                setSearch("");
-                setFilter("all");
-              }}
-            >
-              {language === "ru" ? "Сбросить" : "Reset"}
-            </button>
-          )}
-        </div>
-
-        {/* Список карточек */}
-        <div className="space-y-3">
-          {materialsQuery.isLoading ? (
-            <div className="flex items-center justify-center py-10 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              {language === "ru" ? "Загрузка..." : "Loading..."}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="py-10 text-center text-muted-foreground">
-              <div className="mb-3">{language === "ru" ? "Материалы не найдены" : "No materials found"}</div>
-              <Button onClick={openWizard} className="rounded-xl">
-                <Plus className="h-4 w-4 mr-2" />
-                {language === "ru" ? "Добавить материал" : "Add material"}
-              </Button>
+        {/* RIGHT PANEL: detail preview — lg+ only */}
+        <div className="hidden lg:flex flex-1 flex-col p-6 overflow-y-auto" data-testid="materials-detail-panel">
+          {selectedMaterial == null ? (
+            <div className="flex flex-col items-center justify-center flex-1" data-testid="materials-detail-empty">
+              <OdooEmptyState
+                icon={<Package />}
+                title={language === "ru" ? "Выберите материал из списка" : "Select a material from the list"}
+              />
             </div>
           ) : (
-            filtered.map((m: any) => (
-              <MaterialCard
-                key={m.id}
-                material={m as ProjectMaterialListItem}
-                title={String(m.nameOverride ?? `Материал #${m.id}`)}
-                unit={m.baseUnitOverride ?? m.unit ?? null}
-                isFromCatalog={m.catalogMaterialId != null}
-                warningText={m.warningText ?? null}
-                onOpen={() => setLocation(`/source/materials/${m.id}`)}
-              />
-            ))
+            <OdooCard className="max-w-md">
+              <div className="p-5 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[15px] font-semibold text-[--g900]" data-testid="material-detail-title">
+                      {selectedMaterial.nameOverride ?? `Материал #${selectedMaterial.id}`}
+                    </p>
+                    {selectedMaterial.baseUnitOverride && (
+                      <p className="text-[12px] text-[--g500] mt-0.5">
+                        <span className="o-overline mr-1">{language === "ru" ? "Ед. изм." : "Unit"}</span>
+                        {selectedMaterial.baseUnitOverride}
+                      </p>
+                    )}
+                  </div>
+                  <Badge variant={selectedMaterial.catalogMaterialId != null ? "info" : "neutral"}>
+                    {selectedMaterial.catalogMaterialId != null
+                      ? (language === "ru" ? "Справочник" : "Catalog")
+                      : (language === "ru" ? "Локальный" : "Local")}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { count: selectedMaterial.batchesCount ?? 0, label: language === "ru" ? "Партии" : "Batches" },
+                    { count: selectedMaterial.docsCount ?? 0, label: language === "ru" ? "Документы" : "Docs" },
+                    { count: selectedMaterial.qualityDocsCount ?? 0, label: language === "ru" ? "Кач. доки" : "Quality" },
+                  ].map(({ count, label }) => (
+                    <div key={label} className="text-center p-3 bg-[--g50] rounded-[--o-radius-sm]">
+                      <p className="text-[20px] font-bold text-[--g900] tabular-nums">{count}</p>
+                      <p className="text-[10px] o-overline">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {!selectedMaterial.hasUseInActsQualityDoc && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-[--o-radius-sm] px-3 py-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[13px] text-amber-700">
+                      {language === "ru" ? "Отсутствует документ качества для актов" : "Quality document for acts is missing"}
+                    </p>
+                  </div>
+                )}
+
+                <Button
+                  variant="odoo-primary"
+                  className="w-full"
+                  onClick={() => setLocation(`/source/materials/${selectedMaterial.id}`)}
+                >
+                  {language === "ru" ? "Открыть полную карточку" : "Open full card"}
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </OdooCard>
           )}
         </div>
       </div>
 
       {/* FAB */}
-      <div className="fixed bottom-20 right-4 z-40 flex items-center gap-3">
+      <div className="fixed bottom-20 right-4 z-40 flex items-center gap-3 md:bottom-6 md:right-6 lg:fixed lg:bottom-6 lg:right-6 lg:left-auto">
         {filter === "local" && Number.isFinite(objectId) && (
           <TariffGuard 
             feature="INVOICE_IMPORT"
@@ -193,9 +314,10 @@ export default function SourceMaterials() {
           </TariffGuard>
         )}
         <Button
-          size="icon"
-          className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
+          variant="odoo-fab"
+          size="odoo-fab-size"
           onClick={openWizard}
+          aria-label={language === "ru" ? "Добавить материал" : "Add material"}
         >
           <Plus className="h-6 w-6" />
         </Button>
@@ -213,7 +335,6 @@ export default function SourceMaterials() {
         </>
       ) : null}
 
-      <BottomNav />
-    </div>
+    </ResponsiveShell>
   );
 }

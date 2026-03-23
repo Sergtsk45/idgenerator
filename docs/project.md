@@ -54,6 +54,7 @@
 - **Telegram MiniApp**: Полная интеграция с Telegram WebApp API:
   - **SDK**: `telegram-web-app.js` подключен в `index.html`, инициализация через `WebApp.ready()` и `WebApp.expand()`
   - **TypeScript типы**: `client/src/types/telegram.d.ts` — полные типы для Telegram WebApp API
+  - **Viewport foundation**: `client/index.html` использует `viewport-fit=cover`; `TelegramThemeProvider` синхронизирует CSS-переменные `--tg-viewport-height`, `--tg-viewport-stable-height`, `--tg-viewport-width` для Telegram WebView с безопасным browser fallback
   - **Аутентификация**: 
     - Серверная валидация `initData` через middleware `server/middleware/telegramAuth.ts` (HMAC-SHA-256 с Bot Token)
     - Клиент автоматически передаёт `initData` в заголовке `X-Telegram-Init-Data` (см. `client/src/lib/queryClient.ts`)
@@ -64,12 +65,13 @@
       - Экран входа: `/login`, регистрации: `/register` (`client/src/pages/Login.tsx`, `Register.tsx`)
       - JWT токен хранится в localStorage и автоматически добавляется в заголовок `Authorization: Bearer <token>`
       - Таблицы: `users` (внутренний реестр), `auth_providers` (привязки провайдеров к пользователям)
+    - В dev-режиме (`NODE_ENV=development`) для локального browser-QA автоматически создаётся/обновляется дефолтный email-admin: `admin@admin.com / 12345678`; форма `/login` в dev предзаполняется этими значениями
   - **Хуки**: 
     - `useTelegram()` — доступ к WebApp, user, initData, themeParams, colorScheme
     - `useTelegramMainButton()` — управление главной кнопкой действия (см. `docs/telegram-buttons-guide.md`)
     - `useTelegramBackButton()` — управление кнопкой "Назад"
     - `useTelegramHaptic()` — тактильная обратная связь (impact/notification/selectionChanged, см. `docs/telegram-haptic-guide.md`)
-  - **Тема**: `TelegramThemeProvider` автоматически применяет тему Telegram, CSS-переменные (`--tg-theme-*`)
+  - **Тема**: `TelegramThemeProvider` автоматически применяет тему Telegram, CSS-переменные (`--tg-theme-*`) и foundation viewport vars для shell-слоя
   - **Бот**: Инструкция по созданию и настройке бота в `docs/telegram-bot-setup.md`
 - **Invoice Extractor** (микросервис): Python/Flask сервис для парсинга PDF-счетов поставщиков
   - **Расположение**: `services/invoice-extractor/`
@@ -80,9 +82,24 @@
 - **Backend**: Express + TypeScript. REST API с типами/валидацией на базе `shared/routes.ts` (Zod).
 - **База данных**: PostgreSQL + Drizzle ORM. Схема описана в `shared/schema.ts`.
 - **AI**: OpenAI API (через переменные окружения интеграции), используется для нормализации сообщений.
-- **Навигация UI**: основные разделы в `BottomNav`, доступ к `Settings` — через выпадающее меню "гамбургера" в `Header`.
-  - Порядок вкладок `BottomNav` (слева направо): **ВОР → График работ → Акты → ЖР → Исходные**
-  - **Главная** (`/`) вынесена в кнопку в правом верхнем углу `Header` (иконка микрофона).
+- **Навигация UI**: основные разделы в `BottomNav` на mobile, `ResponsiveShell` на tablet/desktop. Доступ к `Settings` через `secondary` на tablet/desktop, hamburger `Header` Sheet на mobile.
+  - Порядок вкладок `BottomNav` (слева направо, mobile-only): **ВОР → График работ → Акты → ЖР → Исходные**
+  - **Главная** (`/`) доступна как `quickAction` через `BottomNav` (mobile) или `ResponsiveShell` sidebar (lg+).
+  - **Foundation shell (tablet UI, Sprint 1)**:
+    - Breakpoint contract: `sm=640`, `md=768`, `lg=1024`, `xl=1280`, `2xl=1536` зафиксирован в `tailwind.config.ts`
+    - Safe-area utilities в `client/src/index.css`: `pt-safe`, `pb-safe`, `pl-safe`, `pr-safe` 
+    - Shell-токены: `--shell-header-height`, `--shell-bottom-nav-height`, `--shell-content-padding-x/y`, `--shell-content-max-width`, `--shell-font-scale`
+    - Telegram viewport CSS-переменные: `--tg-viewport-height`, `--tg-viewport-stable-height`, `--tg-viewport-width` синхронизируются через `TelegramThemeProvider`
+  - **Navigation contract (Sprint 1, Subphase 2)**:
+    - `client/src/lib/navigation.ts` — единый manifest для `primary` (`/works`, `/schedule`, `/acts`, `/worklog`, `/source-data`), `secondary` (`/objects`, `/settings`), `quickAction` (`/`)
+    - Surface visibility intent: `mobile`, `md+`, `lg+`
+    - Active-state для `source-data` покрывает nested-маршруты: `/source/materials`, `/source/materials/:id`, `/source/documents`
+  - **Shell adapters (Sprint 1, Subphase 2)**:
+    - **Mobile** (`< md`): `BottomNav` (primary) + hamburger `Header` Sheet (primary fallback + secondary/quickAction)
+    - **Tablet** (`md..lg`): `ResponsiveShell` top-nav (primary, горизонтальные кнопки) + hamburger `Header` Sheet скрыт
+    - **Desktop** (`>= lg`): `ResponsiveShell` top-nav (primary) + sidebar (secondary/quick-action, vertical layout)
+    - `ResponsiveShell` — presentational page-level shell adapter, не владеет auth/router/state, только читает manifest и рендерит navigation surfaces
+    - `BottomNav` явно скрыт на `md+` (`md:hidden`)
 
 ### Диаграмма взаимодействий
 ```mermaid

@@ -103,9 +103,33 @@ client/
 ## UI-паттерны
 
 ### 1. Mobile-first layout:
-- Фиксированная нижняя навигация (`BottomNav`)
+- Фиксированная нижняя навигация (`BottomNav`, mobile-only `md:hidden`)
 - Фиксированный заголовок (`Header`)
 - Контент с отступами под навигацию (`pb-24`)
+
+### 1.1 Foundation contract для tablet UI (Sprint 1)
+- Breakpoint contract зафиксирован в `tailwind.config.ts`: `sm=640`, `md=768`, `lg=1024`, `xl=1280`, `2xl=1536`
+- В `client/index.html` используется `viewport-fit=cover` для корректной работы safe-area на iOS/iPadOS
+- В `client/src/index.css` заведены foundation-токены shell: `--shell-header-height`, `--shell-bottom-nav-height`, `--shell-content-padding-x/y`, `--shell-content-max-width`, `--shell-font-scale`
+- Там же определены safe-area utilities `pt-safe`, `pb-safe`, `pl-safe`, `pr-safe`
+- `TelegramThemeProvider` синхронизирует `--tg-viewport-height`, `--tg-viewport-stable-height`, `--tg-viewport-width` с Telegram WebApp и очищает их в browser fallback
+- В `client/src/lib/navigation.ts` вынесен единый navigation contract: `primary`, `secondary`, `quickAction`, surface visibility intent и matching rules для active-state
+- Active-state `source-data` покрывает связанные nested routes: `/source/materials`, `/source/materials/:id`, `/source/documents`
+
+### 1.2 Shell Adapters (Sprint 1, Subphase 2)
+- **`ResponsiveShell` компонент** (`client/src/components/ResponsiveShell.tsx`):
+  - Page-level presentational shell adapter, не владеет auth/router/state
+  - Читает единый navigation manifest и рендерит surfaces в зависимости от breakpoint
+  - **Mobile** (`< md`): скрыт (ничего не рендерит)
+  - **Tablet** (`md..lg`): горизонтальная top-nav с primary-кнопками
+  - **Desktop** (`>= lg`): top-nav (primary) + левая sidebar (secondary + quick-action)
+- **`Header` (обновлён)**:
+  - Hamburger + Sheet теперь только для mobile (`md:hidden`)
+  - На `md+` hamburger скрыт, primary navigation даёт `ResponsiveShell` top-nav
+  - Secondary/quick-action на tablet/desktop даёт `ResponsiveShell` sidebar
+- **`BottomNav` (мобильный)**:
+  - Остаётся мобильным (явно `md:hidden`)
+  - Рендерит primary-кнопки в нижней позиции для узких экранов
 
 ### 2. Анимации (Framer Motion):
 - Появление карточек
@@ -155,6 +179,7 @@ client/
 - Поддержка dark mode (через класс `.dark`)
 - Кастомные утилиты Tailwind
 - Адаптивные отступы для safe-area (iOS)
+- Responsive foundation-слой строится additive-подходом: mobile стили остаются базой, tablet/layout enhancements добавляются поверх них через `min-width` breakpoints
 
 ## Итог
 

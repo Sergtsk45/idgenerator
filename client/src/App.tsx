@@ -5,11 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TelegramThemeProvider } from "@/components/TelegramThemeProvider";
 import { AuthGuard } from "@/components/AuthGuard";
+import { AdminGuard } from "@/components/AdminGuard";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Works from "@/pages/Works";
 import WorkLog from "@/pages/WorkLog";
 import Acts from "@/pages/Acts";
+import ActDetail from "@/pages/ActDetail";
 import Schedule from "@/pages/Schedule";
 import Settings from "@/pages/Settings";
 import Login from "@/pages/Login";
@@ -53,6 +55,13 @@ function Router() {
         <AuthGuard>
           <Acts />
         </AuthGuard>
+      </Route>
+      <Route path="/acts/:id">
+        {(params) => (
+          <AuthGuard>
+            <ActDetail params={params} />
+          </AuthGuard>
+        )}
       </Route>
       <Route path="/schedule">
         <AuthGuard>
@@ -102,26 +111,26 @@ function Router() {
         </AuthGuard>
       </Route>
       
-      {/* Admin Panel - защищённые роуты */}
+      {/* Admin Panel - защищённые роуты с RBAC-проверкой */}
       <Route path="/admin">
-        <AuthGuard>
+        <AdminGuard>
           <AdminDashboard />
-        </AuthGuard>
+        </AdminGuard>
       </Route>
       <Route path="/admin/users">
-        <AuthGuard>
+        <AdminGuard>
           <AdminUsers />
-        </AuthGuard>
+        </AdminGuard>
       </Route>
       <Route path="/admin/messages">
-        <AuthGuard>
+        <AdminGuard>
           <AdminMessages />
-        </AuthGuard>
+        </AdminGuard>
       </Route>
       <Route path="/admin/materials">
-        <AuthGuard>
+        <AdminGuard>
           <AdminMaterials />
-        </AuthGuard>
+        </AdminGuard>
       </Route>
       
       <Route component={NotFound} />

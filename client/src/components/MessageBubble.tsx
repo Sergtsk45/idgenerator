@@ -7,6 +7,7 @@
 
 import { Message } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   CheckCheck,
   Loader2,
@@ -35,11 +36,9 @@ function WorkMatchCard({ data, isProcessing, showActions, language }: WorkMatchC
 
   if (isProcessing) {
     return (
-      <div className="bg-card border border-border/60 rounded-2xl p-4 max-w-[88%]">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          <span>{isRu ? "Анализируем запись..." : "Analyzing..."}</span>
-        </div>
+      <div className="bg-white border border-l-4 border-[--g200] rounded-[--o-radius-lg] p-4 max-w-[88%] animate-pulse">
+        <div className="h-3 bg-[--g200] rounded-full w-3/4 mb-2" />
+        <div className="h-3 bg-[--g200] rounded-full w-1/2" />
       </div>
     );
   }
@@ -65,7 +64,7 @@ function WorkMatchCard({ data, isProcessing, showActions, language }: WorkMatchC
       </div>
 
       {/* Карточка */}
-      <div className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm max-w-[88%]">
+      <div className="bg-white border border-l-4 border-[--success] rounded-[--o-radius-lg] overflow-hidden shadow-sm max-w-[88%]">
         <div className="p-4 space-y-3">
           {/* Строка: КОД ВОР + дата */}
           <div className="flex items-start justify-between gap-2">
@@ -114,20 +113,14 @@ function WorkMatchCard({ data, isProcessing, showActions, language }: WorkMatchC
       {/* Кнопки быстрых действий */}
       {showActions && (
         <div className="flex gap-2 mt-2 pl-1">
-          <button
-            type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-[12px] text-muted-foreground bg-background"
-          >
+          <Button variant="odoo-secondary" size="compact" className="gap-1.5">
             <Paperclip className="h-3.5 w-3.5" />
             {isRu ? "ФОТО/ФАЙЛ" : "PHOTO/FILE"}
-          </button>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-[12px] text-muted-foreground bg-background"
-          >
+          </Button>
+          <Button variant="odoo-secondary" size="compact" className="gap-1.5">
             <Clock className="h-3.5 w-3.5" />
             {isRu ? "ИСТОРИЯ" : "HISTORY"}
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -157,16 +150,16 @@ export function MessageBubble({ message, isProcessing, showActions }: MessageBub
       <div className="flex justify-end pl-12">
         <div
           className={cn(
-            "bg-primary text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[82%] shadow-sm"
+            "bg-[--p100] text-[--g900] rounded-[16px_16px_4px_16px] px-4 py-3 max-w-[82%] shadow-sm"
           )}
         >
           <p className="text-[15px] leading-snug">{message.messageRaw}</p>
           <div className="flex justify-end items-center gap-1 mt-1">
-            <span className="text-[11px] text-white/60">{time}</span>
+            <span className="text-[11px] text-[--g500]">{time}</span>
             {isPending ? (
-              <Loader2 className="h-3.5 w-3.5 text-white/60 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 text-[--g500] animate-spin" />
             ) : (
-              <CheckCheck className="h-3.5 w-3.5 text-white/60" />
+              <CheckCheck className="h-3.5 w-3.5 text-[--g500]" />
             )}
           </div>
         </div>

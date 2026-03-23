@@ -7,6 +7,165 @@
 
 ---
 
+## [2026-03-22] - Odoo UI: Задачи 21, 22 завершены
+
+### Задача 21: Settings.tsx — рестайл на Odoo
+- **21.1** Все секции-карточки → `OdooCard` (убраны `bg-card border border-border/60 rounded-2xl`)
+- **21.2** Кнопки → `variant="odoo-primary"/"odoo-secondary"/"odoo-ghost"`; язык → `PillTabs`; sidebar nav — Odoo active `bg-[--p50] text-[--p700]`
+- **21.3** Заголовки секций → `o-overline` (убраны inline `text-[11px] font-semibold uppercase tracking-widest`)
+- **21.4** `Switch` — оставлен shadcn без изменений
+- Десктопный sidebar: `w-56 bg-white border-[--g200]`, nav item active `bg-[--p50] text-[--p700]`
+- Фон правой панели desktop → `bg-[--g50]`
+
+### Задача 22: ResponsiveShell.tsx + BottomNav — Odoo адаптивность
+- **22.2** `ShellSidebar`: `w-72 bg-muted/20 border-border/50` → `w-[220px] bg-white border-[--g200]`; quick action кнопка → `odoo-primary/odoo-secondary`
+- **22.2** Nav heading → `text-[--g500] tracking-[0.2em]`
+- **22.13** `ShellSidebarLink`: `variant="secondary"/"ghost"` → cn с `bg-[--p50] text-[--p700]` / `text-[--g700] hover:bg-[--g100]`; `strokeWidth=1.5` на иконках
+- **22.13** `ShellTextLink` / `ShellCompactLink`: аналогичный рестайл, `h-8` (вместо `h-9`)
+- **22.13** `ShellTopNav`: `border-border/50 bg-background/95 backdrop-blur` → `border-[--g200] bg-white`, `h-12`
+- `BottomNav` уже имел `lg:hidden` — подтверждено, не менялось
+
+---
+
+## [2026-03-22] - Odoo UI: Задачи 18, 19, 20 завершены
+
+### Задача 18: ActDetail.tsx — полная детализация акта
+- **18.2** Статус-бейдж + прогресс-бар (3 шага: черновик → в работе → принято)
+- **18.3** Accordion-секции: Основные данные, Работы, Материалы, Документы, Нормативы
+- **18.4** Sheet снизу для выбора шаблонов PDF (КС-2, АОСР упрощённый, АОСР полный)
+- **18.5** Кнопка «Экспорт PDF» → анимированный прогресс-бар генерации
+- **18.7** Warning-блоки для отсутствующих дат и проектных чертежей
+- Убран placeholder «Задача 18 в разработке»; добавлены импорты: Accordion, Sheet, Progress, AlertTriangle, CheckCircle2
+
+### Задача 19: SourceMaterials.tsx — рестайл на Odoo
+- **19.1** OdooCard для каждого материала + OdooBadge (Доки ✓ / Нет доков)
+- **19.2** Infinite scroll (IntersectionObserver, PAGE_SIZE=20) + debounced search
+- **19.3** Правая панель (lg+): OdooCard с метриками (партии, документы, кач. доки) + OdooBadge тип
+- **19.6** OdooEmptyState для пустого списка и нулевых результатов поиска
+- Pill-фильтры → PillTabs component; FAB → `variant="odoo-fab"` `size="odoo-fab-size"`
+- Удалён неиспользуемый MaterialCard из импортов
+
+### Задача 20: SourceDocuments.tsx — рестайл на Odoo
+- **20.1** OdooCard + Badge (тип документа) + название + дата для каждого документа
+- **20.2** PillTabs фильтр по типу (Все, Серт., Декл., Паспорт, …) + Select для scope
+- **20.3** Infinite scroll (IntersectionObserver, PAGE_SIZE=20)
+- **20.4** Sheet (вместо Dialog) с OdooForm-формой для добавления документа
+- **20.5** OdooEmptyState для пустого реестра + правая панель с подсказкой
+- Удалены неиспользуемые импорты: ScrollArea, Dialog*, DocumentCard, isDragging
+
+---
+
+## [2026-03-22] - Odoo UI: Задачи 15, 16, 17 завершены
+
+### Задача 15: Schedule.tsx
+- **15.1** Info-card «График сформирован»: OdooCard с BarChart2 + источник + кол-во задач + диапазон дат
+- **15.2** Period switcher «Нед.|Мес.»: pill-кнопки меняют шаг навигации (7/30 дней)
+- 15.3–15.7: подтверждены как уже реализованные (bar colors, metadata, legend, sticky col, month nav)
+
+### Задача 16: SourceData.tsx
+- **16.1** Object selector: `bg-[--p50] border border-[--p300]` + Building2 иконка
+- **16.2** Overline «СТОРОНЫ / УЧАСТНИКИ» (`o-overline`)
+- **16.3** Chip участника: OdooCard hoverable + o-overline роль + ✓ ИНН зелёный / ○ серый индикатор
+- **16.4** Overline «РАЗДЕЛЫ» + OdooCard stat cards
+- **16.5** Stat card Материалы: Progress bar + кнопки «+ Поставка» / «📷 Скан» (`odoo-secondary compact`)
+- **16.7** Accordion «Реквизиты объекта»: название / адрес / город
+- Добавлены импорты: Accordion, OdooCard, Progress, Building2, MapPin
+
+### Задача 17: Works.tsx
+- **17.1** tabToggle → PillTabs component (ВОР / Смета)
+- **17.6** OdooEmptyState для «Нет ВОР», «Выберите коллекцию», «Ничего не найдено»
+- Добавлены импорты: PillTabs, OdooEmptyState, FileText
+
+---
+
+## [2026-03-22] - Odoo UI: Задача 14 WorkLog.tsx завершена
+
+### Добавлено
+- `TableWrapper` компонент (локальный) — scroll-обёртка для таблиц ЖР: scroll hint + `border-[--g200] rounded-[--o-radius-lg]`
+- `TablePagination` компонент (локальный) — кнопки Назад/Далее для таблиц разд. 1/2/4/5
+- FAB кнопка «+» (`variant="odoo-fab"`) — только на Разд. 3, `fixed bottom-24 right-4`
+- Ghost card «+ Добавить новую запись» (dashed border) в конце списка Разд. 3
+
+### Изменено
+- `client/src/pages/WorkLog.tsx`:
+  - **Разд. 3**: таблица → Odoo card list: дата (число/день/месяц) + OdooBadge (принято/в работе) + kebab ⋮ + текст с inline-редактированием
+  - **Info badge** (14.2): добавлена дата последней записи; overline «ОБЩИЙ ПРОГРЕСС» (14.3)
+  - **Infinite scroll** (14.8): IntersectionObserver, 15 записей/порция для Разд. 3
+  - **Разд. 1/2/4/5** (14.7): обёрнуты в `TableWrapper`, шапки без изменений; пагинация кнопками
+
+---
+
+## [2026-03-22] - Odoo UI: Задача 13 Acts.tsx завершена
+
+### Добавлено
+- `client/src/pages/ActDetail.tsx` — placeholder страница детали акта (`/acts/:id`), готова к наполнению в Задаче 18
+- `client/src/App.tsx` — маршрут `/acts/:id` → `ActDetail`
+
+### Изменено
+- `client/src/pages/Acts.tsx`:
+  - **Summary row** — строка статистики `N актов · X принято · Y в работе · Z черновик` после CTA
+  - **Warning block** — предупреждение (AlertTriangle + border-warning) для актов без дат
+  - **Infinite scroll** — IntersectionObserver, 10 актов за загрузку, sentinel с Loader2
+  - **Drill-down** — OdooCard кликабелен, navigate к `/acts/:id`; ChevronRight в заголовке
+  - **Badge** — локализованные метки (принято / в работе / черновик) вместо raw status; вариант `info` для generated
+  - Download кнопка: `e.stopPropagation()` чтобы не триггерить drill-down
+
+---
+
+## [2026-03-22] - Синхронизация трекера Odoo UI (`tasktrecker_odoo_style.md`)
+
+### Изменено
+- `docs/tasktrecker_odoo_style.md` — статусы задач 1–22 и чекбоксы шагов приведены в соответствие с репозиторием; добавлены примечание о синхронизации и таблица «Сводка прогресса»
+
+---
+
+## [2026-03-22] - Odoo UI: компоненты таблиц, форм, навигации (Задачи 3–8)
+
+### Добавлено
+- `client/src/components/ui/odoo-table.tsx` — `OdooTable`, `OdooTHead`, `OdooTh`, `OdooTBody`, `OdooTr`, `OdooTd`, `OdooTFoot`: sticky header, zebra, hover, scroll hint
+- `client/src/components/ui/odoo-form-section.tsx` — `OdooFormSection` (overline + required), `OdooFieldHint`, `OdooFieldError` (slide-in анимация)
+- `client/src/components/ui/button.tsx` — варианты `odoo-primary`, `odoo-secondary`, `odoo-ghost`, `odoo-icon`, `odoo-fab`; размеры `cta`, `std`, `compact`
+- `client/src/components/ui/badge.tsx` — варианты `success`, `warning`, `danger`, `info`, `neutral` (pill-shaped)
+
+### Изменено
+- `client/src/components/Header.tsx` — `bg-white`, `border-[--g200]`, тонкая тень; icon-кнопки → `odoo-icon`; ⚡ → `odoo-primary`; tab-nav активный цвет `text-[--p700]`
+- `client/src/components/BottomNav.tsx` — `bg-white`, `h-14`, `border-[--g200]`, `shadow`; активный `text-[--p700] font-semibold`; `md:hidden` → `lg:hidden`
+- `client/src/components/ui/input.tsx` — `h-10`, `border-[--g300]`, `rounded-[--o-radius-md]`, focus ring sky-500/10
+- `client/src/components/ui/label.tsx` — `text-[13px] font-medium text-[--g700]`
+- `client/src/components/ui/textarea.tsx` — Odoo-стиль (аналогично input)
+- `client/src/components/ui/select.tsx` — SelectTrigger: `h-10`, `border-[--g300]`, focus ring
+- `client/src/pages/Acts.tsx` — статус акта: `default/secondary` → `success/neutral`; счётчик шаблонов `outline` → `neutral`
+- `client/src/pages/Works.tsx` — таблица ВОР переведена на `OdooTable` (позиции + вложенные ресурсы)
+
+---
+
+## [2026-03-22] - Odoo UI: OdooCard (Задача 2)
+
+### Добавлено
+- `client/src/components/ui/odoo-card.tsx` — `OdooCard` (CVA: default/stat/status, hoverable, padding), `OdooCardHeader`, `OdooCardFooter`, `OdooStatCard` (overline + value + delta + progress bar + actions)
+- `client/src/components/ui/card.tsx` — помечен `@deprecated`
+
+### Изменено
+- `client/src/pages/Schedule.tsx` — 3 вхождения `.glass-card` заменены на `<OdooCard>`
+
+---
+
+## [2026-03-22] - Odoo UI: CSS-токены + Tailwind config (Задача 1)
+
+### Добавлено
+- `client/src/index.css` — Odoo TJR цветовая палитра: `--p50`–`--p900` (brand sky), `--g50`–`--g900` (stone neutrals), семантические (`--success/warning/danger/info` + `*-bg`), поверхностная система (`--o-card-bg`, `--o-view-bg`, etc.)
+- `client/src/index.css` — spacing (`--o-spacing-xs/sm/md/lg/xl/2xl/3xl`), radius (`--o-radius-sm/md/lg/xl/pill`), shadows (`--o-shadow-sm/md/lg`)
+- `client/src/index.css` — базовые компонентные классы: `.o-card`, `.o-overline`, `.o-field-label`, `.o-th`, `.o-td`, `.o-numeric`
+- `tailwind.config.ts` — `colors.status` (success/warning/danger/info + online/away/busy/offline), `colors.stripe`
+- `tailwind.config.ts` — `borderRadius`: sm=4px, md=8px, lg=12px, xl=16px, pill=9999px
+
+### Изменено
+- `client/src/design-system.css` — заменён: удалён весь makeui.dev контент, оставлены только motion-токены (`--duration-*`, `--ease-*`)
+- `client/src/index.css` — удалён Outfit из Google Fonts, удалён `.dark` блок (заглушка), обновлены shadcn HSL-токены под Odoo-палитру, заголовки теперь используют Inter вместо Outfit
+- `tailwind.config.ts` — удалён `fontFamily.display` (Outfit), обновлён `borderRadius`
+
+---
+
 ## [2026-03-21] - Синхронизация трекера ISS-002 (`tasktreckerroutes.md`)
 
 ### Изменено

@@ -1,11 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import './design-system.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Telegram WebApp CSS Variables (set by TelegramThemeProvider) */
+  /* ─── Telegram WebApp (set by TelegramThemeProvider) ─── */
   --tg-theme-bg-color: #ffffff;
   --tg-theme-text-color: #000000;
   --tg-theme-hint-color: #999999;
@@ -20,80 +21,155 @@
   --tg-theme-subtitle-text-color: #999999;
   --tg-theme-destructive-text-color: #ef4444;
 
-  /* Professional Construction/Engineering Palette (Blue/Slate based) */
-  /* Using Telegram theme colors as base when available */
-  --background: 210 20% 98%;
-  --foreground: 222 47% 11%;
+  /* ─── Odoo TJR: Brand (sky / голубой) ─── */
+  --p50:  #F0F9FF;
+  --p100: #E0F2FE;
+  --p300: #7DD3FC;
+  --p500: #0EA5E9;
+  --p700: #0369A1;
+  --p900: #0C4A6E;
 
-  /* Surfaces (used by Tailwind bg-card/bg-popover) */
+  /* ─── Odoo TJR: Neutrals (warm stone) ─── */
+  --g50:  #FAFAF9;
+  --g100: #F5F5F4;
+  --g200: #E7E5E4;
+  --g300: #D6D3D1;
+  --g500: #78716C;
+  --g700: #44403C;
+  --g900: #1C1917;
+
+  /* ─── Semantic colors ─── */
+  --success:    #16A34A;
+  --success-bg: #F0FDF4;
+  --warning:    #D97706;
+  --warning-bg: #FFFBEB;
+  --danger:     #DC2626;
+  --danger-bg:  #FEF2F2;
+  --info:       #2563EB;
+  --info-bg:    #EFF6FF;
+
+  /* ─── Odoo surface system ─── */
+  --o-brand-primary:       199 89% 48%;   /* #0EA5E9 */
+  --o-brand-primary-dark:  201 96% 32%;   /* #0369A1 */
+  --o-brand-primary-light: 198 93% 60%;   /* #38BDF8 */
+  --o-view-bg:    0 0% 98%;               /* #FAFAF9 */
+  --o-card-bg:    0 0% 100%;              /* #FFFFFF */
+  --o-card-border: 20 6% 90%;            /* #E7E5E4 */
+  --o-section-bg: 0 0% 96%;              /* #F5F5F4 */
+
+  /* ─── Odoo spacing (8px base) ─── */
+  --o-spacing-xs:  4px;
+  --o-spacing-sm:  8px;
+  --o-spacing-md:  12px;
+  --o-spacing-lg:  16px;
+  --o-spacing-xl:  24px;
+  --o-spacing-2xl: 32px;
+  --o-spacing-3xl: 48px;
+
+  /* ─── Odoo border-radius ─── */
+  --o-radius-sm:   4px;
+  --o-radius-md:   8px;
+  --o-radius-lg:   12px;
+  --o-radius-xl:   16px;
+  --o-radius-pill: 9999px;
+
+  /* ─── Odoo shadows (flat, minimal) ─── */
+  --o-shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --o-shadow-md: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --o-shadow-lg: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+
+  /* ─── shadcn / Radix compatibility (HSL tokens) ─── */
+  --background: 0 0% 98%;
+  --foreground: 20 14% 11%;
+
   --card: 0 0% 100%;
-  --card-foreground: var(--foreground);
-  --card-border: var(--border);
+  --card-foreground: 20 14% 11%;
+  --card-border: 20 6% 90%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: var(--foreground);
-  --popover-border: var(--border);
-  
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
-  
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222 47% 11.2%;
-  
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215 16% 47%;
-  
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222 47% 11.2%;
-  
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221.2 83.2% 53.3%;
-  
-  --radius: 0.75rem;
+  --popover-foreground: 20 14% 11%;
+  --popover-border: 20 6% 90%;
 
+  --primary: 199 89% 48%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 0 0% 96%;
+  --secondary-foreground: 20 14% 11%;
+
+  --muted: 0 0% 96%;
+  --muted-foreground: 20 5% 46%;
+
+  --accent: 0 0% 96%;
+  --accent-foreground: 20 14% 11%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 20 6% 90%;
+  --input: 20 6% 90%;
+  --ring: 199 89% 48%;
+
+  --radius: 0.5rem;
+
+  /* ─── Typography ─── */
   --font-sans: 'Inter', sans-serif;
-  --font-display: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  /* ─── Shell layout ─── */
+  --safe-area-top:    env(safe-area-inset-top, 0px);
+  --safe-area-right:  env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left:   env(safe-area-inset-left, 0px);
+  --app-viewport-height:   var(--tg-viewport-stable-height, 100dvh);
+  --app-viewport-width:    var(--tg-viewport-width, 100vw);
+  --shell-header-height:      3.5rem;
+  --shell-bottom-nav-height:  4rem;
+  --shell-content-max-width:  100%;
+  --shell-content-padding-x:  1rem;
+  --shell-content-padding-y:  1rem;
+  --shell-font-scale: 1;
 }
 
+/* Dark theme stub — not in scope, kept for future */
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
+  color-scheme: dark;
+}
 
-  /* Surfaces (used by Tailwind bg-card/bg-popover) */
-  --card: 222.2 84% 4.9%;
-  --card-foreground: var(--foreground);
-  --card-border: var(--border);
+@media (min-width: 768px) {
+  :root {
+    --shell-header-height:     4rem;
+    --shell-bottom-nav-height: 4.5rem;
+    --shell-content-padding-x: 1.5rem;
+    --shell-content-padding-y: 1.25rem;
+    --shell-content-max-width: 64rem;
+    --shell-font-scale: 1.02;
+  }
+}
 
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: var(--foreground);
-  --popover-border: var(--border);
-  
-  --primary: 217.2 91.2% 59.8%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 224.3 76.3% 48%;
+@media (min-width: 1024px) {
+  :root {
+    --shell-content-padding-x: 2rem;
+    --shell-content-padding-y: 1.5rem;
+    --shell-content-max-width: 72rem;
+    --shell-font-scale: 1.04;
+  }
 }
 
 @layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+  }
+
+  body,
+  #root {
+    min-height: 100vh;
+    min-height: var(--app-viewport-height);
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
@@ -102,8 +178,8 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
-    @apply font-bold tracking-tight;
+    font-family: var(--font-sans);
+    @apply font-semibold tracking-tight;
     color: var(--tg-theme-text-color);
   }
 
@@ -112,91 +188,110 @@
   }
 }
 
+@layer components {
+  /* ─── Odoo overline label (section headings) ─── */
+  .o-overline {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--g500);
+  }
+
+  /* ─── Odoo card base ─── */
+  .o-card {
+    background: #ffffff;
+    border: 1px solid var(--g200);
+    border-radius: var(--o-radius-lg);
+    padding: var(--o-spacing-lg);
+    box-shadow: var(--o-shadow-sm);
+    transition: box-shadow 0.15s ease;
+  }
+
+  .o-card-hoverable:hover {
+    box-shadow: var(--o-shadow-md);
+  }
+
+  .o-card-hoverable:active {
+    transform: scale(0.995);
+  }
+
+  /* ─── Odoo form field ─── */
+  .o-field-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--g700);
+    margin-bottom: 4px;
+  }
+
+  /* ─── Odoo table header cell ─── */
+  .o-th {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--g700);
+    white-space: nowrap;
+    padding: 8px 12px;
+  }
+
+  /* ─── Odoo table data cell ─── */
+  .o-td {
+    font-size: 13px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--g200);
+  }
+
+  /* ─── Numeric data ─── */
+  .o-numeric {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-  
-  /* Telegram Theme Utilities */
-  .tg-bg {
-    background-color: var(--tg-theme-bg-color);
-  }
-  
-  .tg-text {
-    color: var(--tg-theme-text-color);
-  }
-  
-  .tg-hint {
-    color: var(--tg-theme-hint-color);
-  }
-  
-  .tg-link {
-    color: var(--tg-theme-link-color);
-  }
-  
-  .tg-button {
-    background-color: var(--tg-theme-button-color);
-    color: var(--tg-theme-button-text-color);
-  }
-  
-  .tg-secondary-bg {
-    background-color: var(--tg-theme-secondary-bg-color);
-  }
-  
-  .tg-accent {
-    color: var(--tg-theme-accent-text-color);
-  }
-  
-  .tg-destructive {
-    color: var(--tg-theme-destructive-text-color);
-  }
-  
-  /* Glassmorphism utilities */
-  .glass {
-    @apply bg-white/70 backdrop-blur-lg border border-white/20 shadow-xl dark:bg-black/70 dark:border-white/10;
-  }
-  
-  .glass-card {
-    @apply bg-white/80 backdrop-blur-md border border-white/40 shadow-sm hover:shadow-md transition-all duration-300 dark:bg-slate-900/80 dark:border-slate-800;
-  }
-  
-  /* Mobile-first specific utilities */
-  .mobile-safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 20px);
-  }
-  
-  /* Vertical text rotation for document tables */
+  /* ─── Safe area ─── */
+  .pt-safe { padding-top: var(--safe-area-top); }
+  .pb-safe { padding-bottom: var(--safe-area-bottom); }
+  .pl-safe { padding-left: var(--safe-area-left); }
+  .pr-safe { padding-right: var(--safe-area-right); }
+  .mobile-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 20px); }
+
+  /* ─── Telegram theme utilities ─── */
+  .tg-bg           { background-color: var(--tg-theme-bg-color); }
+  .tg-text         { color: var(--tg-theme-text-color); }
+  .tg-hint         { color: var(--tg-theme-hint-color); }
+  .tg-link         { color: var(--tg-theme-link-color); }
+  .tg-button       { background-color: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color); }
+  .tg-secondary-bg { background-color: var(--tg-theme-secondary-bg-color); }
+  .tg-accent       { color: var(--tg-theme-accent-text-color); }
+  .tg-destructive  { color: var(--tg-theme-destructive-text-color); }
+
+  /* ─── Text ─── */
+  .text-balance { text-wrap: balance; }
+
+  /* ─── Document tables ─── */
   .writing-vertical-rl {
     writing-mode: vertical-rl;
     text-orientation: mixed;
   }
-  
-  /* Hide scrollbar for carousel */
+
+  /* ─── Carousel / scroll ─── */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-  
-  /* Subtle grain texture for depth */
-  .bg-grain {
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
-  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* ─── Custom scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/20 rounded-full;
+  background: var(--g300);
+  border-radius: var(--o-radius-pill);
 }
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/40;
-}
+::-webkit-scrollbar-thumb:hover { background: var(--g500); }
