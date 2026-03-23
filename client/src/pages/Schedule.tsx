@@ -447,6 +447,7 @@ export default function Schedule() {
   const { dayWidth, visibleDays } = ZOOM_CONFIGS[zoomLevel];
   const timelineWidth = visibleDays * dayWidth;
   const rowHeight = 88;
+  const auxRowHeight = 32;
 
   // When auxiliary rows are expanded (estimate source), the left table grows,
   // so the timeline must also grow and shift bars down accordingly.
@@ -462,17 +463,18 @@ export default function Schedule() {
       }
     }
 
-    const taskTopRowIndexByTaskId = new Map<number, number>();
-    let rowIndex = 0;
+    const taskTopPixelByTaskId = new Map<number, number>();
+    let pixelOffset = 0;
     for (const task of tasks) {
-      taskTopRowIndexByTaskId.set(task.id, rowIndex);
-      rowIndex += 1 + (expandedAuxCountByTaskId.get(task.id) ?? 0);
+      taskTopPixelByTaskId.set(task.id, pixelOffset);
+      const auxCount = expandedAuxCountByTaskId.get(task.id) ?? 0;
+      pixelOffset += rowHeight + auxCount * auxRowHeight;
     }
 
     return {
       expandedAuxCountByTaskId,
-      taskTopRowIndexByTaskId,
-      totalRows: rowIndex,
+      taskTopPixelByTaskId,
+      totalHeight: pixelOffset,
     };
   }, [tasks, sourceType, expandedTaskIds, auxiliaryPositionsByMainId]);
 
@@ -1311,7 +1313,7 @@ export default function Schedule() {
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-6 w-6 text-muted-foreground/60"
+                                        className="h-6 w-6 text-blue-500"
                                         onClick={() => toggleTaskExpanded(task.id)}
                                       >
                                         <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isExpanded ? "rotate-0" : "-rotate-90")} />
@@ -1402,8 +1404,8 @@ export default function Schedule() {
                           {isExpanded && auxiliaries.map((aux: any, idx: number) => (
                             <div
                               key={`aux-${task.id}-${idx}`}
-                              className="pl-12 pr-3 py-1 bg-muted/20 border-b border-border/40 text-xs text-muted-foreground flex items-center"
-                              style={{ height: rowHeight }}
+                              className="pl-12 pr-3 bg-muted/20 border-b border-border/40 text-xs text-muted-foreground flex items-center"
+                              style={{ height: auxRowHeight }}
                             >
                               <div className="flex items-start gap-2">
                                 <span className="font-mono shrink-0">{aux.lineNo || aux.code}</span>
@@ -1472,7 +1474,7 @@ export default function Schedule() {
                     className="relative shrink-0"
                     style={{
                       width: timelineWidth,
-                      height: scheduleRowLayout.totalRows * rowHeight,
+                      height: scheduleRowLayout.totalHeight,
                       backgroundImage:
                         `repeating-linear-gradient(to right, rgba(0,0,0,0.06) 0, rgba(0,0,0,0.06) 1px, transparent 1px, transparent ${dayWidth}px),` +
                         `repeating-linear-gradient(to bottom, rgba(0,0,0,0.04) 0, rgba(0,0,0,0.04) 1px, transparent 1px, transparent ${rowHeight}px)`,
@@ -1482,9 +1484,9 @@ export default function Schedule() {
                         const start = differenceInCalendarDays(parseISO(String(task.startDate)), parseISO(viewCalendarStart));
                         const left = Math.max(0, start) * dayWidth;
                         const width = Math.max(1, Number(task.durationDays || 1)) * dayWidth;
-                        const topRow = scheduleRowLayout.taskTopRowIndexByTaskId.get(task.id) ?? 0;
+                        const topPx = scheduleRowLayout.taskTopPixelByTaskId.get(task.id) ?? 0;
                         const barHeight = 24; // h-6
-                        const top = topRow * rowHeight + Math.max(0, Math.floor((rowHeight - barHeight) / 2));
+                        const top = topPx + Math.max(0, Math.floor((rowHeight - barHeight) / 2));
                         
                         const splitGroupId = task.splitGroupId;
                         const splitColor = getSplitTaskColor(splitGroupId);
