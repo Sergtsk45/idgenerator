@@ -64,18 +64,17 @@ export function InvoiceImportButton({ objectId, onParsed }: InvoiceImportButtonP
         onChange={handleFileChange}
       />
       <Button
-        size="icon"
         variant="secondary"
-        className="h-14 w-14 rounded-full shadow-xl bg-secondary hover:bg-secondary/90 transition-transform hover:scale-105 active:scale-95"
+        className="h-14 rounded-full px-5 shadow-xl bg-secondary hover:bg-secondary/90 transition-transform hover:scale-105 active:scale-95 gap-2 text-sm font-medium"
         disabled={parseInvoice.isPending}
         onClick={() => fileRef.current?.click()}
-        title={language === "ru" ? "Импорт из счёта (PDF)" : "Import from invoice (PDF)"}
       >
         {parseInvoice.isPending ? (
-          <Loader2 className="h-6 w-6 animate-spin" />
+          <Loader2 className="h-5 w-5 animate-spin shrink-0" />
         ) : (
-          <FileUp className="h-6 w-6" />
+          <FileUp className="h-5 w-5 shrink-0" />
         )}
+        {language === "ru" ? "Импорт из счёта" : "Import invoice"}
       </Button>
     </>
   );
