@@ -302,9 +302,9 @@ export default function SourceMaterials() {
       </div>
 
       {/* FAB */}
-      <div className="fixed bottom-20 right-4 z-40 flex items-center gap-3 md:bottom-6 md:right-6 lg:fixed lg:bottom-6 lg:right-6 lg:left-auto">
+      <div className="fixed bottom-[88px] right-4 z-50 flex flex-row flex-nowrap items-center gap-3 md:bottom-6 md:right-6">
         {filter === "local" && Number.isFinite(objectId) && (
-          <TariffGuard 
+          <TariffGuard
             feature="INVOICE_IMPORT"
             fallback={
               <UpgradePrompt feature="INVOICE_IMPORT" className="max-w-sm" />
@@ -317,6 +317,7 @@ export default function SourceMaterials() {
           variant="odoo-fab"
           size="odoo-fab-size"
           onClick={openWizard}
+          className="!relative !bottom-auto !right-auto"
           aria-label={language === "ru" ? "Добавить материал" : "Add material"}
         >
           <Plus className="h-6 w-6" />
