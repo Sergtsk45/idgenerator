@@ -115,9 +115,29 @@ export class AuthService {
     if (existingProvider.length > 0) {
       const userId = existingProvider[0].userId;
       const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      
+
       if (user.length === 0) {
         throw new Error('User not found for existing provider');
+      }
+
+      // При каждом входе через Telegram обновляем displayName и metadata
+      if (provider === 'telegram' && metadata) {
+        const newDisplayName = this.generateDisplayName(provider, externalId, metadata);
+        await Promise.all([
+          db.update(users)
+            .set({ displayName: newDisplayName })
+            .where(eq(users.id, userId)),
+          db.update(authProviders)
+            .set({ metadata })
+            .where(and(eq(authProviders.provider, provider), eq(authProviders.externalId, externalId))),
+        ]);
+        return {
+          id: user[0].id,
+          displayName: newDisplayName,
+          email: user[0].email,
+          role: user[0].role,
+          isBlocked: user[0].isBlocked,
+        };
       }
 
       return {

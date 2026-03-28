@@ -3317,17 +3317,18 @@ export const adminStorage = {
         .where(inArray(messages.userId, userIds))
         .groupBy(messages.userId),
       db
-        .select({ userId: authProviders.userId, provider: authProviders.provider, externalId: authProviders.externalId })
+        .select({ userId: authProviders.userId, provider: authProviders.provider, externalId: authProviders.externalId, metadata: authProviders.metadata })
         .from(authProviders)
         .where(inArray(authProviders.userId, userIds)),
     ]);
 
     const actsMap = new Map(actsCountRows.map((r) => [r.userId, Number(r.cnt)]));
     const messagesMap = new Map(messagesCountRows.map((r) => [r.userId, Number(r.cnt)]));
-    const providersMap = new Map<number, { provider: string; externalId: string | null }[]>();
+    const providersMap = new Map<number, { provider: string; externalId: string | null; username: string | null }[]>();
     for (const p of providerRows) {
       const list = providersMap.get(p.userId) ?? [];
-      list.push({ provider: p.provider, externalId: p.externalId ?? null });
+      const username = (p.metadata as Record<string, unknown> | null)?.username as string | null ?? null;
+      list.push({ provider: p.provider, externalId: p.externalId ?? null, username });
       providersMap.set(p.userId, list);
     }
 

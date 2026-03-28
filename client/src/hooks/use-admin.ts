@@ -14,6 +14,7 @@ import { getAuthToken } from "@/lib/auth";
 export interface AdminUserAuthProvider {
   provider: 'telegram' | 'email' | 'phone';
   externalId: string | null;
+  username: string | null;
 }
 
 export interface AdminUserRow {

@@ -176,9 +176,11 @@ function UserCard({ user }: { user: AdminUserRow }) {
           {user.authProviders.length > 0 && (
             <div className="flex gap-1 mt-1 flex-wrap">
               {user.authProviders.map((p) => (
-                <Badge key={p.provider} variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5">
+                <Badge key={p.provider} variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 font-mono">
                   {p.provider === 'telegram' ? <MessageCircle className="h-2.5 w-2.5" /> : <Mail className="h-2.5 w-2.5" />}
-                  {p.provider === 'telegram' ? 'TG' : p.provider === 'email' ? 'Email' : 'Phone'}
+                  {p.provider === 'telegram'
+                    ? `TG:${p.externalId ?? '—'}${p.username ? ` @${p.username}` : ''}`
+                    : p.provider === 'email' ? 'Email' : 'Phone'}
                 </Badge>
               ))}
             </div>
