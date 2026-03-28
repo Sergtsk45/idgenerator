@@ -1213,7 +1213,7 @@ export default function Schedule() {
               {/* Таблица Ганта */}
               <OdooCard className="overflow-hidden" padding="none">
                 <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-16rem)]">
                 {/* Header */}
                 <div className="flex border-b bg-muted/20">
                   <div className="w-[160px] md:w-[400px] shrink-0 px-3 py-2">
