@@ -856,7 +856,7 @@ export default function Works() {
         {/* Left sidebar — visible only on lg+ */}
         <aside
           data-testid="works-sidebar"
-          className="hidden lg:flex lg:flex-col w-72 shrink-0 border-r border-border/50 bg-muted/10"
+          className="hidden lg:flex lg:flex-col w-96 shrink-0 border-r border-border/50 bg-muted/10"
         >
           <div className="sticky top-[7rem] overflow-y-auto max-h-[calc(100vh-7rem)] p-4 space-y-4">
             {tabToggle}
