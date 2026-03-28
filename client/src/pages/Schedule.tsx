@@ -1251,10 +1251,17 @@ export default function Schedule() {
                     <div className="flex shrink-0" style={{ width: timelineWidth }}>
                       {Array.from({ length: visibleDays }).map((_, i) => {
                         const d = addDays(parseISO(viewCalendarStart), i);
+                        const dow = d.getDay();
+                        const isWeekend = dow === 0 || dow === 6;
                         return (
                           <div
                             key={i}
-                            className="shrink-0 border-l border-border/40 px-1 py-2 text-[10px] text-muted-foreground"
+                            className={cn(
+                              "shrink-0 border-l border-border/40 px-1 py-2 text-[10px]",
+                              isWeekend
+                                ? "bg-black/[0.045] text-muted-foreground/70 font-semibold"
+                                : "text-muted-foreground"
+                            )}
                             style={{ width: dayWidth }}
                             title={format(d, "yyyy-MM-dd")}
                           >
@@ -1508,6 +1515,18 @@ export default function Schedule() {
                         `repeating-linear-gradient(to bottom, rgba(0,0,0,0.04) 0, rgba(0,0,0,0.04) 1px, transparent 1px, transparent ${rowHeight}px)`,
                     }}
                   >
+                    {/* Weekend shading */}
+                    {Array.from({ length: visibleDays }).map((_, i) => {
+                      const dow = addDays(parseISO(viewCalendarStart), i).getDay();
+                      if (dow !== 0 && dow !== 6) return null;
+                      return (
+                        <div
+                          key={`ws-${i}`}
+                          className="absolute inset-y-0 pointer-events-none"
+                          style={{ left: i * dayWidth, width: dayWidth, backgroundColor: "rgba(0,0,0,0.045)" }}
+                        />
+                      );
+                    })}
                     {filteredTasks.map((task) => {
                         const start = differenceInCalendarDays(parseISO(String(task.startDate)), parseISO(viewCalendarStart));
                         const left = Math.max(0, start) * dayWidth;
