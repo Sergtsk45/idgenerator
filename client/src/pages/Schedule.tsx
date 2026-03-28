@@ -1215,26 +1215,54 @@ export default function Schedule() {
                 <CardContent className="p-0">
                 <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-16rem)]">
                 {/* Header */}
-                <div className="flex border-b bg-muted/20">
-                  <div className="w-[160px] md:w-[400px] shrink-0 px-3 py-2">
-                    <div className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                      {language === "ru" ? "НАИМЕНОВАНИЕ РАБОТ" : "WORKS"}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0" style={{ width: timelineWidth }}>
-                    {Array.from({ length: visibleDays }).map((_, i) => {
-                      const d = addDays(parseISO(viewCalendarStart), i);
-                      return (
+                <div className="bg-muted/20 border-b">
+                  {/* Month row */}
+                  <div className="flex border-b border-border/30">
+                    <div className="w-[160px] md:w-[400px] shrink-0" />
+                    {(() => {
+                      const groups: { label: string; days: number }[] = [];
+                      for (let i = 0; i < visibleDays; i++) {
+                        const d = addDays(parseISO(viewCalendarStart), i);
+                        const label = format(d, "LLLL yyyy", { locale: language === "ru" ? ru : enUS });
+                        if (groups.length === 0 || groups[groups.length - 1].label !== label) {
+                          groups.push({ label, days: 1 });
+                        } else {
+                          groups[groups.length - 1].days += 1;
+                        }
+                      }
+                      return groups.map((g) => (
                         <div
-                          key={i}
-                          className="shrink-0 border-l border-border/40 px-1 py-2 text-[10px] text-muted-foreground"
-                          style={{ width: dayWidth }}
-                          title={format(d, "yyyy-MM-dd")}
+                          key={g.label}
+                          className="shrink-0 border-l border-border/40 px-2 py-1 text-[11px] font-medium text-muted-foreground capitalize overflow-hidden whitespace-nowrap"
+                          style={{ width: g.days * dayWidth }}
                         >
-                          {format(d, "dd")}
+                          {g.label}
                         </div>
-                      );
-                    })}
+                      ));
+                    })()}
+                  </div>
+                  {/* Days row */}
+                  <div className="flex">
+                    <div className="w-[160px] md:w-[400px] shrink-0 px-3 py-2">
+                      <div className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                        {language === "ru" ? "НАИМЕНОВАНИЕ РАБОТ" : "WORKS"}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0" style={{ width: timelineWidth }}>
+                      {Array.from({ length: visibleDays }).map((_, i) => {
+                        const d = addDays(parseISO(viewCalendarStart), i);
+                        return (
+                          <div
+                            key={i}
+                            className="shrink-0 border-l border-border/40 px-1 py-2 text-[10px] text-muted-foreground"
+                            style={{ width: dayWidth }}
+                            title={format(d, "yyyy-MM-dd")}
+                          >
+                            {format(d, "dd")}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
