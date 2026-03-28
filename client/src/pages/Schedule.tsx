@@ -1692,7 +1692,7 @@ export default function Schedule() {
         }}
       >
         <DialogContent
-          className="sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col touch-pan-y overscroll-contain overflow-x-hidden"
+          className="w-[calc(100%-2rem)] sm:max-w-2xl lg:max-w-3xl h-[85svh] max-h-[85svh] overflow-hidden flex flex-col touch-pan-y overscroll-contain overflow-x-hidden"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
@@ -1936,7 +1936,7 @@ export default function Schedule() {
             </TabsContent>
           </Tabs>
 
-          <div className="flex flex-row gap-2 pt-2 shrink-0">
+          <div className="flex flex-row gap-2 pt-3 mt-1 border-t shrink-0">
             <Button variant="outline" className="flex-1" onClick={() => {
               setEditOpen(false);
               setSelectedTask(null);
@@ -1956,7 +1956,7 @@ export default function Schedule() {
         setActTemplatePickerOpen(open);
         if (!open) setActTemplateSearch("");
       }}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg min-h-[50svh] max-h-[85svh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>{language === "ru" ? "Выбрать тип акта" : "Select act type"}</DialogTitle>
           </DialogHeader>
