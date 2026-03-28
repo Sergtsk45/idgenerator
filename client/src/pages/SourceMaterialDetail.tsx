@@ -9,10 +9,10 @@ import { useEffect, useMemo, useState } from "react";
 import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Drawer, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PillTabs } from "@/components/ui/pill-tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -219,19 +219,29 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
         )}
       </div>
 
-      <Drawer open={addBatchOpen} onOpenChange={setAddBatchOpen}>
-        <DrawerContent className="max-h-[90vh]">
-          <DrawerHeader>
-            <DrawerTitle>Добавить партию</DrawerTitle>
-          </DrawerHeader>
-          <div className="px-4 pb-4">
-            <ScrollArea className="h-[60vh] pr-2">
-              <BatchForm value={batchDraft} onChange={setBatchDraft} disabled={createBatch.isPending} />
-            </ScrollArea>
+      <Dialog open={addBatchOpen} onOpenChange={setAddBatchOpen}>
+        <DialogContent
+          className="w-[calc(100%-2rem)] sm:max-w-2xl lg:max-w-3xl h-[85svh] max-h-[85svh] overflow-hidden flex flex-col touch-pan-y overscroll-contain overflow-x-hidden"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Добавить партию</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y pr-1">
+            <BatchForm value={batchDraft} onChange={setBatchDraft} disabled={createBatch.isPending} />
           </div>
-          <DrawerFooter>
+          <div className="flex flex-row gap-2 pt-3 mt-1 border-t shrink-0">
             <Button
-              className="w-full rounded-xl"
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setAddBatchOpen(false)}
+              disabled={createBatch.isPending}
+            >
+              Отмена
+            </Button>
+            <Button
+              className="flex-1"
               disabled={createBatch.isPending}
               onClick={async () => {
                 try {
@@ -259,14 +269,11 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
               <Plus className="h-4 w-4 mr-2" />
               Сохранить
             </Button>
-            <Button type="button" variant="outline" className="w-full rounded-xl" onClick={() => setAddBatchOpen(false)} disabled={createBatch.isPending}>
-              Отмена
-            </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      <Drawer
+      <Dialog
         open={bindDocOpen}
         onOpenChange={(v) => {
           setBindDocOpen(v);
@@ -277,11 +284,14 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
           }
         }}
       >
-        <DrawerContent className="max-h-[90vh]">
-          <DrawerHeader>
-            <DrawerTitle>Привязать документ</DrawerTitle>
-          </DrawerHeader>
-          <div className="px-4 pb-4">
+        <DialogContent
+          className="w-[calc(100%-2rem)] sm:max-w-2xl lg:max-w-3xl h-[85svh] max-h-[85svh] overflow-hidden flex flex-col touch-pan-y overscroll-contain overflow-x-hidden"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Привязать документ</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y pr-1">
             <div className="rounded-xl border p-3">
               <div className="text-sm font-medium">К чему привязать</div>
               <RadioGroup
@@ -373,8 +383,7 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
                 </div>
 
                 <div className="mt-4">
-                  <ScrollArea className="h-[46vh] pr-2">
-                    <div className="grid gap-2">
+                  <div className="grid gap-2">
                       {(docsQuery.data ?? []).length === 0 ? (
                         <div className="text-sm text-muted-foreground py-6 text-center">Документы не найдены</div>
                       ) : (
@@ -433,12 +442,11 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
                         })
                       )}
                     </div>
-                  </ScrollArea>
-                </div>
+                  </div>
               </TabsContent>
 
               <TabsContent value="new" className="mt-4">
-                <ScrollArea className="h-[58vh] pr-2">
+                <div>
                   <div className="grid gap-4">
                     <div className="grid gap-2">
                       <Label>Тип</Label>
@@ -582,18 +590,24 @@ export default function SourceMaterialDetail(props: { params: { id: string } }) 
                       Создать и привязать
                     </Button>
                   </div>
-                </ScrollArea>
+                </div>
               </TabsContent>
             </Tabs>
           </div>
 
-          <DrawerFooter>
-            <Button type="button" variant="outline" className="w-full rounded-xl" onClick={() => setBindDocOpen(false)} disabled={createBinding.isPending || createDocument.isPending}>
+          <div className="flex flex-row gap-2 pt-3 mt-1 border-t shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setBindDocOpen(false)}
+              disabled={createBinding.isPending || createDocument.isPending}
+            >
               Закрыть
             </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ResponsiveShell>
   );
 }
