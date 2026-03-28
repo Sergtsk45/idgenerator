@@ -104,17 +104,19 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
         {/* Mobile bottom nav */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-card z-10 flex">
           {navItems.map((item) => (
-            <Link key={item.href} href={item.href}>
-              <a
-                className={cn(
-                  "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] min-h-[44px] justify-center",
-                  item.active ? "text-primary" : "text-muted-foreground"
-                )}
-              >
-                <item.icon className="h-5 w-5" />
-                {item.label.split(" ")[0]}
-              </a>
-            </Link>
+            <div key={item.href} className="flex-1">
+              <Link href={item.href}>
+                <a
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 py-2 text-[10px] w-full min-h-[44px] justify-center",
+                    item.active ? "text-primary" : "text-muted-foreground"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.label.split(" ")[0]}
+                </a>
+              </Link>
+            </div>
           ))}
         </div>
 
