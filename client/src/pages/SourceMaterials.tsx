@@ -14,11 +14,14 @@ import { OdooCard } from "@/components/ui/odoo-card";
 import { OdooEmptyState } from "@/components/ui/odoo-empty-state";
 import { Badge } from "@/components/ui/badge";
 import { PillTabs } from "@/components/ui/pill-tabs";
-import { AlertTriangle, ChevronRight, Package, Plus, Search } from "lucide-react";
+import { AlertTriangle, ChevronRight, Loader2, Package, Plus, Search } from "lucide-react";
 import { useCurrentObject } from "@/hooks/use-source-data";
-import { useProjectMaterials } from "@/hooks/use-materials";
+import { useProjectMaterials, useProjectMaterial } from "@/hooks/use-materials";
+import { usePatchDocumentBinding } from "@/hooks/use-documents";
 import { type ProjectMaterialListItem } from "@/components/materials/MaterialCard";
+import { MaterialDetailView } from "@/components/materials/MaterialDetailView";
 import { MaterialWizard } from "@/components/materials/MaterialWizard";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { InvoiceImportButton } from "@/components/materials/InvoiceImportButton";
 import { InvoicePreviewDialog } from "@/components/materials/InvoicePreviewDialog";
 import { TariffGuard } from "@/components/TariffGuard";
@@ -27,6 +30,93 @@ import { useLanguageStore } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 20;
+
+function MaterialDetailPanel({ materialId, onOpenFullCard }: { materialId: number; onOpenFullCard: () => void }) {
+  const { language } = useLanguageStore();
+  const { toast } = useToast();
+  const materialQuery = useProjectMaterial(materialId);
+  const patchBinding = usePatchDocumentBinding(materialId);
+
+  const data: any = materialQuery.data;
+  const material = data?.material;
+  const catalog = data?.catalog;
+  const title = material ? String(catalog?.name ?? material?.nameOverride ?? `Материал #${materialId}`) : "";
+  const baseUnit = material ? ((catalog?.baseUnit ?? material?.baseUnitOverride) as string | null) : null;
+
+  if (materialQuery.isLoading) {
+    return (
+      <div className="flex items-center justify-center flex-1">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!data || !material) {
+    return (
+      <div className="flex items-center justify-center flex-1">
+        <OdooEmptyState icon={<Package />} title={language === "ru" ? "Материал не найден" : "Material not found"} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0 border-b border-[--g200]">
+        <div className="min-w-0 flex-1 mr-3">
+          <p className="text-[15px] font-semibold text-[--g900] truncate">{title}</p>
+          {baseUnit && <p className="text-[12px] text-[--g500]">{baseUnit}</p>}
+        </div>
+        <Button variant="odoo-primary" size="compact" onClick={onOpenFullCard} className="shrink-0">
+          {language === "ru" ? "Полная карточка" : "Full card"}
+          <ChevronRight className="h-4 w-4 ml-1" />
+        </Button>
+      </div>
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-6 py-4">
+          <MaterialDetailView
+            materialTitle={title}
+            badge={material.catalogMaterialId != null ? "catalog" : "local"}
+            baseUnit={baseUnit}
+            batches={data.batches ?? []}
+            documents={(data.documents ?? []).map((d: any) => ({
+              id: Number(d.id),
+              docType: String(d.docType ?? ""),
+              scope: String(d.scope ?? ""),
+              title: d.title ?? null,
+              docNumber: d.docNumber ?? null,
+              docDate: d.docDate ?? null,
+              fileUrl: d.fileUrl ?? null,
+            }))}
+            bindings={(data.bindings ?? []).map((b: any) => ({
+              id: Number(b.id),
+              documentId: Number(b.documentId),
+              batchId: b.batchId == null ? null : Number(b.batchId),
+              bindingRole: String(b.bindingRole ?? "quality"),
+              useInActs: Boolean(b.useInActs),
+              isPrimary: Boolean(b.isPrimary),
+            }))}
+            onPatchBinding={(bindingId, patch) =>
+              patchBinding.mutate(
+                { id: bindingId, patch: patch as any },
+                {
+                  onError: (e) =>
+                    toast({
+                      title: language === "ru" ? "Ошибка" : "Error",
+                      description: e instanceof Error ? e.message : String(e),
+                      variant: "destructive",
+                    }),
+                }
+              )
+            }
+            onAddBatch={onOpenFullCard}
+            onBindDocument={onOpenFullCard}
+            onBindDocumentToBatch={onOpenFullCard}
+          />
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
 
 type Filter = "all" | "catalog" | "local" | "attention";
 
@@ -234,8 +324,8 @@ export default function SourceMaterials() {
           </div>
         </div>
 
-        {/* RIGHT PANEL: detail preview — lg+ only */}
-        <div className="hidden lg:flex flex-1 flex-col p-6 overflow-y-auto" data-testid="materials-detail-panel">
+        {/* RIGHT PANEL: full detail — lg+ only */}
+        <div className="hidden lg:flex flex-1 flex-col overflow-hidden" data-testid="materials-detail-panel">
           {selectedMaterial == null ? (
             <div className="flex flex-col items-center justify-center flex-1" data-testid="materials-detail-empty">
               <OdooEmptyState
@@ -244,59 +334,10 @@ export default function SourceMaterials() {
               />
             </div>
           ) : (
-            <OdooCard className="max-w-md">
-              <div className="p-5 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[15px] font-semibold text-[--g900]" data-testid="material-detail-title">
-                      {selectedMaterial.nameOverride ?? `Материал #${selectedMaterial.id}`}
-                    </p>
-                    {selectedMaterial.baseUnitOverride && (
-                      <p className="text-[12px] text-[--g500] mt-0.5">
-                        <span className="o-overline mr-1">{language === "ru" ? "Ед. изм." : "Unit"}</span>
-                        {selectedMaterial.baseUnitOverride}
-                      </p>
-                    )}
-                  </div>
-                  <Badge variant={selectedMaterial.catalogMaterialId != null ? "info" : "neutral"}>
-                    {selectedMaterial.catalogMaterialId != null
-                      ? (language === "ru" ? "Справочник" : "Catalog")
-                      : (language === "ru" ? "Локальный" : "Local")}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { count: selectedMaterial.batchesCount ?? 0, label: language === "ru" ? "Партии" : "Batches" },
-                    { count: selectedMaterial.docsCount ?? 0, label: language === "ru" ? "Документы" : "Docs" },
-                    { count: selectedMaterial.qualityDocsCount ?? 0, label: language === "ru" ? "Кач. доки" : "Quality" },
-                  ].map(({ count, label }) => (
-                    <div key={label} className="text-center p-3 bg-[--g50] rounded-[--o-radius-sm]">
-                      <p className="text-[20px] font-bold text-[--g900] tabular-nums">{count}</p>
-                      <p className="text-[10px] o-overline">{label}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {!selectedMaterial.hasUseInActsQualityDoc && (
-                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-[--o-radius-sm] px-3 py-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[13px] text-amber-700">
-                      {language === "ru" ? "Отсутствует документ качества для актов" : "Quality document for acts is missing"}
-                    </p>
-                  </div>
-                )}
-
-                <Button
-                  variant="odoo-primary"
-                  className="w-full"
-                  onClick={() => setLocation(`/source/materials/${selectedMaterial.id}`)}
-                >
-                  {language === "ru" ? "Открыть полную карточку" : "Open full card"}
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            </OdooCard>
+            <MaterialDetailPanel
+              materialId={selectedMaterial.id}
+              onOpenFullCard={() => setLocation(`/source/materials/${selectedMaterial.id}`)}
+            />
           )}
         </div>
       </div>
