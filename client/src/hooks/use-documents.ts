@@ -72,6 +72,7 @@ export function useCreateDocumentBinding() {
         await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.get.path, Number((variables as any).projectMaterialId)] });
       }
       await queryClient.invalidateQueries({ queryKey: [api.documents.list.path] });
+      await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
     },
   });
 }
@@ -95,6 +96,7 @@ export function usePatchDocumentBinding(projectMaterialId?: number) {
     },
     onSuccess: async () => {
       if (projectMaterialId) await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.get.path, projectMaterialId] });
+      await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
     },
   });
 }
@@ -113,6 +115,7 @@ export function useDeleteDocumentBinding(projectMaterialId?: number) {
     },
     onSuccess: async () => {
       if (projectMaterialId) await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.get.path, projectMaterialId] });
+      await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
     },
   });
 }
