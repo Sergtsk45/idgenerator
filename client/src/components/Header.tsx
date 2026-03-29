@@ -29,6 +29,9 @@ import {
 import { ObjectSelector } from "./ObjectSelector";
 import { cn } from "@/lib/utils";
 import { useLanguageStore, translations } from "@/lib/i18n";
+import { useAuth } from "@/hooks/use-auth";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import {
   getNavigationItemsForSurface,
   getNavigationLabel,
@@ -125,6 +128,11 @@ function LeftSlot({
     groups: "secondary",
   });
   const quickAction = getQuickActionForSurface("headerSheetMobile");
+  const { user } = useAuth();
+
+  const initials = user?.displayName
+    ? user.displayName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+    : "?";
 
   if (showBack) {
     return (
@@ -159,7 +167,18 @@ function LeftSlot({
           <SheetHeader>
             <SheetTitle>{shellT.navigation}</SheetTitle>
           </SheetHeader>
-          <nav className="mt-6 flex flex-col gap-1" aria-label={shellT.secondaryNavigation}>
+          {user && (
+            <div className="mt-4 flex items-center gap-3 rounded-lg bg-[--g50] px-3 py-2.5">
+              <Avatar className="w-9 h-9 shrink-0">
+                <AvatarFallback className="text-sm bg-[--p100] text-[--p700]">{initials}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{user.displayName}</p>
+                {user.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
+              </div>
+            </div>
+          )}
+          <nav className="mt-4 flex flex-col gap-1" aria-label={shellT.secondaryNavigation}>
             {navigationItems.map((item) => {
               const isActive = isNavigationItemActive(item, location);
 
@@ -206,6 +225,12 @@ function RightSlot({
   const shellT = translations[language].shell;
   const quickAction = getQuickActionForSurface("headerQuickActionMobile");
   const secondaryItems = getNavigationItemsForSurface("shellSecondaryMdUp", { groups: "secondary" });
+  const { user } = useAuth();
+
+  const initials = user?.displayName
+    ? user.displayName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+    : "?";
+  const subtitle = user?.email ?? (language === "ru" ? "Настройки" : "Settings");
 
   if (rightAction !== undefined) {
     return <div className="shrink-0">{rightAction}</div>;
@@ -227,14 +252,23 @@ function RightSlot({
           <span className="sr-only">{shellT.search}</span>
         </Button>
       )}
-      {showAvatar && (
-        <div className="relative ml-1">
-          <Avatar className="w-8 h-8">
-            <AvatarFallback className="text-xs">S</AvatarFallback>
-          </Avatar>
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background" />
-        </div>
-      )}
+
+      {/* Аватар с инициалами — всегда виден, ведёт в настройки */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button asChild variant="ghost" size="icon" className="relative w-9 h-9 rounded-full p-0">
+            <Link href="/settings">
+              <Avatar className="w-8 h-8">
+                <AvatarFallback className="text-xs bg-[--p100] text-[--p700]">{initials}</AvatarFallback>
+              </Avatar>
+            </Link>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" align="end">
+          <p className="font-medium">{user?.displayName ?? "—"}</p>
+          {user?.email && <p className="text-xs text-muted-foreground">{user.email}</p>}
+        </TooltipContent>
+      </Tooltip>
 
       {/* md+ secondary nav dropdown (Objects, Settings) */}
       {secondaryItems.length > 0 && (
@@ -246,6 +280,12 @@ function RightSlot({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {/* Блок с именем пользователя */}
+            <DropdownMenuLabel className="font-normal">
+              <p className="font-medium text-sm">{user?.displayName ?? "—"}</p>
+              <p className="text-xs text-muted-foreground">{subtitle}</p>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
             {secondaryItems.map((item) => {
               const isActive = isNavigationItemActive(item, location);
               const label = getNavigationLabel(item, t);
