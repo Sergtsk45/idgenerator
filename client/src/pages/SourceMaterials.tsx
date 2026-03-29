@@ -14,14 +14,12 @@ import { OdooCard } from "@/components/ui/odoo-card";
 import { OdooEmptyState } from "@/components/ui/odoo-empty-state";
 import { Badge } from "@/components/ui/badge";
 import { PillTabs } from "@/components/ui/pill-tabs";
-import { AlertTriangle, ChevronRight, Loader2, Package, Plus, Search } from "lucide-react";
+import { AlertTriangle, Package, Plus, Search } from "lucide-react";
 import { useCurrentObject } from "@/hooks/use-source-data";
-import { useProjectMaterials, useProjectMaterial } from "@/hooks/use-materials";
-import { usePatchDocumentBinding } from "@/hooks/use-documents";
+import { useProjectMaterials } from "@/hooks/use-materials";
 import { type ProjectMaterialListItem } from "@/components/materials/MaterialCard";
-import { MaterialDetailView } from "@/components/materials/MaterialDetailView";
+import { MaterialFullCard } from "@/components/materials/MaterialFullCard";
 import { MaterialWizard } from "@/components/materials/MaterialWizard";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { InvoiceImportButton } from "@/components/materials/InvoiceImportButton";
 import { InvoicePreviewDialog } from "@/components/materials/InvoicePreviewDialog";
 import { TariffGuard } from "@/components/TariffGuard";
@@ -31,92 +29,6 @@ import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 20;
 
-function MaterialDetailPanel({ materialId, onOpenFullCard }: { materialId: number; onOpenFullCard: () => void }) {
-  const { language } = useLanguageStore();
-  const { toast } = useToast();
-  const materialQuery = useProjectMaterial(materialId);
-  const patchBinding = usePatchDocumentBinding(materialId);
-
-  const data: any = materialQuery.data;
-  const material = data?.material;
-  const catalog = data?.catalog;
-  const title = material ? String(catalog?.name ?? material?.nameOverride ?? `Материал #${materialId}`) : "";
-  const baseUnit = material ? ((catalog?.baseUnit ?? material?.baseUnitOverride) as string | null) : null;
-
-  if (materialQuery.isLoading) {
-    return (
-      <div className="flex items-center justify-center flex-1">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!data || !material) {
-    return (
-      <div className="flex items-center justify-center flex-1">
-        <OdooEmptyState icon={<Package />} title={language === "ru" ? "Материал не найден" : "Material not found"} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0 border-b border-[--g200]">
-        <div className="min-w-0 flex-1 mr-3">
-          <p className="text-[15px] font-semibold text-[--g900] truncate">{title}</p>
-          {baseUnit && <p className="text-[12px] text-[--g500]">{baseUnit}</p>}
-        </div>
-        <Button variant="odoo-primary" size="compact" onClick={onOpenFullCard} className="shrink-0">
-          {language === "ru" ? "Полная карточка" : "Full card"}
-          <ChevronRight className="h-4 w-4 ml-1" />
-        </Button>
-      </div>
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="px-6 py-4">
-          <MaterialDetailView
-            materialTitle={title}
-            badge={material.catalogMaterialId != null ? "catalog" : "local"}
-            baseUnit={baseUnit}
-            batches={data.batches ?? []}
-            documents={(data.documents ?? []).map((d: any) => ({
-              id: Number(d.id),
-              docType: String(d.docType ?? ""),
-              scope: String(d.scope ?? ""),
-              title: d.title ?? null,
-              docNumber: d.docNumber ?? null,
-              docDate: d.docDate ?? null,
-              fileUrl: d.fileUrl ?? null,
-            }))}
-            bindings={(data.bindings ?? []).map((b: any) => ({
-              id: Number(b.id),
-              documentId: Number(b.documentId),
-              batchId: b.batchId == null ? null : Number(b.batchId),
-              bindingRole: String(b.bindingRole ?? "quality"),
-              useInActs: Boolean(b.useInActs),
-              isPrimary: Boolean(b.isPrimary),
-            }))}
-            onPatchBinding={(bindingId, patch) =>
-              patchBinding.mutate(
-                { id: bindingId, patch: patch as any },
-                {
-                  onError: (e) =>
-                    toast({
-                      title: language === "ru" ? "Ошибка" : "Error",
-                      description: e instanceof Error ? e.message : String(e),
-                      variant: "destructive",
-                    }),
-                }
-              )
-            }
-            onAddBatch={onOpenFullCard}
-            onBindDocument={onOpenFullCard}
-            onBindDocumentToBatch={onOpenFullCard}
-          />
-        </div>
-      </ScrollArea>
-    </div>
-  );
-}
 
 type Filter = "all" | "catalog" | "local" | "attention";
 
@@ -334,10 +246,7 @@ export default function SourceMaterials() {
               />
             </div>
           ) : (
-            <MaterialDetailPanel
-              materialId={selectedMaterial.id}
-              onOpenFullCard={() => setLocation(`/source/materials/${selectedMaterial.id}`)}
-            />
+            <MaterialFullCard materialId={selectedMaterial.id} objectId={objectId} />
           )}
         </div>
       </div>
