@@ -133,7 +133,7 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
   return (
     <>
       <ScrollArea className="flex-1 min-h-0">
-        <div className="space-y-4 px-4 py-4 pr-6">
+        <div className="space-y-4 px-4 py-4 pr-6 pb-28 lg:pb-6">
           {material.catalogMaterialId == null ? (
             <Button
               variant="outline"
