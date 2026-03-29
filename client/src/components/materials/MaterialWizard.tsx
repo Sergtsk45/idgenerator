@@ -69,10 +69,10 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
     if (step === 1) return true;
     if (step === 2) {
       if (source === "catalog") return selectedCatalogId != null;
-      return nameOverride.trim().length > 0;
+      return nameOverride.trim().length > 0 && baseUnitOverride.trim().length > 0;
     }
     return true;
-  }, [step, source, selectedCatalogId, nameOverride]);
+  }, [step, source, selectedCatalogId, nameOverride, baseUnitOverride]);
 
   const reset = () => {
     setStep(1);
