@@ -1,5 +1,42 @@
 # Changelog
 
+## [2026-07-22] - Исправление критических findings ревью ветки `feature/tablet-ui-v2` (шаг 1)
+
+### Изменено
+- `server/routes/materials.ts`, `server/storage.ts`: endpoints удаления документов и привязок переведены на защищённый поток (`appAuth` + `resolveCurrentObject`), добавлена object-aware проверка доступа с учётом владельца объекта.
+- `server/storage.ts`: удаление документа теперь выполняется транзакционно — удаляются привязки в области текущего объекта, документ soft-delete'ится только если привязок больше не осталось.
+- `client/src/hooks/use-documents.ts`: destructive mutations (`DELETE document`, `DELETE binding`) переведены на `apiRequest`, чтобы гарантированно передавать JWT/Telegram headers и единообразно обрабатывать 401.
+- `client/src/components/Header.tsx`, `client/src/components/ResponsiveShell.tsx`, `client/src/components/BottomNav.tsx`, `client/src/lib/navigation.ts`: устранены дубли navigation surfaces на tablet, и добавлен active-state для вложенного маршрута `/acts/:id`.
+- `client/src/pages/SourceDocuments.tsx`, `client/src/pages/SourceMaterials.tsx`: исправлена логика infinite scroll observer (переподключение при изменении данных/фильтров), на `/source/documents` включена вертикальная прокрутка для mobile/tablet.
+
+### Исправлено
+- `server/pdfGenerator.ts`: сохранена CJS/ESM-совместимость через `createRequire(path.join(process.cwd(), "server/pdfGenerator.ts"))` (актуальный вариант idgenerator `main`).
+- `shared/routes.ts`, `client/src/pages/SourceDocuments.tsx`, `client/src/components/materials/MaterialDetailView.tsx`: усилена безопасность ссылок документов (валидация `fileUrl` как `http/https`, открытие через `noopener,noreferrer`).
+- `client/src/pages/SourceMaterialDetail.tsx`, `client/src/components/materials/MaterialDetailView.tsx`: добавлено подтверждение перед destructive действиями и увеличен touch target icon-кнопок в карточке документов.
+- `client/src/pages/ActDetail.tsx`: включена отображаемая кнопка «Назад» (`showBack`) во всех состояниях страницы.
+- `client/src/pages/ActDetail.tsx`: удалена имитация экспорта PDF; экран детали теперь запрашивает реальные шаблоны (`GET /api/act-templates`) и выполняет реальный экспорт через `POST /api/acts/:id/export` с последующим скачиванием файлов.
+- `package.json`: добавлен скрипт `test` на базе встроенного `node:test` с загрузчиком `tsx` (`node --import tsx --test "tests/**/*.test.ts"`), чтобы включить минимальный runnable test pipeline без новых внешних зависимостей.
+- `client/src/lib/pdf-download.ts` (новый): вынесена общая логика безопасного скачивания PDF; переиспользуется в `Acts` и `ActDetail`.
+
+### Добавлено
+- `tests/documents-fileurl-schema.test.ts`: smoke-тест валидации `fileUrl` (принимает `http/https`, отклоняет `javascript:`).
+- `tests/navigation-acts-active.test.ts`: тест active-state навигации для `/acts` и `/acts/:id`.
+- `tests/pdf-download-query.test.ts`: тест корректного формирования `download=1` query-параметра.
+- `tests/documents-delete-contract.test.ts`: тест API-контракта `documents.delete` (method/path + schemas для `204/400/401/404`).
+- `tests/document-bindings-delete-contract.test.ts`: тест API-контракта `documentBindings.delete` (method/path + schemas для `204/400/404`).
+- `tests/build-url-delete-endpoints.test.ts`: тест корректной подстановки `:id` через `buildUrl` для delete-endpoints.
+
+---
+
+## [2026-07-22] - Документация: one-page чеклисты ревью PR
+
+### Добавлено
+- `docs/review-checklists/frontend-pr-checklist.md` — чеклист ревью frontend PR (Odoo tokens, адаптивность 3 зон, touch targets, object-aware cache, типичные ловушки проекта).
+- `docs/review-checklists/backend-pr-checklist.md` — чеклист ревью backend PR (контракт `shared/routes.ts`, auth/object isolation, middleware parity, smoke-лист по доменам).
+- `docs/review-checklists/db-migration-pr-checklist.md` — чеклист ревью миграций БД (синхронизация SQL/Drizzle/Zod, типы и FK-политики, паттерн add → backfill → tighten, аудитные поля).
+
+---
+
 ## [2026-03-22] - Исправление dev-regression в `pdfGenerator`
 
 ### Исправлено

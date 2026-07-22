@@ -109,7 +109,10 @@ const primaryNavigation: NavigationItem[] = [
     group: "primary",
     icon: FileCheck,
     surfaceVisibility: primarySurfaceVisibility,
-    activeMatch: [{ type: "exact", value: "/acts" }],
+    activeMatch: [
+      { type: "exact", value: "/acts" },
+      { type: "prefix", value: "/acts/" },
+    ],
   },
   {
     id: "worklog",

@@ -79,7 +79,7 @@ export default function SourceDocuments() {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [docsQuery.data, docType, scope, search]);
 
   const [form, setForm] = useState({
     docType: "certificate",
@@ -127,7 +127,7 @@ export default function SourceDocuments() {
 
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
         {/* LEFT: document list */}
-        <div className="lg:w-[420px] lg:border-r lg:border-[--g200] lg:overflow-y-auto flex-col flex-1 overflow-hidden px-4 py-4 pb-24 lg:pb-6">
+        <div className="lg:w-[420px] lg:border-r lg:border-[--g200] lg:overflow-y-auto flex-col flex-1 overflow-y-auto px-4 py-4 pb-24 lg:pb-6">
 
           {/* Поиск */}
           <div className="relative mb-3">
@@ -188,7 +188,7 @@ export default function SourceDocuments() {
                 <OdooCard
                   key={d.id}
                   hoverable={!!d.fileUrl}
-                  onClick={d.fileUrl ? () => window.open(d.fileUrl, "_blank") : undefined}
+                  onClick={d.fileUrl ? () => window.open(d.fileUrl, "_blank", "noopener,noreferrer") : undefined}
                 >
                   <div className="p-3 flex items-center gap-3">
                     <div className="h-9 w-9 rounded-[--o-radius-sm] bg-[--p50] flex items-center justify-center text-[--p500] shrink-0">

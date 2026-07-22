@@ -10,7 +10,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { api } from '@shared/routes';
-import { storage, appAuth } from './_common';
+import { storage, appAuth, getObjectId, resolveCurrentObject, type AuthenticatedRequest } from './_common';
 import { requireFeature, requireQuota } from '../middleware/tariff';
 
 // ── Invoice upload config ────────────────────────────────────────────────────
@@ -459,6 +459,26 @@ export function registerMaterialsRoutes(app: Express): void {
     }
   });
 
+  // DELETE /api/documents/:id — soft-delete документа
+  app.delete(api.documents.delete.path, ...appAuth, resolveCurrentObject, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ message: 'Invalid id' });
+    }
+    const objectId = getObjectId(req);
+    if (!objectId) {
+      return res.status(400).json({ message: 'Current object is required' });
+    }
+    try {
+      const ok = await storage.deleteDocument(id, (req as AuthenticatedRequest).user.id, objectId);
+      if (!ok) return res.status(404).json({ message: 'Not found' });
+      return res.status(204).send();
+    } catch (err) {
+      console.error('Document delete failed:', err);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
   // POST /api/document-bindings — создать привязку документа
   app.post(api.documentBindings.create.path, async (req, res) => {
     try {
@@ -495,13 +515,17 @@ export function registerMaterialsRoutes(app: Express): void {
   });
 
   // DELETE /api/document-bindings/:id — удалить привязку документа
-  app.delete(api.documentBindings.delete.path, async (req, res) => {
+  app.delete(api.documentBindings.delete.path, ...appAuth, resolveCurrentObject, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id) || id <= 0) {
       return res.status(400).json({ message: 'Invalid id' });
     }
+    const objectId = getObjectId(req);
+    if (!objectId) {
+      return res.status(400).json({ message: 'Current object is required' });
+    }
     try {
-      const ok = await storage.deleteBinding(id);
+      const ok = await storage.deleteBinding(id, (req as AuthenticatedRequest).user.id, objectId);
       if (!ok) return res.status(404).json({ message: 'Not found' });
       return res.status(204).send();
     } catch (err) {

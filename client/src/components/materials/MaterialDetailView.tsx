@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { DocumentCard, type DocumentCardModel } from "@/components/documents/DocumentCard";
-import { AlertTriangle, CheckCircle2, Star } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Star, Trash2, Unlink } from "lucide-react";
 import { formatIsoToDmy } from "@/lib/dateFormat";
 
 type BatchModel = {
@@ -41,6 +41,8 @@ export function MaterialDetailView(props: {
   documents: DocumentCardModel[];
   bindings: BindingModel[];
   onPatchBinding?: (bindingId: number, patch: Partial<Pick<BindingModel, "useInActs" | "isPrimary" | "bindingRole">>) => void;
+  onUnlinkBinding?: (bindingId: number) => void;
+  onDeleteDocument?: (documentId: number) => void;
   onAddBatch?: () => void;
   onBindDocument?: () => void;
   onBindDocumentToBatch?: (batchId: number) => void;
@@ -202,6 +204,32 @@ export function MaterialDetailView(props: {
                             >
                               <Star className="h-4 w-4" />
                             </Button>
+
+                            {props.onUnlinkBinding && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                                onClick={() => props.onUnlinkBinding!(binding.id)}
+                                title="Отвязать документ"
+                              >
+                                <Unlink className="h-4 w-4" />
+                              </Button>
+                            )}
+
+                            {props.onDeleteDocument && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                                onClick={() => props.onDeleteDocument!(binding.documentId)}
+                                title="Удалить документ"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                           ) : (
                             <Button
@@ -219,7 +247,7 @@ export function MaterialDetailView(props: {
                           )}
                         </div>
                       }
-                      onOpen={d.fileUrl ? () => window.open(d.fileUrl || undefined, "_blank") : undefined}
+                      onOpen={d.fileUrl ? () => window.open(d.fileUrl || undefined, "_blank", "noopener,noreferrer") : undefined}
                     />
                   );
                 })}

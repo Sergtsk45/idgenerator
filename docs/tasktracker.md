@@ -2,6 +2,39 @@
 
 ---
 
+## Задача: Закрытие findings ревью ветки `feature/tablet-ui-v2` (без изменения бизнес-логики)
+- **Статус**: Завершена (перенесено в idgenerator)
+- **Дата начала**: 2026-07-22
+- **Дата завершения**: 2026-07-24
+- **Описание**: По результатам мульти-агентного ревью устранить критические проблемы безопасности и runtime, затем закрыть high/major замечания по навигации, scroll и destructive UX с обязательной проверкой `npm run check` и `npm run build`. Перенесено из TelegramJurnalRabot в канонический репозиторий `idgenerator`.
+- **Шаги выполнения**:
+  - [x] Закрыть Blocker: auth + object-aware ownership для `DELETE /api/documents/:id` и `DELETE /api/document-bindings/:id`
+  - [x] Закрыть Blocker: восстановить CJS-совместимость `server/pdfGenerator.ts`
+  - [x] Закрыть security major: валидация `fileUrl` (`http/https`) + `noopener,noreferrer` при открытии ссылок
+  - [x] Закрыть UI major: убрать дубли nav surfaces на tablet (`BottomNav`, `Header`, `ResponsiveShell`)
+  - [x] Закрыть UI major: исправить `showBack` на `ActDetail` и active-state для `/acts/:id`
+  - [x] Закрыть UI major: исправить observer/reconnect и прокрутку списка документов на mobile/tablet
+  - [x] Закрыть UX major: добавить confirm перед удалением/отвязкой документа и увеличить touch target action-кнопок
+  - [x] Закрыть оставшийся major: заменить mock export в `ActDetail` на реальный API flow (`POST /api/acts/:id/export`)
+  - [x] Закрыть quality major: восстановить runnable test pipeline (минимум smoke E2E для document delete/unlink + nav)
+- **Зависимости**: `docs/review-checklists/frontend-pr-checklist.md`, `docs/review-checklists/backend-pr-checklist.md`
+
+---
+
+## Задача: Полная карточка документа — доработки UX и данных
+- **Статус**: Не начата
+- **Описание**: Доработки экрана/модалки полной карточки документа: операции с материалами и партиями, безопасное удаление документа. Текущие пробелы зафиксированы как точки роста (см. обсуждение спринта / терминал).
+- **Шаги выполнения**:
+  - [ ] Редактирование названия и единицы измерения материала в карточке документа
+  - [ ] Удаление партии (lot) из карточки документа с согласованным API и валидацией
+  - [ ] Редактирование партии (lot) в карточке документа
+  - [ ] Подтверждение перед удалением документа (сейчас удаление выполняется сразу, без диалога confirm)
+- **Зависимости**: экран полной карточки документа, существующие API материалов/партий/документов (уточнить при старте)
+
+---
+
+## Задача: Исправление дублирования меню в tablet shell
+
 ## Задача: Исправление dev-regression в `pdfGenerator`
 - **Статус**: Завершена
 - **Дата начала**: 2026-03-22

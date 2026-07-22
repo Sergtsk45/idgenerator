@@ -24,7 +24,7 @@ export function BottomNav() {
   const navItems = getNavigationItemsForSurface("bottomNavMobile", { groups: "primary" });
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[--g200] shadow-[0_-1px_3px_rgba(0,0,0,0.05)] pb-safe lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[--g200] shadow-[0_-1px_3px_rgba(0,0,0,0.05)] pb-safe md:hidden">
       <div className="flex justify-around items-stretch h-14 max-w-md mx-auto">
         {navItems.map((item) => {
           const isActive = isNavigationItemActive(item, location);

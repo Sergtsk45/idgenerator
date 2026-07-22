@@ -4,7 +4,7 @@
  * @dependencies: use-acts, OdooCard, Badge, Accordion, Sheet, ResponsiveShell
  * @created: 2026-03-22
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useAct } from "@/hooks/use-acts";
 import { ResponsiveShell } from "@/components/ResponsiveShell";
@@ -42,9 +42,26 @@ import {
 import { format } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
 import { useLanguageStore } from "@/lib/i18n";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { openPdfDownload } from "@/lib/pdf-download";
 
 interface ActDetailProps {
   params: { id: string };
+}
+
+interface ActTemplate {
+  id: number;
+  templateId: string;
+  code: string;
+  category: string;
+  title: string;
+  titleEn: string | null;
+}
+
+interface TemplatesResponse {
+  templates: ActTemplate[];
 }
 
 const STATUS_STEPS = ["draft", "generated", "signed"] as const;
@@ -58,8 +75,12 @@ function statusProgress(status: string | null | undefined): number {
 export default function ActDetail({ params }: ActDetailProps) {
   const { language } = useLanguageStore();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const actId = Number(params.id);
   const { data: act, isLoading } = useAct(actId);
+  const { data: templatesData, isLoading: templatesLoading } = useQuery<TemplatesResponse>({
+    queryKey: ["/api/act-templates"],
+  });
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -81,30 +102,57 @@ export default function ActDetail({ params }: ActDetailProps) {
     return format(new Date(d), "d MMM yyyy", { locale: language === "ru" ? ru : enUS });
   };
 
-  const handleExport = () => {
+  const exportAct = useMutation({
+    mutationFn: async (templateIds: string[]) => {
+      const response = await apiRequest("POST", `/api/acts/${actId}/export`, { templateIds });
+      return response.json();
+    },
+  });
+
+  const currentTemplate = useMemo(() => {
+    if (!act || !templatesData?.templates) return null;
+    const actTemplateId = Number((act as any).actTemplateId ?? 0);
+    if (!actTemplateId) return null;
+    return templatesData.templates.find((tpl) => tpl.id === actTemplateId) ?? null;
+  }, [act, templatesData]);
+
+  const handleExport = async (templateIds: string[]) => {
     setExporting(true);
-    setExportProgress(0);
-    const interval = setInterval(() => {
-      setExportProgress((p) => {
-        if (p >= 90) {
-          clearInterval(interval);
-          return p;
-        }
-        return p + 15;
-      });
-    }, 300);
-    // Simulate completion after 2s
-    setTimeout(() => {
-      clearInterval(interval);
+    setExportProgress(10);
+    const progressTimer = setInterval(() => {
+      setExportProgress((p) => (p < 85 ? p + 15 : p));
+    }, 600);
+
+    try {
+      const exportResult = await exportAct.mutateAsync(templateIds);
       setExportProgress(100);
-      setTimeout(() => setExporting(false), 600);
-    }, 2000);
+      if (exportResult.files && exportResult.files.length > 0) {
+        toast({
+          title: t("Успех", "Success"),
+          description: t(`Создано ${exportResult.files.length} PDF-документов`, `Generated ${exportResult.files.length} PDF documents`),
+          duration: 1800,
+        });
+        exportResult.files.forEach((file: { url: string; filename: string }) => openPdfDownload(file.url, file.filename));
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : undefined;
+      toast({
+        title: t("Ошибка", "Error"),
+        description: msg || t("Не удалось экспортировать акт", "Failed to export act"),
+        variant: "destructive",
+      });
+    } finally {
+      clearInterval(progressTimer);
+      setExporting(false);
+      setExportProgress(0);
+    }
   };
 
   if (isLoading) {
     return (
       <ResponsiveShell
         title={t(`Акт №${params.id}`, `Act #${params.id}`)}
+        showBack
         onBack={() => navigate("/acts")}
       >
         <div className="flex-1 px-4 py-6 pb-24 w-full max-w-md lg:max-w-3xl mx-auto space-y-4">
@@ -131,6 +179,7 @@ export default function ActDetail({ params }: ActDetailProps) {
     return (
       <ResponsiveShell
         title={t("Акт", "Act")}
+        showBack
         onBack={() => navigate("/acts")}
       >
         <div className="flex-1 flex items-center justify-center p-8">
@@ -154,6 +203,7 @@ export default function ActDetail({ params }: ActDetailProps) {
   return (
     <ResponsiveShell
       title={t(`Акт №${act.actNumber ?? act.id}`, `Act #${act.actNumber ?? act.id}`)}
+      showBack
       onBack={() => navigate("/acts")}
     >
       <div className="flex-1 px-4 py-6 pb-24 w-full max-w-md lg:max-w-3xl mx-auto space-y-4">
@@ -393,20 +443,45 @@ export default function ActDetail({ params }: ActDetailProps) {
                 </SheetTitle>
               </SheetHeader>
               <div className="space-y-2">
-                {["КС-2 (стандарт)", "АОСР (упрощённый)", "АОСР (полный)"].map((tmpl) => (
+                {currentTemplate && (
                   <button
-                    key={tmpl}
                     type="button"
-                    className="w-full flex items-center justify-between px-4 py-3 bg-white border border-[--g200] rounded-[--o-radius-md] hover:bg-[--g50] transition-colors text-[13px]"
-                    onClick={() => {
+                    className="w-full flex items-center justify-between px-4 py-3 bg-[--p50] border border-[--p200] rounded-[--o-radius-md] hover:bg-[--p100] transition-colors text-[13px]"
+                    onClick={async () => {
                       setSheetOpen(false);
-                      handleExport();
+                      await handleExport([]);
                     }}
                   >
-                    <span className="text-[--g900] font-medium">{tmpl}</span>
-                    <Download className="h-4 w-4 text-[--g400]" />
+                    <span className="text-[--g900] font-medium">
+                      {t("По шаблону акта", "Use act template")}: {language === "ru" ? currentTemplate.title : (currentTemplate.titleEn ?? currentTemplate.title)}
+                    </span>
+                    <Download className="h-4 w-4 text-[--g500]" />
                   </button>
-                ))}
+                )}
+
+                {templatesLoading ? (
+                  <div className="flex items-center justify-center py-6 text-[--g500]">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    {t("Загрузка шаблонов...", "Loading templates...")}
+                  </div>
+                ) : (
+                  (templatesData?.templates ?? []).map((template) => (
+                    <button
+                      key={template.templateId}
+                      type="button"
+                      className="w-full flex items-center justify-between px-4 py-3 bg-white border border-[--g200] rounded-[--o-radius-md] hover:bg-[--g50] transition-colors text-[13px]"
+                      onClick={async () => {
+                        setSheetOpen(false);
+                        await handleExport([template.templateId]);
+                      }}
+                    >
+                      <span className="text-[--g900] font-medium">
+                        {template.code} — {language === "ru" ? template.title : (template.titleEn ?? template.title)}
+                      </span>
+                      <Download className="h-4 w-4 text-[--g400]" />
+                    </button>
+                  ))
+                )}
               </div>
             </SheetContent>
           </Sheet>

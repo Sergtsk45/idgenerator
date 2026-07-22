@@ -102,7 +102,7 @@ export default function SourceMaterials() {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [filtered.length, filter, search]);
 
   const filterTabs = [
     { value: "all", label: language === "ru" ? "Все" : "All" },

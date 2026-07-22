@@ -612,11 +612,28 @@ export const api = {
         validFrom: z.string().nullable().optional(),
         validTo: z.string().nullable().optional(),
         meta: z.record(z.any()).optional(),
-        fileUrl: z.string().nullable().optional(),
+        fileUrl: z
+          .string()
+          .url()
+          .refine((value) => value.startsWith("http://") || value.startsWith("https://"), {
+            message: "fileUrl must start with http:// or https://",
+          })
+          .nullable()
+          .optional(),
       }),
       responses: {
         201: z.custom<typeof documents.$inferSelect>(),
         400: z.object({ message: z.string() }),
+      },
+    },
+    delete: {
+      method: "DELETE" as const,
+      path: "/api/documents/:id",
+      responses: {
+        204: z.any(),
+        400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+        404: z.object({ message: z.string() }),
       },
     },
   },
@@ -664,6 +681,7 @@ export const api = {
       responses: {
         204: z.any(),
         400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
         404: z.object({ message: z.string() }),
       },
     },

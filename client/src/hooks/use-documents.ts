@@ -7,6 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type InsertDocument, type InsertDocumentBinding } from "@shared/routes";
+import { apiRequest } from "@/lib/queryClient";
 
 export function useDocuments(params?: { query?: string; docType?: string; scope?: string }) {
   const query = String(params?.query ?? "");
@@ -24,6 +25,24 @@ export function useDocuments(params?: { query?: string; docType?: string; scope?
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch documents");
       return api.documents.list.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useDeleteDocument(projectMaterialId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (documentId: number) => {
+      const url = buildUrl(api.documents.delete.path, { id: documentId });
+      await apiRequest(api.documents.delete.method, url);
+      return true;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [api.documents.list.path] });
+      await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
+      if (projectMaterialId) {
+        await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.get.path, projectMaterialId] });
+      }
     },
   });
 }
@@ -106,11 +125,7 @@ export function useDeleteDocumentBinding(projectMaterialId?: number) {
   return useMutation({
     mutationFn: async (bindingId: number) => {
       const url = buildUrl(api.documentBindings.delete.path, { id: bindingId });
-      const res = await fetch(url, { method: api.documentBindings.delete.method, credentials: "include" });
-      if (!res.ok && res.status !== 204) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to delete document binding");
-      }
+      await apiRequest(api.documentBindings.delete.method, url);
       return true;
     },
     onSuccess: async () => {

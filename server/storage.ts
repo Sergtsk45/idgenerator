@@ -184,6 +184,7 @@ export interface IStorage {
   // Documents
   searchDocuments(params: { query?: string; docType?: string; scope?: string }): Promise<Document[]>;
   createDocument(data: InsertDocument): Promise<Document>;
+  deleteDocument(id: number, userId: number, objectId: number): Promise<boolean>;
 
   // Document Bindings
   createBinding(data: InsertDocumentBinding): Promise<DocumentBinding>;
@@ -191,7 +192,7 @@ export interface IStorage {
     id: number,
     patch: Partial<Pick<DocumentBinding, "useInActs" | "isPrimary" | "bindingRole">>
   ): Promise<DocumentBinding | undefined>;
-  deleteBinding(id: number): Promise<boolean>;
+  deleteBinding(id: number, userId: number, objectId: number): Promise<boolean>;
 
   // Act Material Usages
   getActMaterialUsages(actId: number): Promise<
@@ -1143,6 +1144,52 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async deleteDocument(id: number, userId: number, objectId: number): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      const [ownedObject] = await tx
+        .select({ id: objects.id })
+        .from(objects)
+        .where(and(eq(objects.id, objectId as any), eq(objects.userId, userId as any)));
+      if (!ownedObject) return false;
+
+      const projectMaterialRows = await tx
+        .select({ id: projectMaterials.id })
+        .from(projectMaterials)
+        .where(eq(projectMaterials.objectId, objectId as any));
+      const projectMaterialIds = projectMaterialRows.map((row) => Number(row.id));
+
+      const scopeConditions: any[] = [eq(documentBindings.objectId, objectId as any)];
+      if (projectMaterialIds.length > 0) {
+        scopeConditions.push(inArray(documentBindings.projectMaterialId, projectMaterialIds as any));
+      }
+      const scopeWhere = scopeConditions.length === 1 ? scopeConditions[0] : or(...scopeConditions);
+
+      const [allowedBinding] = await tx
+        .select({ id: documentBindings.id })
+        .from(documentBindings)
+        .where(and(eq(documentBindings.documentId, id as any), scopeWhere));
+      if (!allowedBinding) return false;
+
+      await tx
+        .delete(documentBindings)
+        .where(and(eq(documentBindings.documentId, id as any), scopeWhere));
+
+      const [remainingBinding] = await tx
+        .select({ id: documentBindings.id })
+        .from(documentBindings)
+        .where(eq(documentBindings.documentId, id as any));
+
+      if (!remainingBinding) {
+        await tx
+          .update(documents)
+          .set({ deletedAt: new Date() } as any)
+          .where(eq(documents.id, id as any));
+      }
+
+      return true;
+    });
+  }
+
   async createBinding(data: InsertDocumentBinding): Promise<DocumentBinding> {
     const [created] = await db.insert(documentBindings).values(data).returning();
     return created;
@@ -1186,11 +1233,33 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async deleteBinding(id: number): Promise<boolean> {
-    const [existing] = await db.select({ id: documentBindings.id }).from(documentBindings).where(eq(documentBindings.id, id as any));
-    if (!existing) return false;
-    await db.delete(documentBindings).where(eq(documentBindings.id, id as any));
-    return true;
+  async deleteBinding(id: number, userId: number, objectId: number): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      const [ownedObject] = await tx
+        .select({ id: objects.id })
+        .from(objects)
+        .where(and(eq(objects.id, objectId as any), eq(objects.userId, userId as any)));
+      if (!ownedObject) return false;
+
+      const projectMaterialRows = await tx
+        .select({ id: projectMaterials.id })
+        .from(projectMaterials)
+        .where(eq(projectMaterials.objectId, objectId as any));
+      const projectMaterialIds = projectMaterialRows.map((row) => Number(row.id));
+
+      const scopeConditions: any[] = [eq(documentBindings.objectId, objectId as any)];
+      if (projectMaterialIds.length > 0) {
+        scopeConditions.push(inArray(documentBindings.projectMaterialId, projectMaterialIds as any));
+      }
+      const scopeWhere = scopeConditions.length === 1 ? scopeConditions[0] : or(...scopeConditions);
+
+      const [deleted] = await tx
+        .delete(documentBindings)
+        .where(and(eq(documentBindings.id, id as any), scopeWhere))
+        .returning({ id: documentBindings.id });
+
+      return Boolean(deleted);
+    });
   }
 
   async getActMaterialUsages(
