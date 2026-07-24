@@ -1,6 +1,6 @@
 /**
  * @file: documents-delete-contract.test.ts
- * @description: Контракт API для удаления документов (responses 204/400/401/404).
+ * @description: Контракт API для удаления документов (responses 204/400/401/404/409).
  * @dependencies: node:test, node:assert/strict, shared/routes.ts
  * @created: 2026-07-22
  */
@@ -19,4 +19,5 @@ test("documents.delete response schemas parse expected payloads", () => {
   assert.doesNotThrow(() => api.documents.delete.responses[400].parse({ message: "Invalid id" }));
   assert.doesNotThrow(() => api.documents.delete.responses[401].parse({ error: "Authentication required" }));
   assert.doesNotThrow(() => api.documents.delete.responses[404].parse({ message: "Not found" }));
+  assert.doesNotThrow(() => api.documents.delete.responses[409].parse({ message: "Document is used in acts" }));
 });

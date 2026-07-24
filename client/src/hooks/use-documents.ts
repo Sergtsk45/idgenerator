@@ -7,22 +7,62 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type InsertDocument, type InsertDocumentBinding } from "@shared/routes";
+import { createApiHeaders } from "@/lib/api-headers";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentObject } from "@/hooks/use-source-data";
 
-export function useDocuments(params?: { query?: string; docType?: string; scope?: string }) {
+type DocumentViewMode = "project" | "global" | "all";
+type DocumentScope = "project" | "global";
+
+type DocumentPatch = {
+  title?: string | null;
+  docNumber?: string | null;
+  docDate?: string | null;
+  validFrom?: string | null;
+  validTo?: string | null;
+  fileUrl?: string | null;
+};
+
+function viewModeFromParams(params?: { viewMode?: DocumentViewMode; scope?: string }): DocumentViewMode {
+  if (params?.viewMode) return params.viewMode;
+  if (params?.scope === "global" || params?.scope === "project") return params.scope;
+  return "project";
+}
+
+function documentsQueryKey(objectId?: number, params?: { query?: string; docType?: string; viewMode?: DocumentViewMode; scope?: string }) {
+  return [
+    api.documents.list.path,
+    objectId ?? null,
+    String(params?.query ?? ""),
+    params?.docType ? String(params.docType) : "",
+    viewModeFromParams(params),
+  ] as const;
+}
+
+async function invalidateDocuments(queryClient: ReturnType<typeof useQueryClient>) {
+  await queryClient.invalidateQueries({ queryKey: [api.documents.list.path] });
+}
+
+export function useDocuments(params?: { query?: string; docType?: string; viewMode?: DocumentViewMode; scope?: string }) {
+  const currentObjectQuery = useCurrentObject();
+  const objectId = (currentObjectQuery.data as any)?.id as number | undefined;
   const query = String(params?.query ?? "");
   const docType = params?.docType ? String(params.docType) : "";
-  const scope = params?.scope ? String(params.scope) : "";
+  const viewMode = viewModeFromParams(params);
 
   return useQuery({
-    queryKey: [api.documents.list.path, query, docType, scope],
+    queryKey: documentsQueryKey(objectId, { query, docType, viewMode }),
+    enabled: Boolean(objectId),
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (query) qs.set("query", query);
       if (docType) qs.set("docType", docType);
-      if (scope) qs.set("scope", scope);
+      qs.set("viewMode", viewMode);
       const url = `${api.documents.list.path}?${qs.toString()}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, {
+        credentials: "include",
+        headers: createApiHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to fetch documents");
       return api.documents.list.responses[200].parse(await res.json());
     },
@@ -34,11 +74,19 @@ export function useDeleteDocument(projectMaterialId?: number) {
   return useMutation({
     mutationFn: async (documentId: number) => {
       const url = buildUrl(api.documents.delete.path, { id: documentId });
-      await apiRequest(api.documents.delete.method, url);
+      const res = await fetch(url, {
+        method: api.documents.delete.method,
+        credentials: "include",
+        headers: createApiHeaders(),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to delete document");
+      }
       return true;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [api.documents.list.path] });
+      await invalidateDocuments(queryClient);
       await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
       if (projectMaterialId) {
         await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.get.path, projectMaterialId] });
@@ -50,11 +98,15 @@ export function useDeleteDocument(projectMaterialId?: number) {
 export function useCreateDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: InsertDocument) => {
+    mutationFn: async (data: Omit<InsertDocument, "objectId"> & { viewMode?: DocumentViewMode }) => {
+      const { viewMode: _viewMode, ...payload } = data as any;
+      if (!payload.scope && (_viewMode === "project" || _viewMode === "global")) {
+        payload.scope = _viewMode;
+      }
       const res = await fetch(api.documents.create.path, {
         method: api.documents.create.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        headers: createApiHeaders(true),
+        body: JSON.stringify(payload),
         credentials: "include",
       });
       if (!res.ok) {
@@ -64,7 +116,54 @@ export function useCreateDocument() {
       return api.documents.create.responses[201].parse(await res.json());
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [api.documents.list.path] });
+      await invalidateDocuments(queryClient);
+    },
+  });
+}
+
+export function useUpdateDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { id: number; patch: DocumentPatch }) => {
+      const url = buildUrl(api.documents.patch.path, { id: args.id });
+      const res = await fetch(url, {
+        method: api.documents.patch.method,
+        headers: createApiHeaders(true),
+        body: JSON.stringify(args.patch),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to update document");
+      }
+      return api.documents.patch.responses[200].parse(await res.json());
+    },
+    onSuccess: async () => {
+      await invalidateDocuments(queryClient);
+    },
+  });
+}
+
+export function useSetDocumentScope() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { id: number; scope: DocumentScope }) => {
+      const url = buildUrl(api.documents.setScope.path, { id: args.id });
+      const res = await fetch(url, {
+        method: api.documents.setScope.method,
+        headers: createApiHeaders(true),
+        body: JSON.stringify({ scope: args.scope }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to update document scope");
+      }
+      return api.documents.setScope.responses[200].parse(await res.json());
+    },
+    onSuccess: async () => {
+      await invalidateDocuments(queryClient);
+      await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
     },
   });
 }
@@ -75,7 +174,7 @@ export function useCreateDocumentBinding() {
     mutationFn: async (data: InsertDocumentBinding) => {
       const res = await fetch(api.documentBindings.create.path, {
         method: api.documentBindings.create.method,
-        headers: { "Content-Type": "application/json" },
+        headers: createApiHeaders(true),
         body: JSON.stringify(data),
         credentials: "include",
       });
@@ -90,7 +189,7 @@ export function useCreateDocumentBinding() {
       if ((variables as any).projectMaterialId) {
         await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.get.path, Number((variables as any).projectMaterialId)] });
       }
-      await queryClient.invalidateQueries({ queryKey: [api.documents.list.path] });
+      await invalidateDocuments(queryClient);
       await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
     },
   });
@@ -103,7 +202,7 @@ export function usePatchDocumentBinding(projectMaterialId?: number) {
       const url = buildUrl(api.documentBindings.patch.path, { id: args.id });
       const res = await fetch(url, {
         method: api.documentBindings.patch.method,
-        headers: { "Content-Type": "application/json" },
+        headers: createApiHeaders(true),
         body: JSON.stringify(args.patch),
         credentials: "include",
       });
@@ -116,6 +215,7 @@ export function usePatchDocumentBinding(projectMaterialId?: number) {
     onSuccess: async () => {
       if (projectMaterialId) await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.get.path, projectMaterialId] });
       await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
+      await invalidateDocuments(queryClient);
     },
   });
 }
@@ -131,7 +231,7 @@ export function useDeleteDocumentBinding(projectMaterialId?: number) {
     onSuccess: async () => {
       if (projectMaterialId) await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.get.path, projectMaterialId] });
       await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
+      await invalidateDocuments(queryClient);
     },
   });
 }
-

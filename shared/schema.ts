@@ -468,6 +468,7 @@ export const documents = pgTable(
     id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
     docType: text("doc_type").notNull(),
     scope: text("scope").notNull().default("project"),
+    objectId: integer("object_id").references(() => objects.id, { onDelete: "cascade" }),
     title: text("title"),
     docNumber: text("doc_number"),
     docDate: date("doc_date"),
@@ -482,6 +483,8 @@ export const documents = pgTable(
   (t) => ({
     docTypeIdx: index("documents_doc_type_idx").on(t.docType),
     scopeIdx: index("documents_scope_idx").on(t.scope),
+    objectIdIdx: index("documents_object_id_idx").on(t.objectId),
+    scopeObjectIdx: index("documents_scope_object_idx").on(t.scope, t.objectId),
     docNumberIdx: index("documents_doc_number_idx").on(t.docNumber),
     docTypeCheck: check(
       "documents_doc_type_check",
@@ -491,6 +494,10 @@ export const documents = pgTable(
     validDatesCheck: check(
       "documents_valid_dates_check",
       sql`valid_from IS NULL OR valid_to IS NULL OR valid_from <= valid_to`,
+    ),
+    scopeObjectCheck: check(
+      "documents_scope_object_check",
+      sql`deleted_at IS NOT NULL OR (scope = 'global' AND object_id IS NULL) OR (scope = 'project' AND object_id IS NOT NULL)`,
     ),
   })
 );

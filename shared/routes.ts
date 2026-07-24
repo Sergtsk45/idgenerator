@@ -120,6 +120,15 @@ const linkProviderSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
+const documentScopeSchema = z.enum(["global", "project"]);
+const documentViewModeSchema = z.enum(["project", "global", "all"]);
+const documentFileUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => value.startsWith("http://") || value.startsWith("https://"), {
+    message: "fileUrl must start with http:// or https://",
+  });
+
 const linkEmailSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -596,8 +605,17 @@ export const api = {
     list: {
       method: "GET" as const,
       path: "/api/documents",
+      input: z
+        .object({
+          viewMode: documentViewModeSchema.optional().default("project"),
+          query: z.string().optional(),
+          docType: z.enum(["certificate", "declaration", "passport", "protocol", "scheme", "other"]).optional(),
+        })
+        .optional(),
       responses: {
         200: z.array(z.custom<typeof documents.$inferSelect>()),
+        400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
       },
     },
     create: {
@@ -605,25 +623,52 @@ export const api = {
       path: "/api/documents",
       input: z.object({
         docType: z.enum(["certificate", "declaration", "passport", "protocol", "scheme", "other"]),
-        scope: z.enum(["global", "project"]).optional(),
+        scope: documentScopeSchema.optional(),
         title: z.string().nullable().optional(),
         docNumber: z.string().nullable().optional(),
         docDate: z.string().nullable().optional(), // YYYY-MM-DD
         validFrom: z.string().nullable().optional(),
         validTo: z.string().nullable().optional(),
         meta: z.record(z.any()).optional(),
-        fileUrl: z
-          .string()
-          .url()
-          .refine((value) => value.startsWith("http://") || value.startsWith("https://"), {
-            message: "fileUrl must start with http:// or https://",
-          })
-          .nullable()
-          .optional(),
+        fileUrl: documentFileUrlSchema.nullable().optional(),
       }),
       responses: {
         201: z.custom<typeof documents.$inferSelect>(),
         400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+      },
+    },
+    patch: {
+      method: "PATCH" as const,
+      path: "/api/documents/:id",
+      input: z
+        .object({
+          title: z.string().nullable().optional(),
+          docNumber: z.string().nullable().optional(),
+          docDate: z.string().nullable().optional(),
+          validFrom: z.string().nullable().optional(),
+          validTo: z.string().nullable().optional(),
+          fileUrl: documentFileUrlSchema.nullable().optional(),
+        })
+        .refine((v) => Object.keys(v).length > 0, { message: "Empty patch" }),
+      responses: {
+        200: z.custom<typeof documents.$inferSelect>(),
+        400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    setScope: {
+      method: "PATCH" as const,
+      path: "/api/documents/:id/scope",
+      input: z.object({
+        scope: documentScopeSchema,
+      }),
+      responses: {
+        200: z.custom<typeof documents.$inferSelect>(),
+        400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+        404: z.object({ message: z.string() }),
       },
     },
     delete: {
@@ -633,6 +678,7 @@ export const api = {
         204: z.any(),
         400: z.object({ message: z.string() }),
         401: z.object({ error: z.string() }),
+        409: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),
       },
     },

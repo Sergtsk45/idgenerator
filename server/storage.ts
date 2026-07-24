@@ -102,6 +102,16 @@ type ObjectPersonRole =
   | "rep_designer"
   | "rep_work_performer";
 
+type DocumentViewMode = "project" | "global" | "all";
+type DocumentScope = "project" | "global";
+
+export class DocumentInUseError extends Error {
+  constructor(message = "Document is used in acts") {
+    super(message);
+    this.name = "DocumentInUseError";
+  }
+}
+
 /**
  * Determines if an estimate position is a "main" work (for schedule tasks).
  * Main positions have code starting with ГЭСН, ФЕР, ТЕР (case-insensitive).
@@ -182,8 +192,15 @@ export interface IStorage {
   deleteBatch(id: number): Promise<boolean>;
 
   // Documents
-  searchDocuments(params: { query?: string; docType?: string; scope?: string }): Promise<Document[]>;
-  createDocument(data: InsertDocument): Promise<Document>;
+  searchDocuments(params: { objectId: number; viewMode?: DocumentViewMode; query?: string; docType?: string }): Promise<Document[]>;
+  createDocument(objectId: number, data: Omit<InsertDocument, "objectId">): Promise<Document>;
+  updateDocument(
+    id: number,
+    userId: number,
+    objectId: number,
+    patch: Partial<Pick<Document, "title" | "docNumber" | "docDate" | "validFrom" | "validTo" | "fileUrl">>
+  ): Promise<Document | undefined>;
+  setDocumentScope(id: number, userId: number, objectId: number, scope: DocumentScope): Promise<Document | undefined>;
   deleteDocument(id: number, userId: number, objectId: number): Promise<boolean>;
 
   // Document Bindings
@@ -1118,15 +1135,22 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async searchDocuments(params: { query?: string; docType?: string; scope?: string }): Promise<Document[]> {
+  async searchDocuments(params: { objectId: number; viewMode?: DocumentViewMode; query?: string; docType?: string }): Promise<Document[]> {
     const q = String(params.query ?? "").trim();
     const docType = params.docType ? String(params.docType) : null;
-    const scope = params.scope ? String(params.scope) : null;
+    const viewMode = params.viewMode ?? "project";
+
+    const visibility =
+      viewMode === "global"
+        ? eq(documents.scope, "global")
+        : viewMode === "all"
+          ? or(eq(documents.scope, "global"), eq(documents.objectId, params.objectId as any))
+          : and(eq(documents.scope, "project"), eq(documents.objectId, params.objectId as any));
 
     const whereParts = [
       isNull(documents.deletedAt),
       docType ? eq(documents.docType, docType) : undefined,
-      scope ? eq(documents.scope, scope) : undefined,
+      visibility,
       q
         ? or(
             ilike(documents.docNumber, `%${q}%`),
@@ -1139,9 +1163,84 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(documents).where(where).orderBy(desc(documents.updatedAt));
   }
 
-  async createDocument(data: InsertDocument): Promise<Document> {
-    const [created] = await db.insert(documents).values(data).returning();
+  async createDocument(objectId: number, data: Omit<InsertDocument, "objectId">): Promise<Document> {
+    const scope = data.scope === "global" ? "global" : "project";
+    const [created] = await db
+      .insert(documents)
+      .values({
+        ...(data as any),
+        scope,
+        objectId: scope === "project" ? objectId : null,
+      })
+      .returning();
     return created;
+  }
+
+  async updateDocument(
+    id: number,
+    userId: number,
+    objectId: number,
+    patch: Partial<Pick<Document, "title" | "docNumber" | "docDate" | "validFrom" | "validTo" | "fileUrl">>
+  ): Promise<Document | undefined> {
+    if (Object.keys(patch).length === 0) return undefined;
+
+    return await db.transaction(async (tx) => {
+      const [ownedObject] = await tx
+        .select({ id: objects.id })
+        .from(objects)
+        .where(and(eq(objects.id, objectId as any), eq(objects.userId, userId as any)));
+      if (!ownedObject) return undefined;
+
+      const [existing] = await tx
+        .select()
+        .from(documents)
+        .where(and(eq(documents.id, id as any), isNull(documents.deletedAt)));
+      if (!existing) return undefined;
+      if (existing.scope === "project" && existing.objectId !== objectId) return undefined;
+
+      const [updated] = await tx
+        .update(documents)
+        .set({
+          ...(patch.title !== undefined ? { title: patch.title as any } : {}),
+          ...(patch.docNumber !== undefined ? { docNumber: patch.docNumber as any } : {}),
+          ...(patch.docDate !== undefined ? { docDate: patch.docDate as any } : {}),
+          ...(patch.validFrom !== undefined ? { validFrom: patch.validFrom as any } : {}),
+          ...(patch.validTo !== undefined ? { validTo: patch.validTo as any } : {}),
+          ...(patch.fileUrl !== undefined ? { fileUrl: patch.fileUrl as any } : {}),
+        })
+        .where(eq(documents.id, id as any))
+        .returning();
+
+      return updated;
+    });
+  }
+
+  async setDocumentScope(id: number, userId: number, objectId: number, scope: DocumentScope): Promise<Document | undefined> {
+    return await db.transaction(async (tx) => {
+      const [ownedObject] = await tx
+        .select({ id: objects.id })
+        .from(objects)
+        .where(and(eq(objects.id, objectId as any), eq(objects.userId, userId as any)));
+      if (!ownedObject) return undefined;
+
+      const [existing] = await tx
+        .select()
+        .from(documents)
+        .where(and(eq(documents.id, id as any), isNull(documents.deletedAt)));
+      if (!existing) return undefined;
+      if (existing.scope === "project" && existing.objectId !== objectId) return undefined;
+
+      const [updated] = await tx
+        .update(documents)
+        .set({
+          scope,
+          objectId: scope === "project" ? objectId : null,
+        } as any)
+        .where(eq(documents.id, id as any))
+        .returning();
+
+      return updated;
+    });
   }
 
   async deleteDocument(id: number, userId: number, objectId: number): Promise<boolean> {
@@ -1152,39 +1251,33 @@ export class DatabaseStorage implements IStorage {
         .where(and(eq(objects.id, objectId as any), eq(objects.userId, userId as any)));
       if (!ownedObject) return false;
 
-      const projectMaterialRows = await tx
-        .select({ id: projectMaterials.id })
-        .from(projectMaterials)
-        .where(eq(projectMaterials.objectId, objectId as any));
-      const projectMaterialIds = projectMaterialRows.map((row) => Number(row.id));
+      const [existing] = await tx
+        .select()
+        .from(documents)
+        .where(and(eq(documents.id, id as any), isNull(documents.deletedAt)));
+      if (!existing) return false;
+      if (existing.scope === "project" && existing.objectId !== objectId) return false;
 
-      const scopeConditions: any[] = [eq(documentBindings.objectId, objectId as any)];
-      if (projectMaterialIds.length > 0) {
-        scopeConditions.push(inArray(documentBindings.projectMaterialId, projectMaterialIds as any));
+      if (existing.scope === "global") {
+        const [actAttachment] = await tx
+          .select({ id: actDocumentAttachments.id })
+          .from(actDocumentAttachments)
+          .where(eq(actDocumentAttachments.documentId, id as any))
+          .limit(1);
+        const [actMaterialUsage] = await tx
+          .select({ id: actMaterialUsages.id })
+          .from(actMaterialUsages)
+          .where(eq(actMaterialUsages.qualityDocumentId, id as any))
+          .limit(1);
+        if (actAttachment || actMaterialUsage) {
+          throw new DocumentInUseError();
+        }
       }
-      const scopeWhere = scopeConditions.length === 1 ? scopeConditions[0] : or(...scopeConditions);
-
-      const [allowedBinding] = await tx
-        .select({ id: documentBindings.id })
-        .from(documentBindings)
-        .where(and(eq(documentBindings.documentId, id as any), scopeWhere));
-      if (!allowedBinding) return false;
 
       await tx
-        .delete(documentBindings)
-        .where(and(eq(documentBindings.documentId, id as any), scopeWhere));
-
-      const [remainingBinding] = await tx
-        .select({ id: documentBindings.id })
-        .from(documentBindings)
-        .where(eq(documentBindings.documentId, id as any));
-
-      if (!remainingBinding) {
-        await tx
-          .update(documents)
-          .set({ deletedAt: new Date() } as any)
-          .where(eq(documents.id, id as any));
-      }
+        .update(documents)
+        .set({ deletedAt: new Date() } as any)
+        .where(eq(documents.id, id as any));
 
       return true;
     });

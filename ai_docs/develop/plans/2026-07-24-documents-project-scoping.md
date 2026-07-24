@@ -52,60 +52,64 @@
 ## Задачи
 
 ### Задача: DOC-SCOPE-001 — Миграция БД: добавить object_id в documents
-- **Статус**: Не начата
+- **Статус**: Реализована, проверка полного clean workflow заблокирована старой миграцией `0019_drop_legacy_telegram_columns.sql`
 - **Приоритет**: Высокий
 - **Описание**: Добавить колонку `object_id`, индекс, CHECK-ограничение согласованности scope↔object_id. Безопасная миграция: добавление → backfill → ужесточение.
 - **Шаги выполнения**:
-  - [ ] Создать `migrations/00XX_documents_object_id.sql`
-  - [ ] `ALTER TABLE documents ADD COLUMN object_id integer` (nullable на этом шаге)
-  - [ ] FK `references objects(id) ON DELETE CASCADE`
-  - [ ] Индекс `documents_object_id_idx` и составной `documents_scope_object_idx (scope, object_id)`
-  - [ ] Backfill: проставить `object_id` для `scope='project'` по bindings (материал → object_id, либо `document_bindings.object_id`)
-  - [ ] Документы `scope='project'` без единой привязки (осиротевшие) → `deleted_at = now()` (решение №4)
-  - [ ] Добавить CHECK `documents_scope_object_check`
+  - [x] Создать `migrations/00XX_documents_object_id.sql`
+  - [x] `ALTER TABLE documents ADD COLUMN object_id integer` (nullable на этом шаге)
+  - [x] FK `references objects(id) ON DELETE CASCADE`
+  - [x] Индекс `documents_object_id_idx` и составной `documents_scope_object_idx (scope, object_id)`
+  - [x] Backfill: проставить `object_id` для `scope='project'` по bindings (материал → object_id, либо `document_bindings.object_id`)
+  - [x] Документы `scope='project'` без единой привязки (осиротевшие) → `deleted_at = now()` (решение №4)
+  - [x] Добавить CHECK `documents_scope_object_check`
   - [ ] Проверить прогон в `.github/workflows/test-migrations.yml`
+    - 2026-07-24: полный прогон на чистой временной БД останавливается до `0026` на `0019_drop_legacy_telegram_columns.sql`: `Cannot make user_id NOT NULL: found 1 rows with NULL user_id`. Новая `0026_documents_object_id.sql` вручную применена на схеме после `0018`: колонка, FK, CHECK и индексы созданы.
 - **Зависимости**: нет
 - **Проверка**: миграция применяется на чистой и на текущей БД без ошибок; данные не потеряны
 
 ### Задача: DOC-SCOPE-002 — Обновить схему Drizzle и Zod-контракты
-- **Статус**: Не начата
+- **Статус**: Реализована
 - **Приоритет**: Высокий
 - **Описание**: Отразить `object_id` в `shared/schema.ts`; обновить `shared/routes.ts` (list с фильтром по объекту/режиму, create с object_id, новый patch).
 - **Шаги выполнения**:
-  - [ ] `shared/schema.ts`: добавить `objectId` в `documents` + CHECK
-  - [ ] `shared/routes.ts` `documents.list`: query-параметры `viewMode` (`project|global|all`), объект берётся из заголовка `X-Object-Id`/сессии
-  - [ ] `shared/routes.ts` `documents.create`: `object_id` проставляется сервером по `scope` (клиент scope не передаёт напрямую — см. UI)
-  - [ ] Добавить контракт `documents.patch` (`PATCH /api/documents/:id`): title, docNumber, docDate, validFrom, validTo, fileUrl (без смены scope здесь)
-  - [ ] Добавить контракт `documents.setScope` ИЛИ включить смену scope в patch (уточнить) — «Сделать глобальным»/«В проект»
+  - [x] `shared/schema.ts`: добавить `objectId` в `documents` + CHECK
+  - [x] `shared/routes.ts` `documents.list`: query-параметры `viewMode` (`project|global|all`), объект берётся из заголовка `X-Object-Id`/сессии
+  - [x] `shared/routes.ts` `documents.create`: `object_id` проставляется сервером по `scope` (клиент scope не передаёт напрямую — см. UI)
+    - 2026-07-24: `scope` временно оставлен в контракте `create` для совместимости до реализации backend/frontend задач `DOC-SCOPE-003`/`DOC-SCOPE-005`; `objectId` в input не принимается.
+  - [x] Добавить контракт `documents.patch` (`PATCH /api/documents/:id`): title, docNumber, docDate, validFrom, validTo, fileUrl (без смены scope здесь)
+  - [x] Добавить контракт `documents.setScope` ИЛИ включить смену scope в patch (уточнить) — «Сделать глобальным»/«В проект»
 - **Зависимости**: DOC-SCOPE-001
 
 ### Задача: DOC-SCOPE-003 — Backend: фильтрация и CRUD по объекту
-- **Статус**: Не начата
+- **Статус**: Реализована
 - **Приоритет**: Высокий
 - **Описание**: Переписать выдачу и создание документов с учётом текущего объекта; добавить PATCH и корректное удаление проектных/глобальных.
 - **Шаги выполнения**:
-  - [ ] `server/routes/materials.ts` `GET /api/documents`: добавить `...appAuth` + `resolveCurrentObject`, прокинуть `objectId` и `viewMode`
-  - [ ] `storage.searchDocuments({ objectId, viewMode, query, docType })`: реализовать правило видимости (project/global/all)
-  - [ ] `storage.createDocument`: для `project` — проставить `object_id = currentObject`; для `global` — `NULL`
-  - [ ] `POST /api/documents`: определить scope из тела (сегмент UI) и подставить object_id на сервере
-  - [ ] Реализовать `PATCH /api/documents/:id` (доступ любому владельцу — решение №5; для проектного проверяется владение объектом)
-  - [ ] `storage.deleteDocument`: проектный — soft-delete в своём объекте; глобальный — soft-delete любым владельцем, но запрет при использовании в актах (понятная 409)
-  - [ ] Действие «Сделать глобальным» (доступно всем — решение №7): `scope→global`, `object_id→NULL` (bindings сохраняются)
-  - [ ] Для global НЕ копируем в проект — привязка по ссылке (Вариант 1)
+  - [x] `server/routes/materials.ts` `GET /api/documents`: добавить `...appAuth` + `resolveCurrentObject`, прокинуть `objectId` и `viewMode`
+    - 2026-07-24: добавлен временный fallback `scope -> viewMode` для совместимости до `DOC-SCOPE-004`.
+  - [x] `storage.searchDocuments({ objectId, viewMode, query, docType })`: реализовать правило видимости (project/global/all)
+  - [x] `storage.createDocument`: для `project` — проставить `object_id = currentObject`; для `global` — `NULL`
+  - [x] `POST /api/documents`: определить scope из тела (сегмент UI) и подставить object_id на сервере
+  - [x] Реализовать `PATCH /api/documents/:id` (доступ любому владельцу — решение №5; для проектного проверяется владение объектом)
+  - [x] `storage.deleteDocument`: проектный — soft-delete в своём объекте; глобальный — soft-delete любым владельцем, но запрет при использовании в актах (понятная 409)
+  - [x] Действие «Сделать глобальным» (доступно всем — решение №7): `scope→global`, `object_id→NULL` (bindings сохраняются)
+  - [x] Для global НЕ копируем в проект — привязка по ссылке (Вариант 1)
 - **Зависимости**: DOC-SCOPE-002
 - **Проверка**: на новом объекте `GET /api/documents?viewMode=project` пуст; global видны везде
 
 ### Задача: DOC-SCOPE-004 — Frontend: хуки use-documents
-- **Статус**: Не начата
+- **Статус**: Реализована
 - **Приоритет**: Высокий
 - **Описание**: Обновить хуки под режимы просмотра, добавить edit/patch и корректную инвалидацию по объекту.
 - **Шаги выполнения**:
-  - [ ] `useDocuments({ viewMode, query, docType })` вместо `scope`
-  - [ ] Добавить текущий `objectId` в queryKey (инвалидация при смене объекта)
-  - [ ] `useCreateDocument`: принимает `viewMode`/`scope` из активного сегмента
-  - [ ] Добавить `useUpdateDocument` (PATCH)
-  - [ ] `useDeleteDocument`: работает из реестра, обрабатывает 409 (используется в актах)
-  - [ ] `useSetDocumentScope` (сделать глобальным)
+  - [x] `useDocuments({ viewMode, query, docType })` вместо `scope`
+    - 2026-07-24: временно поддержан legacy `scope` как alias для совместимости до `DOC-SCOPE-005`.
+  - [x] Добавить текущий `objectId` в queryKey (инвалидация при смене объекта)
+  - [x] `useCreateDocument`: принимает `viewMode`/`scope` из активного сегмента
+  - [x] Добавить `useUpdateDocument` (PATCH)
+  - [x] `useDeleteDocument`: работает из реестра, обрабатывает 409 (используется в актах)
+  - [x] `useSetDocumentScope` (сделать глобальным)
 - **Зависимости**: DOC-SCOPE-002
 
 ### Задача: DOC-SCOPE-005 — Frontend: страница /source/documents (3 сегмента + действия)

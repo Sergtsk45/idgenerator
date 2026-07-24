@@ -12,6 +12,7 @@ import rateLimit from 'express-rate-limit';
 import { api } from '@shared/routes';
 import { storage, appAuth, getObjectId, resolveCurrentObject, type AuthenticatedRequest } from './_common';
 import { requireFeature, requireQuota } from '../middleware/tariff';
+import { DocumentInUseError } from '../storage';
 
 // ── Invoice upload config ────────────────────────────────────────────────────
 
@@ -431,30 +432,99 @@ export function registerMaterialsRoutes(app: Express): void {
   // ── Documents & Bindings ───────────────────────────────────────────────────
 
   // GET /api/documents — список документов
-  app.get(api.documents.list.path, async (req, res) => {
+  app.get(api.documents.list.path, ...appAuth, resolveCurrentObject, async (req, res) => {
     try {
-      const query = typeof req.query.query === 'string' ? req.query.query : undefined;
-      const docType = typeof req.query.docType === 'string' ? req.query.docType : undefined;
-      const scope = typeof req.query.scope === 'string' ? req.query.scope : undefined;
-      const list = await storage.searchDocuments({ query, docType, scope });
+      const objectId = getObjectId(req);
+      if (!objectId) {
+        return res.status(400).json({ message: 'Current object is required' });
+      }
+      const legacyScope =
+        req.query.scope === "global" || req.query.scope === "project"
+          ? req.query.scope
+          : undefined;
+      const input = api.documents.list.input?.parse({
+        ...req.query,
+        viewMode: req.query.viewMode ?? legacyScope,
+      }) ?? { viewMode: "project" as const };
+      const list = await storage.searchDocuments({
+        objectId,
+        viewMode: input.viewMode,
+        query: input.query,
+        docType: input.docType,
+      });
       return res.status(200).json(list);
     } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
       console.error('Documents list failed:', err);
       return res.status(500).json({ message: 'Internal Server Error' });
     }
   });
 
   // POST /api/documents — создать документ
-  app.post(api.documents.create.path, async (req, res) => {
+  app.post(api.documents.create.path, ...appAuth, resolveCurrentObject, async (req, res) => {
     try {
+      const objectId = getObjectId(req);
+      if (!objectId) {
+        return res.status(400).json({ message: 'Current object is required' });
+      }
       const input = api.documents.create.input.parse(req.body);
-      const created = await storage.createDocument(input as any);
+      const created = await storage.createDocument(objectId, input as any);
       return res.status(201).json(created);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
       console.error('Documents create failed:', err);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
+  // PATCH /api/documents/:id — обновить поля документа
+  app.patch(api.documents.patch.path, ...appAuth, resolveCurrentObject, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ message: 'Invalid id' });
+    }
+    const objectId = getObjectId(req);
+    if (!objectId) {
+      return res.status(400).json({ message: 'Current object is required' });
+    }
+    try {
+      const input = api.documents.patch.input.parse(req.body);
+      const updated = await storage.updateDocument(id, (req as AuthenticatedRequest).user.id, objectId, input as any);
+      if (!updated) return res.status(404).json({ message: 'Not found' });
+      return res.status(200).json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error('Document patch failed:', err);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
+  // PATCH /api/documents/:id/scope — сменить scope документа
+  app.patch(api.documents.setScope.path, ...appAuth, resolveCurrentObject, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ message: 'Invalid id' });
+    }
+    const objectId = getObjectId(req);
+    if (!objectId) {
+      return res.status(400).json({ message: 'Current object is required' });
+    }
+    try {
+      const input = api.documents.setScope.input.parse(req.body);
+      const updated = await storage.setDocumentScope(id, (req as AuthenticatedRequest).user.id, objectId, input.scope);
+      if (!updated) return res.status(404).json({ message: 'Not found' });
+      return res.status(200).json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      console.error('Document set scope failed:', err);
       return res.status(500).json({ message: 'Internal Server Error' });
     }
   });
@@ -474,6 +544,9 @@ export function registerMaterialsRoutes(app: Express): void {
       if (!ok) return res.status(404).json({ message: 'Not found' });
       return res.status(204).send();
     } catch (err) {
+      if (err instanceof DocumentInUseError) {
+        return res.status(409).json({ message: err.message });
+      }
       console.error('Document delete failed:', err);
       return res.status(500).json({ message: 'Internal Server Error' });
     }
