@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateProjectMaterial, useMaterialsCatalogSearch } from "@/hooks/use-materials";
-import { useCreateDocument, useCreateDocumentBinding } from "@/hooks/use-documents";
+import { useCreateDocument, useCreateDocumentBinding, useDocuments } from "@/hooks/use-documents";
 import { BatchForm, type BatchDraft } from "@/components/materials/BatchForm";
 import { Loader2, Plus } from "lucide-react";
 import { api, buildUrl } from "@shared/routes";
@@ -52,6 +52,9 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
 
   // step 4
   const [addDoc, setAddDoc] = useState(false);
+  const [docMode, setDocMode] = useState<"registry" | "new">("new");
+  const [docSearch, setDocSearch] = useState("");
+  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
   const [docBindTarget, setDocBindTarget] = useState<"material" | "batch">("material");
   const [doc, setDoc] = useState<DocDraft>({
     docType: "certificate",
@@ -62,6 +65,7 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
   const createMaterial = useCreateProjectMaterial(props.objectId);
   const createDocument = useCreateDocument();
   const createBinding = useCreateDocumentBinding();
+  const docsQuery = useDocuments({ query: docSearch, viewMode: "all" });
 
   const isBusy = createMaterial.isPending || createDocument.isPending || createBinding.isPending;
 
@@ -84,6 +88,9 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
     setAddBatch(false);
     setBatch({});
     setAddDoc(false);
+    setDocMode("new");
+    setDocSearch("");
+    setSelectedDocumentId(null);
     setDocBindTarget("material");
     setDoc({ docType: "certificate", scope: "project", useInActs: true });
   };
@@ -127,7 +134,16 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
       }
 
       if (addDoc) {
-        const createdDoc = await createDocument.mutateAsync({
+        const selectedExistingDoc =
+          docMode === "registry"
+            ? ((docsQuery.data ?? []) as any[]).find((d) => Number(d.id) === selectedDocumentId)
+            : null;
+
+        if (docMode === "registry" && !selectedExistingDoc) {
+          throw new Error("Выберите документ из реестра");
+        }
+
+        const documentForBinding = selectedExistingDoc ?? await createDocument.mutateAsync({
           docType: doc.docType,
           scope: doc.scope,
           title: doc.title || null,
@@ -140,11 +156,11 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
         } as any);
 
         const bindingRole =
-          doc.docType === "passport"
+          String((documentForBinding as any).docType ?? doc.docType) === "passport"
             ? "passport"
-            : doc.docType === "protocol"
+            : String((documentForBinding as any).docType ?? doc.docType) === "protocol"
               ? "protocol"
-              : doc.docType === "scheme"
+              : String((documentForBinding as any).docType ?? doc.docType) === "scheme"
                 ? "scheme"
                 : "quality";
 
@@ -152,7 +168,7 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
           addBatch && docBindTarget === "batch" ? createdBatchId : null;
 
         await createBinding.mutateAsync({
-          documentId: (createdDoc as any).id,
+          documentId: (documentForBinding as any).id,
           projectMaterialId,
           objectId: null,
           batchId: batchIdForBinding,
@@ -283,6 +299,26 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
 
             {addDoc ? (
               <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label>Источник документа</Label>
+                  <RadioGroup value={docMode} onValueChange={(v) => setDocMode(v as any)} className="grid grid-cols-2 gap-2">
+                    <Label className="flex items-center gap-3 rounded-lg border p-3">
+                      <RadioGroupItem value="registry" />
+                      <div>
+                        <div className="font-medium">Из реестра</div>
+                        <div className="text-xs text-muted-foreground">Проект + глобальные</div>
+                      </div>
+                    </Label>
+                    <Label className="flex items-center gap-3 rounded-lg border p-3">
+                      <RadioGroupItem value="new" />
+                      <div>
+                        <div className="font-medium">Новый</div>
+                        <div className="text-xs text-muted-foreground">Создать и привязать</div>
+                      </div>
+                    </Label>
+                  </RadioGroup>
+                </div>
+
                 {addBatch ? (
                   <div className="grid gap-2">
                     <Label>Привязать документ</Label>
@@ -305,39 +341,79 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
                   </div>
                 ) : null}
 
-                <div className="grid gap-2">
-                  <Label>Тип</Label>
-                  <Select value={doc.docType} onValueChange={(v) => setDoc((p) => ({ ...p, docType: v as any, useInActs: v !== "passport" }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="certificate">certificate</SelectItem>
-                      <SelectItem value="declaration">declaration</SelectItem>
-                      <SelectItem value="passport">passport</SelectItem>
-                      <SelectItem value="protocol">protocol</SelectItem>
-                      <SelectItem value="scheme">scheme</SelectItem>
-                      <SelectItem value="other">other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {docMode === "registry" ? (
+                  <div className="grid gap-3">
+                    <div className="grid gap-2">
+                      <Label>Поиск в реестре</Label>
+                      <Input value={docSearch} onChange={(e) => setDocSearch(e.target.value)} placeholder="например: сертификат 123" />
+                    </div>
+                    <div className="grid gap-2 max-h-56 overflow-y-auto pr-1">
+                      {docsQuery.isLoading ? (
+                        <div className="text-sm text-muted-foreground py-4 text-center">Загрузка...</div>
+                      ) : (docsQuery.data ?? []).length === 0 ? (
+                        <div className="text-sm text-muted-foreground py-4 text-center">Документы не найдены</div>
+                      ) : (
+                        (docsQuery.data ?? []).slice(0, 50).map((d: any) => {
+                          const id = Number(d.id);
+                          const label = [
+                            String(d.docType ?? "document"),
+                            d.scope === "global" ? "глобальный" : "проект",
+                            d.docNumber ? `№${String(d.docNumber)}` : null,
+                            d.docDate ? `от ${String(d.docDate)}` : null,
+                            d.title ? String(d.title) : null,
+                          ].filter(Boolean).join(" • ");
+                          return (
+                            <Button
+                              key={String(d.id)}
+                              type="button"
+                              variant={selectedDocumentId === id ? "default" : "outline"}
+                              className="w-full justify-start rounded-xl"
+                              onClick={() => setSelectedDocumentId(id)}
+                            >
+                              {label}
+                            </Button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-2">
+                      <Label>Тип</Label>
+                      <Select value={doc.docType} onValueChange={(v) => setDoc((p) => ({ ...p, docType: v as any, useInActs: v !== "passport" }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="certificate">certificate</SelectItem>
+                          <SelectItem value="declaration">declaration</SelectItem>
+                          <SelectItem value="passport">passport</SelectItem>
+                          <SelectItem value="protocol">protocol</SelectItem>
+                          <SelectItem value="scheme">scheme</SelectItem>
+                          <SelectItem value="other">other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div className="grid gap-2">
-                  <Label>Номер</Label>
-                  <Input value={doc.docNumber ?? ""} onChange={(e) => setDoc((p) => ({ ...p, docNumber: e.target.value }))} />
-                </div>
+                    <div className="grid gap-2">
+                      <Label>Номер</Label>
+                      <Input value={doc.docNumber ?? ""} onChange={(e) => setDoc((p) => ({ ...p, docNumber: e.target.value }))} />
+                    </div>
 
-                <div className="grid gap-2">
-                  <Label>Дата</Label>
-                  <Input type="date" value={doc.docDate ?? ""} onChange={(e) => setDoc((p) => ({ ...p, docDate: e.target.value }))} />
-                </div>
+                    <div className="grid gap-2">
+                      <Label>Дата</Label>
+                      <Input type="date" value={doc.docDate ?? ""} onChange={(e) => setDoc((p) => ({ ...p, docDate: e.target.value }))} />
+                    </div>
 
-                <div className="grid gap-2">
-                  <Label>URL файла (опц.)</Label>
-                  <Input value={doc.fileUrl ?? ""} onChange={(e) => setDoc((p) => ({ ...p, fileUrl: e.target.value }))} />
-                </div>
+                    <div className="grid gap-2">
+                      <Label>URL файла (опц.)</Label>
+                      <Input value={doc.fileUrl ?? ""} onChange={(e) => setDoc((p) => ({ ...p, fileUrl: e.target.value }))} />
+                    </div>
+                  </>
+                )}
 
-                {(doc.docType === "certificate" || doc.docType === "declaration") && (
+                {(docMode === "registry" || doc.docType === "certificate" || doc.docType === "declaration") && (
                   <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
                     <div className="text-sm">Использовать в актах</div>
                     <Switch checked={doc.useInActs} onCheckedChange={(v) => setDoc((p) => ({ ...p, useInActs: v }))} />
@@ -370,4 +446,3 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
     </Dialog>
   );
 }
-

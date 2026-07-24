@@ -74,7 +74,7 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
   const [bindDocOpen, setBindDocOpen] = useState(false);
   const [bindTab, setBindTab] = useState<"registry" | "new">("registry");
   const [docSearch, setDocSearch] = useState("");
-  const docsQuery = useDocuments({ query: docSearch });
+  const docsQuery = useDocuments({ query: docSearch, viewMode: "all" });
   const [bindDocTarget, setBindDocTarget] = useState<"material" | "batch">("material");
   const [bindDocSelectedBatchId, setBindDocSelectedBatchId] = useState<number | null>(null);
 

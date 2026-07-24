@@ -62,7 +62,7 @@ export default function SourceData() {
   const saveMutation = useSaveSourceData();
 
   const materialsQuery = useProjectMaterials(objectId);
-  const docsQuery = useDocuments({ scope: "project" });
+  const docsQuery = useDocuments({ viewMode: "all" });
   const createDoc = useCreateDocument();
 
   const [draft, setDraft] = useState<SourceDataDto>(() => emptySourceData());
@@ -914,4 +914,3 @@ export default function SourceData() {
     </ResponsiveShell>
   );
 }
-
