@@ -1,7 +1,7 @@
 /**
  * @file: SourceDocuments.tsx
  * @description: Страница реестра документов качества (/source/documents).
- * @dependencies: hooks/use-documents, components/documents/DocumentCard
+ * @dependencies: hooks/use-documents, components/ui, ResponsiveShell
  * @created: 2026-02-01
  */
 
@@ -22,13 +22,36 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { useCreateDocument, useDocuments } from "@/hooks/use-documents";
-import { FileText, Loader2, Plus, Search } from "lucide-react";
+import { useCreateDocument, useDeleteDocument, useDocuments, useSetDocumentScope, useUpdateDocument } from "@/hooks/use-documents";
+import { useCurrentObject } from "@/hooks/use-source-data";
+import { ExternalLink, FileText, Globe2, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const DOC_TYPES = ["certificate", "declaration", "passport", "protocol", "scheme", "other"] as const;
 const PAGE_SIZE = 20;
+type ViewMode = "project" | "global" | "all";
+type DocScope = "project" | "global";
+type DocumentForm = {
+  docType: string;
+  scope: DocScope;
+  title: string;
+  docNumber: string;
+  docDate: string;
+  validFrom: string;
+  validTo: string;
+  fileUrl: string;
+};
 
 function docTypeBadgeVariant(type: string): "info" | "success" | "neutral" | "warning" {
   if (type === "certificate") return "success";
@@ -49,25 +72,67 @@ function docTypeLabel(type: string): string {
   return map[type] ?? type;
 }
 
+function scopeLabel(scope: string): string {
+  return scope === "global" ? "Глобальный" : "Проект";
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return "";
+  return format(new Date(value), "dd.MM.yyyy");
+}
+
+function emptyForm(scope: DocScope): DocumentForm {
+  return {
+    docType: "certificate",
+    scope,
+    title: "",
+    docNumber: "",
+    docDate: "",
+    validFrom: "",
+    validTo: "",
+    fileUrl: "",
+  };
+}
+
+function formFromDocument(doc: any): DocumentForm {
+  return {
+    docType: doc.docType ?? "certificate",
+    scope: doc.scope === "global" ? "global" : "project",
+    title: doc.title ?? "",
+    docNumber: doc.docNumber ?? "",
+    docDate: doc.docDate ?? "",
+    validFrom: doc.validFrom ?? "",
+    validTo: doc.validTo ?? "",
+    fileUrl: doc.fileUrl ?? "",
+  };
+}
+
 export default function SourceDocuments() {
   const { toast } = useToast();
   const createDoc = useCreateDocument();
+  const updateDoc = useUpdateDocument();
+  const deleteDoc = useDeleteDocument();
+  const setDocScope = useSetDocumentScope();
+  const currentObjectQuery = useCurrentObject();
+  const currentObjectTitle = String((currentObjectQuery.data as any)?.title ?? "текущий объект");
 
   const [search, setSearch] = useState("");
   const [docType, setDocType] = useState<string>("__all__");
-  const [scope, setScope] = useState<string>("__all__");
+  const [viewMode, setViewMode] = useState<ViewMode>("project");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<any | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const docsQuery = useDocuments({
     query: search,
     docType: docType === "__all__" ? undefined : docType,
-    scope: scope === "__all__" ? undefined : scope,
+    viewMode,
   });
 
   // Reset visible on filter change
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [docType, scope, search]);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [docType, viewMode, search]);
 
   // Infinite scroll
   useEffect(() => {
@@ -79,33 +144,86 @@ export default function SourceDocuments() {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [docsQuery.data, docType, scope, search]);
+  }, [docsQuery.data, docType, viewMode, search]);
 
-  const [form, setForm] = useState({
-    docType: "certificate",
-    scope: "project",
-    title: "",
-    docNumber: "",
-    docDate: "",
-    fileUrl: "",
-  });
+  const [form, setForm] = useState<DocumentForm>(() => emptyForm("project"));
+
+  const createScope: DocScope = viewMode === "global" ? "global" : "project";
+
+  const openCreate = () => {
+    setEditingDoc(null);
+    setForm(emptyForm(createScope));
+    setSheetOpen(true);
+  };
+
+  const openEdit = (doc: any) => {
+    setEditingDoc(doc);
+    setForm(formFromDocument(doc));
+    setSheetOpen(true);
+  };
 
   const submit = async () => {
     try {
-      await createDoc.mutateAsync({
-        docType: form.docType as any,
-        scope: form.scope as any,
-        title: form.title || null,
-        docNumber: form.docNumber || null,
-        docDate: form.docDate || null,
-        validFrom: null,
-        validTo: null,
-        meta: {},
-        fileUrl: form.fileUrl || null,
-      } as any);
-      toast({ title: "Создано", description: "Документ добавлен в реестр" });
+      if (editingDoc) {
+        await updateDoc.mutateAsync({
+          id: Number(editingDoc.id),
+          patch: {
+            title: form.title || null,
+            docNumber: form.docNumber || null,
+            docDate: form.docDate || null,
+            validFrom: form.validFrom || null,
+            validTo: form.validTo || null,
+            fileUrl: form.fileUrl || null,
+          },
+        });
+        toast({ title: "Сохранено", description: "Документ обновлен" });
+      } else {
+        const scope = viewMode === "all" ? form.scope : createScope;
+        await createDoc.mutateAsync({
+          docType: form.docType as any,
+          scope,
+          viewMode,
+          title: form.title || null,
+          docNumber: form.docNumber || null,
+          docDate: form.docDate || null,
+          validFrom: form.validFrom || null,
+          validTo: form.validTo || null,
+          meta: {},
+          fileUrl: form.fileUrl || null,
+        } as any);
+        toast({ title: "Создано", description: "Документ добавлен в реестр" });
+      }
       setSheetOpen(false);
-      setForm({ docType: "certificate", scope: "project", title: "", docNumber: "", docDate: "", fileUrl: "" });
+      setEditingDoc(null);
+      setForm(emptyForm(createScope));
+    } catch (e) {
+      toast({
+        title: "Ошибка",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteDoc.mutateAsync(Number(deleteTarget.id));
+      toast({ title: "Удалено", description: "Документ удален из реестра" });
+      setDeleteTarget(null);
+    } catch (e) {
+      toast({
+        title: "Не удалось удалить",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const makeGlobal = async (doc: any) => {
+    try {
+      await setDocScope.mutateAsync({ id: Number(doc.id), scope: "global" });
+      toast({ title: "Готово", description: "Документ стал глобальным" });
     } catch (e) {
       toast({
         title: "Ошибка",
@@ -121,6 +239,24 @@ export default function SourceDocuments() {
     { value: "__all__", label: "Все" },
     ...DOC_TYPES.map((t) => ({ value: t, label: docTypeLabel(t) })),
   ];
+  const viewTabs = [
+    { value: "project", label: "Проект" },
+    { value: "global", label: "Глобальные" },
+    { value: "all", label: "Все" },
+  ];
+
+  const emptyTitle =
+    viewMode === "global"
+      ? "Глобальных документов нет"
+      : viewMode === "all"
+        ? "Документы не найдены"
+        : "В проекте нет документов";
+  const emptyHint =
+    viewMode === "global"
+      ? "Добавьте общий документ, чтобы использовать его в любом объекте."
+      : viewMode === "all"
+        ? "Измените поиск или добавьте документ в проект или глобальный реестр."
+        : "Добавьте первый документ качества для текущего объекта.";
 
   return (
     <ResponsiveShell className="min-h-screen h-[100dvh] bg-background bg-grain" title="Документы качества">
@@ -140,6 +276,17 @@ export default function SourceDocuments() {
             />
           </div>
 
+          <PillTabs
+            tabs={viewTabs}
+            activeTab={viewMode}
+            onTabChange={(value) => setViewMode(value as ViewMode)}
+            className="mb-3"
+          />
+
+          <div className="mb-3 text-[11px] text-[--g500] truncate">
+            {viewMode === "project" ? `Проект: ${currentObjectTitle}` : viewMode === "global" ? "Глобальные видны во всех объектах" : "Проектные текущего объекта и глобальные"}
+          </div>
+
           {/* 20.2 PillTabs по типу */}
           <PillTabs
             tabs={typeTabs}
@@ -147,21 +294,6 @@ export default function SourceDocuments() {
             onTabChange={setDocType}
             className="mb-3"
           />
-
-          {/* Scope select (compact) */}
-          <div className="flex items-center gap-2 mb-3">
-            <p className="o-overline shrink-0">Scope:</p>
-            <Select value={scope} onValueChange={setScope}>
-              <SelectTrigger className="h-8 text-[12px] rounded-full border-[--g300] w-auto min-w-[100px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Все</SelectItem>
-                <SelectItem value="project">project</SelectItem>
-                <SelectItem value="global">global</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           {/* 20.5 Empty state / список */}
           {docsQuery.isLoading ? (
@@ -172,10 +304,10 @@ export default function SourceDocuments() {
           ) : docs.length === 0 ? (
             <OdooEmptyState
               icon={<FileText />}
-              title="Документы не найдены"
-              hint="Добавьте первый документ качества."
+              title={emptyTitle}
+              hint={emptyHint}
               action={
-                <Button variant="odoo-primary" size="compact" onClick={() => setSheetOpen(true)}>
+                <Button variant="odoo-primary" size="compact" onClick={openCreate}>
                   <Plus className="h-4 w-4 mr-1.5" />
                   Добавить
                 </Button>
@@ -185,23 +317,64 @@ export default function SourceDocuments() {
             <div className="space-y-2">
               {/* 20.1 OdooCard list */}
               {docs.slice(0, visibleCount).map((d: any) => (
-                <OdooCard
-                  key={d.id}
-                  hoverable={!!d.fileUrl}
-                  onClick={d.fileUrl ? () => window.open(d.fileUrl, "_blank", "noopener,noreferrer") : undefined}
-                >
-                  <div className="p-3 flex items-center gap-3">
+                <OdooCard key={d.id}>
+                  <div className="p-3 flex items-start gap-3">
                     <div className="h-9 w-9 rounded-[--o-radius-sm] bg-[--p50] flex items-center justify-center text-[--p500] shrink-0">
                       <FileText className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-[--g900] truncate">
-                        {d.title ?? d.docNumber ?? `Документ #${d.id}`}
-                      </p>
-                      <p className="text-[11px] text-[--g500]">
+                      <div className="flex items-start gap-2">
+                        <p className="text-[13px] font-medium text-[--g900] truncate">
+                          {d.title ?? d.docNumber ?? `Документ #${d.id}`}
+                        </p>
+                        {viewMode === "all" && (
+                          <Badge variant={d.scope === "global" ? "info" : "neutral"} className="shrink-0 text-[10px]">
+                            {scopeLabel(d.scope)}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[--g500] truncate">
                         {d.docNumber ? `№${d.docNumber}` : ""}
-                        {d.docDate ? ` · ${format(new Date(d.docDate), "dd.MM.yyyy")}` : ""}
+                        {d.docDate ? ` · ${formatDate(d.docDate)}` : ""}
                       </p>
+                      {(d.validFrom || d.validTo) && (
+                        <p className="text-[11px] text-[--g500] truncate">
+                          {d.validFrom ? `с ${formatDate(d.validFrom)}` : ""}
+                          {d.validTo ? ` до ${formatDate(d.validTo)}` : ""}
+                        </p>
+                      )}
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="compact"
+                          className="h-7 px-2 text-[11px] gap-1"
+                          disabled={!d.fileUrl}
+                          onClick={() => d.fileUrl && window.open(d.fileUrl, "_blank", "noopener,noreferrer")}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          Открыть
+                        </Button>
+                        <Button variant="outline" size="compact" className="h-7 px-2 text-[11px] gap-1" onClick={() => openEdit(d)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                          Редактировать
+                        </Button>
+                        {d.scope === "project" && (
+                          <Button
+                            variant="outline"
+                            size="compact"
+                            className="h-7 px-2 text-[11px] gap-1"
+                            disabled={setDocScope.isPending}
+                            onClick={() => makeGlobal(d)}
+                          >
+                            <Globe2 className="h-3.5 w-3.5" />
+                            Сделать глобальным
+                          </Button>
+                        )}
+                        <Button variant="outline" size="compact" className="h-7 px-2 text-[11px] gap-1 text-[--danger]" onClick={() => setDeleteTarget(d)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Удалить
+                        </Button>
+                      </div>
                     </div>
                     <Badge variant={docTypeBadgeVariant(d.docType ?? "")} className="shrink-0 text-[10px]">
                       {docTypeLabel(d.docType ?? "other")}
@@ -226,7 +399,7 @@ export default function SourceDocuments() {
             title="Реестр документов качества"
             hint="Добавляйте сертификаты, декларации и другие документы, затем привязывайте их к материалам."
             action={
-              <Button variant="odoo-primary" onClick={() => setSheetOpen(true)}>
+              <Button variant="odoo-primary" onClick={openCreate}>
                 <Plus className="h-4 w-4 mr-2" />
                 Добавить документ
               </Button>
@@ -243,13 +416,14 @@ export default function SourceDocuments() {
               variant="odoo-fab"
               size="odoo-fab-size"
               aria-label="Добавить документ"
+              onClick={openCreate}
             >
               <Plus className="h-6 w-6" />
             </Button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
             <SheetHeader className="pb-4">
-              <SheetTitle className="text-left text-[15px]">Добавить документ</SheetTitle>
+              <SheetTitle className="text-left text-[15px]">{editingDoc ? "Редактировать документ" : "Добавить документ"}</SheetTitle>
             </SheetHeader>
 
             <div className="space-y-4 pb-6">
@@ -267,18 +441,20 @@ export default function SourceDocuments() {
                 </Select>
               </div>
 
-              <div className="grid gap-1.5">
-                <Label className="o-overline">Scope</Label>
-                <Select value={form.scope} onValueChange={(v) => setForm((p) => ({ ...p, scope: v }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="project">project</SelectItem>
-                    <SelectItem value="global">global</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {!editingDoc && viewMode === "all" && (
+                <div className="grid gap-1.5">
+                  <Label className="o-overline">Область</Label>
+                  <Select value={form.scope} onValueChange={(v) => setForm((p) => ({ ...p, scope: v as DocScope }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="project">Проект</SelectItem>
+                      <SelectItem value="global">Глобальный</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="grid gap-1.5">
                 <Label className="o-overline">Название (опц.)</Label>
@@ -292,21 +468,53 @@ export default function SourceDocuments() {
                 <Label className="o-overline">Дата</Label>
                 <Input type="date" value={form.docDate} onChange={(e) => setForm((p) => ({ ...p, docDate: e.target.value }))} />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="o-overline">Действует с</Label>
+                  <Input type="date" value={form.validFrom} onChange={(e) => setForm((p) => ({ ...p, validFrom: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="o-overline">Действует до</Label>
+                  <Input type="date" value={form.validTo} onChange={(e) => setForm((p) => ({ ...p, validTo: e.target.value }))} />
+                </div>
+              </div>
               <div className="grid gap-1.5">
                 <Label className="o-overline">URL файла (опц.)</Label>
                 <Input value={form.fileUrl} onChange={(e) => setForm((p) => ({ ...p, fileUrl: e.target.value }))} />
               </div>
 
-              <Button variant="odoo-primary" onClick={submit} disabled={createDoc.isPending} className="w-full gap-2">
-                {createDoc.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Создать
+              <Button variant="odoo-primary" onClick={submit} disabled={createDoc.isPending || updateDoc.isPending} className="w-full gap-2">
+                {createDoc.isPending || updateDoc.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {editingDoc ? "Сохранить" : "Создать"}
               </Button>
             </div>
           </SheetContent>
         </Sheet>
       </div>
 
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить документ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Документ будет скрыт из реестра. Если он используется в актах, удаление будет отклонено.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteDoc.isPending}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmDelete();
+              }}
+              disabled={deleteDoc.isPending}
+            >
+              {deleteDoc.isPending ? "Удаление..." : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </ResponsiveShell>
   );
 }
-
