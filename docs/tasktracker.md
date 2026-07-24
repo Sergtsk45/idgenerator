@@ -2,6 +2,27 @@
 
 ---
 
+## Задача: DOC-SCOPE — Разделение документов на проектные и глобальные
+- **Статус**: Завершена
+- **Дата начала**: 2026-07-24
+- **Дата завершения**: 2026-07-24
+- **Описание**: Документы качества переведены на object-scoped модель: проектные документы принадлежат текущему объекту через `documents.object_id`, глобальные видны во всех объектах и привязываются к материалам по ссылке.
+- **Шаги выполнения**:
+  - [x] `DOC-SCOPE-001`: миграция `0026_documents_object_id.sql` с backfill и CHECK
+  - [x] `DOC-SCOPE-002`: Drizzle/Zod контракты `viewMode`, `patch`, `setScope`
+  - [x] `DOC-SCOPE-003`: backend-фильтрация, create/patch/delete/setScope
+  - [x] `DOC-SCOPE-004`: хуки `use-documents` под object-aware query key и CRUD
+  - [x] `DOC-SCOPE-005`: `/source/documents` с сегментами `Проект / Глобальные / Все` и действиями
+  - [x] `DOC-SCOPE-006`: связанные экраны используют проектные текущего объекта + глобальные
+  - [x] `DOC-SCOPE-007`: тесты и документация
+- **Проверка**:
+  - [x] `npm run check`
+  - [x] `npm run test`
+  - [x] `npm run build`
+- **Зависимости**: `ai_docs/develop/plans/2026-07-24-documents-project-scoping.md`
+
+---
+
 ## Задача: Перенос оставшейся документации из TelegramJurnalRabot
 - **Статус**: Завершена
 - **Дата начала**: 2026-07-24

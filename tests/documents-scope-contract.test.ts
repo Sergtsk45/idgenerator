@@ -30,6 +30,9 @@ test("documents.patch exposes expected method/path and validates editable fields
   assert.equal(parsed.docNumber, null);
   assert.throws(() => api.documents.patch.input.parse({}));
   assert.throws(() => api.documents.patch.input.parse({ fileUrl: "ftp://example.com/document.pdf" }));
+  assert.doesNotThrow(() => api.documents.patch.responses[400].parse({ message: "Invalid id" }));
+  assert.doesNotThrow(() => api.documents.patch.responses[401].parse({ error: "Authentication required" }));
+  assert.doesNotThrow(() => api.documents.patch.responses[404].parse({ message: "Not found" }));
 });
 
 test("documents.setScope exposes expected method/path and accepts project/global", () => {
@@ -38,5 +41,7 @@ test("documents.setScope exposes expected method/path and accepts project/global
   assert.equal(api.documents.setScope.input.parse({ scope: "global" }).scope, "global");
   assert.equal(api.documents.setScope.input.parse({ scope: "project" }).scope, "project");
   assert.throws(() => api.documents.setScope.input.parse({ scope: "team" }));
+  assert.doesNotThrow(() => api.documents.setScope.responses[400].parse({ message: "Invalid id" }));
+  assert.doesNotThrow(() => api.documents.setScope.responses[401].parse({ error: "Authentication required" }));
+  assert.doesNotThrow(() => api.documents.setScope.responses[404].parse({ message: "Not found" }));
 });
-

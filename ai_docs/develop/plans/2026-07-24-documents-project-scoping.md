@@ -138,15 +138,17 @@
 - **Зависимости**: DOC-SCOPE-004
 
 ### Задача: DOC-SCOPE-007 — Тесты и документация
-- **Статус**: Не начата
+- **Статус**: Реализована
 - **Приоритет**: Средний
 - **Описание**: Покрыть контракты и логику видимости; обновить проектную документацию.
 - **Шаги выполнения**:
-  - [ ] Контракт-тесты: `documents.list` (viewMode), `documents.patch`, обновлённый `documents.delete`
-  - [ ] Тест видимости: новый объект не видит проектные документы другого объекта; global видны везде
-  - [ ] Тест миграции backfill (project → object_id)
-  - [ ] `npm run check` + `npm run test`
-  - [ ] Обновить `docs/project.md` (модель документов, API), `docs/changelog.md`, `docs/tasktracker.md`
+  - [x] Контракт-тесты: `documents.list` (viewMode), `documents.patch`, обновлённый `documents.delete`
+  - [x] Тест видимости: новый объект не видит проектные документы другого объекта; global видны везде
+    - 2026-07-24: покрыто implementation smoke-тестом `storage.searchDocuments` без поднятия Postgres.
+  - [x] Тест миграции backfill (project → object_id)
+    - 2026-07-24: покрыто SQL smoke-тестом миграции `0026_documents_object_id.sql`.
+  - [x] `npm run check` + `npm run test`
+  - [x] Обновить `docs/project.md` (модель документов, API), `docs/changelog.md`, `docs/tasktracker.md`
 - **Зависимости**: DOC-SCOPE-003, DOC-SCOPE-005
 
 ---

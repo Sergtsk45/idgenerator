@@ -232,8 +232,8 @@ flowchart LR
 - `materials_catalog`: глобальный справочник материалов (наименование, ГОСТ/ТУ, ед. изм., параметры). Импортируется администраторами через API `POST /api/admin/materials-catalog/import`.
 - `project_materials`: материалы в рамках объекта (локальные либо привязанные к справочнику) + агрегаты для UI.
 - `material_batches`: партии/поставки материалов на объект.
-- `documents`: реестр документов качества (сертификаты/паспорта/протоколы и т.п.), scope: `project|global`.
-- `document_bindings`: привязки документов к объекту/материалу/партии + флаги `useInActs`/`isPrimary`.
+- `documents`: реестр документов качества (сертификаты/паспорта/протоколы и т.п.), scope: `project|global`, `object_id` для проектных документов. Активная видимость: `global` видны во всех объектах, `project` видны только в своём `object_id`; soft-deleted строки исключаются.
+- `document_bindings`: привязки документов к объекту/материалу/партии + флаги `useInActs`/`isPrimary`. Глобальные документы привязываются по ссылке без копирования записи документа.
 - `act_material_usages`: список материалов для п.3 АОСР "При выполнении работ применены…" (с порядком, опциональной привязкой к работе/партии/документу качества).
 - `act_document_attachments`: формальные приложения к АОСР (уникально по (actId, documentId)), отдельно от `attachments`.
 - `works`: позиции ВОР/ВОИР (код, описание, единицы, плановый объём, синонимы).
@@ -302,6 +302,7 @@ objects
 
 - `users.current_object_id` — серверное хранение текущего объекта. При первом обращении, если поле `NULL`, сервер автоматически создаёт дефолтный объект (`getOrCreateDefaultObject`).
 - Каскадное удаление: при удалении объекта удаляются все связанные данные (ВОР, акты, сообщения, материалы, задачи графика и т.д.).
+- Документы качества используют тот же контекст объекта: `/source/documents` показывает проектные документы текущего объекта и глобальные документы. Сегменты UI/API: `project`, `global`, `all`.
 
 #### Квоты по тарифам
 
@@ -370,7 +371,12 @@ objects
 - **Invoice Import** (новые endpoints):
   - `POST /api/parse-invoice` — загрузка и парсинг PDF-счёта через invoice-extractor (multipart/form-data, rate-limited 10 req/min на пользователя)
   - `POST /api/bulk-create-materials` — массовое создание материалов проекта с дедупликацией по названию (case-insensitive)
-- **Documents**: `GET /api/documents`, `POST /api/documents`
+- **Documents**:
+  - `GET /api/documents?viewMode=project|global|all&query=&docType=` — список документов в контексте текущего объекта (`project` по умолчанию)
+  - `POST /api/documents` — создать документ; сервер выставляет `object_id` для `project` и `NULL` для `global`
+  - `PATCH /api/documents/:id` — редактировать поля документа (`title`, `docNumber`, `docDate`, `validFrom`, `validTo`, `fileUrl`)
+  - `PATCH /api/documents/:id/scope` — сменить `scope` (`global` отвязывает `object_id`, `project` назначает текущий объект)
+  - `DELETE /api/documents/:id` — soft-delete; для global возвращает `409`, если документ используется в актах
 - **Document Bindings**: `POST /api/document-bindings`, `PATCH /api/document-bindings/:id`, `DELETE /api/document-bindings/:id`
 - **Act material usages**: `GET /api/acts/:id/material-usages`, `PUT /api/acts/:id/material-usages`
 - **Act document attachments**: `GET /api/acts/:id/document-attachments`, `PUT /api/acts/:id/document-attachments`
