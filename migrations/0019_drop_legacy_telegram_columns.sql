@@ -18,7 +18,31 @@ ALTER TABLE "objects" DROP COLUMN IF EXISTS "telegram_user_id";
 -- ============================
 -- 3. Make user_id NOT NULL in objects (now required)
 -- ============================
--- First check if there are any NULL values
+-- Clean migration chain can still contain seed object(s) created before the
+-- users table existed. Assign them to one explicit legacy owner instead of a
+-- random real user, then enforce NOT NULL.
+DO $$
+DECLARE
+  legacy_user_id INTEGER;
+BEGIN
+  IF EXISTS (SELECT 1 FROM objects WHERE user_id IS NULL) THEN
+    SELECT u.id INTO legacy_user_id
+    FROM users u
+    WHERE u.email = 'legacy-system-owner@local.invalid'
+    LIMIT 1;
+
+    IF legacy_user_id IS NULL THEN
+      INSERT INTO users (display_name, email, role, is_blocked, created_at)
+      VALUES ('Legacy System Owner', 'legacy-system-owner@local.invalid', 'admin', true, now())
+      RETURNING id INTO legacy_user_id;
+    END IF;
+
+    UPDATE objects
+    SET user_id = legacy_user_id
+    WHERE user_id IS NULL;
+  END IF;
+END $$;
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM objects WHERE user_id IS NULL) THEN

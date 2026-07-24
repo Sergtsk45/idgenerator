@@ -438,14 +438,7 @@ export function registerMaterialsRoutes(app: Express): void {
       if (!objectId) {
         return res.status(400).json({ message: 'Current object is required' });
       }
-      const legacyScope =
-        req.query.scope === "global" || req.query.scope === "project"
-          ? req.query.scope
-          : undefined;
-      const input = api.documents.list.input?.parse({
-        ...req.query,
-        viewMode: req.query.viewMode ?? legacyScope,
-      }) ?? { viewMode: "project" as const };
+      const input = api.documents.list.input?.parse(req.query) ?? { viewMode: "project" as const };
       const list = await storage.searchDocuments({
         objectId,
         viewMode: input.viewMode,
@@ -470,7 +463,7 @@ export function registerMaterialsRoutes(app: Express): void {
         return res.status(400).json({ message: 'Current object is required' });
       }
       const input = api.documents.create.input.parse(req.body);
-      const created = await storage.createDocument(objectId, input as any);
+      const created = await storage.createDocument(objectId, (req as AuthenticatedRequest).user.id, input as any);
       return res.status(201).json(created);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -553,10 +546,15 @@ export function registerMaterialsRoutes(app: Express): void {
   });
 
   // POST /api/document-bindings — создать привязку документа
-  app.post(api.documentBindings.create.path, async (req, res) => {
+  app.post(api.documentBindings.create.path, ...appAuth, resolveCurrentObject, async (req, res) => {
+    const objectId = getObjectId(req);
+    if (!objectId) {
+      return res.status(400).json({ message: 'Current object is required' });
+    }
     try {
       const input = api.documentBindings.create.input.parse(req.body);
-      const created = await storage.createBinding(input as any);
+      const created = await storage.createBinding(input as any, (req as AuthenticatedRequest).user.id, objectId);
+      if (!created) return res.status(404).json({ message: 'Not found' });
       return res.status(201).json(created);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -568,14 +566,18 @@ export function registerMaterialsRoutes(app: Express): void {
   });
 
   // PATCH /api/document-bindings/:id — обновить привязку документа
-  app.patch(api.documentBindings.patch.path, async (req, res) => {
+  app.patch(api.documentBindings.patch.path, ...appAuth, resolveCurrentObject, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id) || id <= 0) {
       return res.status(400).json({ message: 'Invalid id' });
     }
+    const objectId = getObjectId(req);
+    if (!objectId) {
+      return res.status(400).json({ message: 'Current object is required' });
+    }
     try {
       const patch = api.documentBindings.patch.input.parse(req.body);
-      const updated = await storage.updateBinding(id, patch as any);
+      const updated = await storage.updateBinding(id, (req as AuthenticatedRequest).user.id, objectId, patch as any);
       if (!updated) return res.status(404).json({ message: 'Not found' });
       return res.status(200).json(updated);
     } catch (err) {

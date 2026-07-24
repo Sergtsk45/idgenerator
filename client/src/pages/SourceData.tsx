@@ -62,7 +62,8 @@ export default function SourceData() {
   const saveMutation = useSaveSourceData();
 
   const materialsQuery = useProjectMaterials(objectId);
-  const docsQuery = useDocuments({ viewMode: "all" });
+  const projectDocsQuery = useDocuments({ viewMode: "project" });
+  const globalDocsQuery = useDocuments({ viewMode: "global" });
   const createDoc = useCreateDocument();
 
   const [draft, setDraft] = useState<SourceDataDto>(() => emptySourceData());
@@ -133,7 +134,9 @@ export default function SourceData() {
   };
 
   const materialsCount = (materialsQuery.data ?? []).length;
-  const docsCount = (docsQuery.data ?? []).length;
+  const projectDocsCount = (projectDocsQuery.data ?? []).length;
+  const globalDocsCount = (globalDocsQuery.data ?? []).length;
+  const docsCount = projectDocsCount + globalDocsCount;
   const personsFilledCount = useMemo(() => {
     const list = Object.values(draft.persons ?? {});
     return list.filter((p: any) => String(p?.personName ?? "").trim().length > 0).length;
@@ -373,7 +376,9 @@ export default function SourceData() {
                             <div className="min-w-0">
                               <p className="text-[14px] font-semibold text-[--g900]">{language === "ru" ? "Документы качества" : "Quality documents"}</p>
                               <p className="text-[11px] text-[--g500] truncate">
-                                {language === "ru" ? "Сертификаты, паспорта, протоколы" : "Certificates, passports, protocols"}
+                                {language === "ru"
+                                  ? `Проектные ${projectDocsCount} · Глобальные ${globalDocsCount}`
+                                  : `Project ${projectDocsCount} · Global ${globalDocsCount}`}
                               </p>
                             </div>
                           </div>

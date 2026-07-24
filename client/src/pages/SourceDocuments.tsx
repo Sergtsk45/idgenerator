@@ -32,10 +32,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { useCreateDocument, useDeleteDocument, useDocuments, useSetDocumentScope, useUpdateDocument } from "@/hooks/use-documents";
+import { type ApiError, useCreateDocument, useDeleteDocument, useDocuments, useSetDocumentScope, useUpdateDocument } from "@/hooks/use-documents";
 import { useCurrentObject } from "@/hooks/use-source-data";
-import { ExternalLink, FileText, Globe2, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ExternalLink, FileText, Globe2, Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const DOC_TYPES = ["certificate", "declaration", "passport", "protocol", "scheme", "other"] as const;
@@ -122,6 +128,7 @@ export default function SourceDocuments() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<any | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [makeGlobalTarget, setMakeGlobalTarget] = useState<any | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -168,6 +175,7 @@ export default function SourceDocuments() {
         await updateDoc.mutateAsync({
           id: Number(editingDoc.id),
           patch: {
+            docType: form.docType,
             title: form.title || null,
             docNumber: form.docNumber || null,
             docDate: form.docDate || null,
@@ -212,18 +220,23 @@ export default function SourceDocuments() {
       toast({ title: "Удалено", description: "Документ удален из реестра" });
       setDeleteTarget(null);
     } catch (e) {
+      const error = e as ApiError;
       toast({
         title: "Не удалось удалить",
-        description: e instanceof Error ? e.message : String(e),
+        description: error?.status === 409
+          ? "Документ используется в актах. Сначала удалите или замените его использование в актах, затем повторите удаление."
+          : e instanceof Error ? e.message : String(e),
         variant: "destructive",
       });
     }
   };
 
-  const makeGlobal = async (doc: any) => {
+  const confirmMakeGlobal = async () => {
+    if (!makeGlobalTarget) return;
     try {
-      await setDocScope.mutateAsync({ id: Number(doc.id), scope: "global" });
+      await setDocScope.mutateAsync({ id: Number(makeGlobalTarget.id), scope: "global" });
       toast({ title: "Готово", description: "Документ стал глобальным" });
+      setMakeGlobalTarget(null);
     } catch (e) {
       toast({
         title: "Ошибка",
@@ -239,8 +252,9 @@ export default function SourceDocuments() {
     { value: "__all__", label: "Все" },
     ...DOC_TYPES.map((t) => ({ value: t, label: docTypeLabel(t) })),
   ];
+  const shortObjectTitle = currentObjectTitle.length > 18 ? `${currentObjectTitle.slice(0, 18)}...` : currentObjectTitle;
   const viewTabs = [
-    { value: "project", label: "Проект" },
+    { value: "project", label: `Проект: ${shortObjectTitle}` },
     { value: "global", label: "Глобальные" },
     { value: "all", label: "Все" },
   ];
@@ -283,7 +297,7 @@ export default function SourceDocuments() {
             className="mb-3"
           />
 
-          <div className="mb-3 text-[11px] text-[--g500] truncate">
+          <div className="mb-3 text-[11px] text-[--g500] truncate" title={currentObjectTitle}>
             {viewMode === "project" ? `Проект: ${currentObjectTitle}` : viewMode === "global" ? "Глобальные видны во всех объектах" : "Проектные текущего объекта и глобальные"}
           </div>
 
@@ -347,33 +361,42 @@ export default function SourceDocuments() {
                         <Button
                           variant="outline"
                           size="compact"
-                          className="h-7 px-2 text-[11px] gap-1"
+                          className="h-11 sm:h-7 px-3 sm:px-2 text-[11px] gap-1"
                           disabled={!d.fileUrl}
                           onClick={() => d.fileUrl && window.open(d.fileUrl, "_blank", "noopener,noreferrer")}
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                           Открыть
                         </Button>
-                        <Button variant="outline" size="compact" className="h-7 px-2 text-[11px] gap-1" onClick={() => openEdit(d)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                          Редактировать
-                        </Button>
-                        {d.scope === "project" && (
-                          <Button
-                            variant="outline"
-                            size="compact"
-                            className="h-7 px-2 text-[11px] gap-1"
-                            disabled={setDocScope.isPending}
-                            onClick={() => makeGlobal(d)}
-                          >
-                            <Globe2 className="h-3.5 w-3.5" />
-                            Сделать глобальным
-                          </Button>
-                        )}
-                        <Button variant="outline" size="compact" className="h-7 px-2 text-[11px] gap-1 text-[--danger]" onClick={() => setDeleteTarget(d)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Удалить
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-11 w-11 sm:h-7 sm:w-8"
+                              aria-label="Действия с документом"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEdit(d)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Редактировать
+                            </DropdownMenuItem>
+                            {d.scope === "project" && (
+                              <DropdownMenuItem disabled={setDocScope.isPending} onClick={() => setMakeGlobalTarget(d)}>
+                                <Globe2 className="h-4 w-4 mr-2" />
+                                Сделать глобальным
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem className="text-[--danger]" onClick={() => setDeleteTarget(d)}>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Удалить
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                     <Badge variant={docTypeBadgeVariant(d.docType ?? "")} className="shrink-0 text-[10px]">
@@ -510,6 +533,29 @@ export default function SourceDocuments() {
               disabled={deleteDoc.isPending}
             >
               {deleteDoc.isPending ? "Удаление..." : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(makeGlobalTarget)} onOpenChange={(open) => { if (!open && !setDocScope.isPending) setMakeGlobalTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Сделать документ глобальным?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Документ станет видимым во всех объектах. Текущие привязки к материалам сохранятся.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={setDocScope.isPending}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmMakeGlobal();
+              }}
+              disabled={setDocScope.isPending}
+            >
+              {setDocScope.isPending ? "Сохранение..." : "Сделать глобальным"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

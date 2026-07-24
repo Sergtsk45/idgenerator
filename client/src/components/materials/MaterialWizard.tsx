@@ -7,9 +7,11 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PillTabs } from "@/components/ui/pill-tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -21,6 +23,7 @@ import { Loader2, Plus } from "lucide-react";
 import { api, buildUrl } from "@shared/routes";
 
 type Step = 1 | 2 | 3 | 4;
+type DocScopeFilter = "all" | "project" | "global";
 
 type DocDraft = {
   docType: "certificate" | "declaration" | "passport" | "protocol" | "scheme" | "other";
@@ -31,6 +34,10 @@ type DocDraft = {
   fileUrl?: string;
   useInActs: boolean;
 };
+
+function documentScopeLabel(scope: string) {
+  return scope === "global" ? "Глобальный" : "Проект";
+}
 
 export function MaterialWizard(props: { objectId: number; open: boolean; onOpenChange: (v: boolean) => void }) {
   const { toast } = useToast();
@@ -54,6 +61,7 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
   const [addDoc, setAddDoc] = useState(false);
   const [docMode, setDocMode] = useState<"registry" | "new">("new");
   const [docSearch, setDocSearch] = useState("");
+  const [docScopeFilter, setDocScopeFilter] = useState<DocScopeFilter>("all");
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
   const [docBindTarget, setDocBindTarget] = useState<"material" | "batch">("material");
   const [doc, setDoc] = useState<DocDraft>({
@@ -65,7 +73,7 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
   const createMaterial = useCreateProjectMaterial(props.objectId);
   const createDocument = useCreateDocument();
   const createBinding = useCreateDocumentBinding();
-  const docsQuery = useDocuments({ query: docSearch, viewMode: "all" });
+  const docsQuery = useDocuments({ query: docSearch, viewMode: docScopeFilter });
 
   const isBusy = createMaterial.isPending || createDocument.isPending || createBinding.isPending;
 
@@ -90,6 +98,7 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
     setAddDoc(false);
     setDocMode("new");
     setDocSearch("");
+    setDocScopeFilter("all");
     setSelectedDocumentId(null);
     setDocBindTarget("material");
     setDoc({ docType: "certificate", scope: "project", useInActs: true });
@@ -347,6 +356,18 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
                       <Label>Поиск в реестре</Label>
                       <Input value={docSearch} onChange={(e) => setDocSearch(e.target.value)} placeholder="например: сертификат 123" />
                     </div>
+                    <PillTabs
+                      activeTab={docScopeFilter}
+                      onTabChange={(v) => {
+                        setDocScopeFilter(v as DocScopeFilter);
+                        setSelectedDocumentId(null);
+                      }}
+                      tabs={[
+                        { label: "Все", value: "all" },
+                        { label: "Проект", value: "project" },
+                        { label: "Глобальные", value: "global" },
+                      ]}
+                    />
                     <div className="grid gap-2 max-h-56 overflow-y-auto pr-1">
                       {docsQuery.isLoading ? (
                         <div className="text-sm text-muted-foreground py-4 text-center">Загрузка...</div>
@@ -357,7 +378,6 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
                           const id = Number(d.id);
                           const label = [
                             String(d.docType ?? "document"),
-                            d.scope === "global" ? "глобальный" : "проект",
                             d.docNumber ? `№${String(d.docNumber)}` : null,
                             d.docDate ? `от ${String(d.docDate)}` : null,
                             d.title ? String(d.title) : null,
@@ -370,7 +390,10 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
                               className="w-full justify-start rounded-xl"
                               onClick={() => setSelectedDocumentId(id)}
                             >
-                              {label}
+                              <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+                              <Badge variant={d.scope === "global" ? "info" : "neutral"} className="ml-2 shrink-0">
+                                {documentScopeLabel(String(d.scope ?? "project"))}
+                              </Badge>
                             </Button>
                           );
                         })

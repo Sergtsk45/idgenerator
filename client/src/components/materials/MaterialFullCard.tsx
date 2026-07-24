@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -37,6 +38,11 @@ type DocDraft = {
   fileUrl?: string;
   useInActs: boolean;
 };
+type DocScopeFilter = "all" | "project" | "global";
+
+function documentScopeLabel(scope: string) {
+  return scope === "global" ? "Глобальный" : "Проект";
+}
 
 function deriveBindingRole(docType: DocDraft["docType"]) {
   if (docType === "passport") return "passport";
@@ -74,7 +80,8 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
   const [bindDocOpen, setBindDocOpen] = useState(false);
   const [bindTab, setBindTab] = useState<"registry" | "new">("registry");
   const [docSearch, setDocSearch] = useState("");
-  const docsQuery = useDocuments({ query: docSearch, viewMode: "all" });
+  const [docScopeFilter, setDocScopeFilter] = useState<DocScopeFilter>("all");
+  const docsQuery = useDocuments({ query: docSearch, viewMode: docScopeFilter });
   const [bindDocTarget, setBindDocTarget] = useState<"material" | "batch">("material");
   const [bindDocSelectedBatchId, setBindDocSelectedBatchId] = useState<number | null>(null);
 
@@ -105,6 +112,7 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
     const pre = opts?.preselectedBatchId ?? null;
     setBindTab("registry");
     setDocSearch("");
+    setDocScopeFilter("all");
     if (pre != null) {
       setBindDocTarget("batch");
       setBindDocSelectedBatchId(pre);
@@ -129,6 +137,16 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
       <div className="py-10 text-center text-muted-foreground">Материал не найден</div>
     );
   }
+
+  const availableRegistryDocuments = ((docsQuery.data ?? []) as any[]).filter((doc) => {
+    const docId = Number(doc.id);
+    return !((data.bindings ?? []) as any[]).some((binding) => {
+      if (Number(binding.documentId) !== docId) return false;
+      const bindingBatchId = binding.batchId == null ? null : Number(binding.batchId);
+      if (bindDocTarget === "batch") return bindingBatchId === bindDocSelectedBatchId;
+      return bindingBatchId == null;
+    });
+  });
 
   return (
     <>
@@ -348,11 +366,23 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                   <Label>Поиск</Label>
                   <Input value={docSearch} onChange={(e) => setDocSearch(e.target.value)} placeholder="например: сертификат 123" />
                 </div>
+                <PillTabs
+                  activeTab={docScopeFilter}
+                  onTabChange={(v) => setDocScopeFilter(v as DocScopeFilter)}
+                  tabs={[
+                    { label: "Все", value: "all" },
+                    { label: "Проект", value: "project" },
+                    { label: "Глобальные", value: "global" },
+                  ]}
+                  className="mt-3"
+                />
                 <div className="mt-4 grid gap-2">
-                  {(docsQuery.data ?? []).length === 0 ? (
+                  {docsQuery.isLoading ? (
+                    <div className="text-sm text-muted-foreground py-6 text-center">Загрузка...</div>
+                  ) : availableRegistryDocuments.length === 0 ? (
                     <div className="text-sm text-muted-foreground py-6 text-center">Документы не найдены</div>
                   ) : (
-                    (docsQuery.data ?? []).map((d: any) => {
+                    availableRegistryDocuments.map((d: any) => {
                       const label = [
                         String(d.docType ?? "document"),
                         d.docNumber ? `№${String(d.docNumber)}` : null,
@@ -390,7 +420,10 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                             }
                           }}
                         >
-                          {label}
+                          <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+                          <Badge variant={d.scope === "global" ? "info" : "neutral"} className="ml-2 shrink-0">
+                            {documentScopeLabel(String(d.scope ?? "project"))}
+                          </Badge>
                         </Button>
                       );
                     })

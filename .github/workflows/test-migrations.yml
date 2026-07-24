@@ -75,3 +75,52 @@ jobs:
             exit 1
           fi
           echo "All $APPLIED migration(s) applied and recorded."
+
+      - name: Verify documents object scope migration
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+            SELECT 1 / COUNT(*)::int AS documents_object_id_column
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'documents'
+              AND column_name = 'object_id'
+              AND data_type = 'integer';
+
+            SELECT 1 / COUNT(*)::int AS documents_object_id_fkey
+            FROM pg_constraint
+            WHERE conrelid = 'documents'::regclass
+              AND conname = 'documents_object_id_fkey'
+              AND contype = 'f';
+
+            SELECT 1 / COUNT(*)::int AS documents_scope_object_check
+            FROM pg_constraint
+            WHERE conrelid = 'documents'::regclass
+              AND conname = 'documents_scope_object_check'
+              AND contype = 'c';
+
+            SELECT 1 / COUNT(*)::int AS documents_object_id_idx
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND tablename = 'documents'
+              AND indexname = 'documents_object_id_idx';
+
+            SELECT 1 / COUNT(*)::int AS documents_scope_object_idx
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND tablename = 'documents'
+              AND indexname = 'documents_scope_object_idx';
+
+            SELECT 1 / COUNT(*)::int AS documents_created_by_user_id_column
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'documents'
+              AND column_name = 'created_by_user_id'
+              AND data_type = 'integer';
+
+            SELECT 1 / COUNT(*)::int AS documents_updated_by_user_id_column
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'documents'
+              AND column_name = 'updated_by_user_id'
+              AND data_type = 'integer';
+          SQL

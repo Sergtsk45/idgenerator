@@ -193,20 +193,22 @@ export interface IStorage {
 
   // Documents
   searchDocuments(params: { objectId: number; viewMode?: DocumentViewMode; query?: string; docType?: string }): Promise<Document[]>;
-  createDocument(objectId: number, data: Omit<InsertDocument, "objectId">): Promise<Document>;
+  createDocument(objectId: number, userId: number, data: Omit<InsertDocument, "objectId">): Promise<Document>;
   updateDocument(
     id: number,
     userId: number,
     objectId: number,
-    patch: Partial<Pick<Document, "title" | "docNumber" | "docDate" | "validFrom" | "validTo" | "fileUrl">>
+    patch: Partial<Pick<Document, "docType" | "title" | "docNumber" | "docDate" | "validFrom" | "validTo" | "fileUrl">>
   ): Promise<Document | undefined>;
   setDocumentScope(id: number, userId: number, objectId: number, scope: DocumentScope): Promise<Document | undefined>;
   deleteDocument(id: number, userId: number, objectId: number): Promise<boolean>;
 
   // Document Bindings
-  createBinding(data: InsertDocumentBinding): Promise<DocumentBinding>;
+  createBinding(data: InsertDocumentBinding, userId: number, objectId: number): Promise<DocumentBinding | undefined>;
   updateBinding(
     id: number,
+    userId: number,
+    objectId: number,
     patch: Partial<Pick<DocumentBinding, "useInActs" | "isPrimary" | "bindingRole">>
   ): Promise<DocumentBinding | undefined>;
   deleteBinding(id: number, userId: number, objectId: number): Promise<boolean>;
@@ -478,6 +480,88 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private async ownsObject(tx: any, userId: number, objectId: number): Promise<boolean> {
+    const [ownedObject] = await tx
+      .select({ id: objects.id })
+      .from(objects)
+      .where(and(eq(objects.id, objectId as any), eq(objects.userId, userId as any)));
+    return Boolean(ownedObject);
+  }
+
+  private async isDocumentVisibleForObject(tx: any, documentId: number, objectId: number): Promise<boolean> {
+    const [doc] = await tx
+      .select({ id: documents.id, scope: documents.scope, objectId: documents.objectId })
+      .from(documents)
+      .where(and(eq(documents.id, documentId as any), isNull(documents.deletedAt)));
+    if (!doc) return false;
+    return doc.scope === "global" || doc.objectId === objectId;
+  }
+
+  private async isDocumentInUse(tx: any, documentId: number): Promise<boolean> {
+    const [actAttachment] = await tx
+      .select({ id: actDocumentAttachments.id })
+      .from(actDocumentAttachments)
+      .where(eq(actDocumentAttachments.documentId, documentId as any))
+      .limit(1);
+    if (actAttachment) return true;
+
+    const [actMaterialUsage] = await tx
+      .select({ id: actMaterialUsages.id })
+      .from(actMaterialUsages)
+      .where(eq(actMaterialUsages.qualityDocumentId, documentId as any))
+      .limit(1);
+    if (actMaterialUsage) return true;
+
+    const [taskMaterial] = await tx
+      .select({ id: taskMaterials.id })
+      .from(taskMaterials)
+      .where(eq(taskMaterials.qualityDocumentId, documentId as any))
+      .limit(1);
+    return Boolean(taskMaterial);
+  }
+
+  private async isBindingVisibleForObject(tx: any, bindingId: number, objectId: number): Promise<boolean> {
+    const [binding] = await tx
+      .select()
+      .from(documentBindings)
+      .where(eq(documentBindings.id, bindingId as any));
+    if (!binding) return false;
+    if (!(await this.isDocumentVisibleForObject(tx, Number(binding.documentId), objectId))) return false;
+    return await this.isBindingTargetOwnedByObject(tx, binding as any, objectId);
+  }
+
+  private async isBindingTargetOwnedByObject(
+    tx: any,
+    binding: Pick<DocumentBinding, "objectId" | "projectMaterialId" | "batchId">,
+    objectId: number
+  ): Promise<boolean> {
+    if (binding.objectId != null && binding.objectId !== objectId) return false;
+
+    if (binding.projectMaterialId != null) {
+      const [material] = await tx
+        .select({ id: projectMaterials.id })
+        .from(projectMaterials)
+        .where(
+          and(
+            eq(projectMaterials.id, binding.projectMaterialId as any),
+            eq(projectMaterials.objectId, objectId as any),
+            isNull(projectMaterials.deletedAt)
+          )
+        );
+      if (!material) return false;
+    }
+
+    if (binding.batchId != null) {
+      const [batch] = await tx
+        .select({ id: materialBatches.id })
+        .from(materialBatches)
+        .where(and(eq(materialBatches.id, binding.batchId as any), eq(materialBatches.objectId, objectId as any)));
+      if (!batch) return false;
+    }
+
+    return binding.objectId != null || binding.projectMaterialId != null || binding.batchId != null;
+  }
+
   async getOrCreateDefaultObject(userId: number): Promise<DbObject> {
     // MVP: single "current" object per user.
     // IMPORTANT: do NOT rely on title to find the current object,
@@ -1163,7 +1247,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(documents).where(where).orderBy(desc(documents.updatedAt));
   }
 
-  async createDocument(objectId: number, data: Omit<InsertDocument, "objectId">): Promise<Document> {
+  async createDocument(objectId: number, userId: number, data: Omit<InsertDocument, "objectId">): Promise<Document> {
     const scope = data.scope === "global" ? "global" : "project";
     const [created] = await db
       .insert(documents)
@@ -1171,6 +1255,8 @@ export class DatabaseStorage implements IStorage {
         ...(data as any),
         scope,
         objectId: scope === "project" ? objectId : null,
+        createdByUserId: userId,
+        updatedByUserId: userId,
       })
       .returning();
     return created;
@@ -1180,7 +1266,7 @@ export class DatabaseStorage implements IStorage {
     id: number,
     userId: number,
     objectId: number,
-    patch: Partial<Pick<Document, "title" | "docNumber" | "docDate" | "validFrom" | "validTo" | "fileUrl">>
+    patch: Partial<Pick<Document, "docType" | "title" | "docNumber" | "docDate" | "validFrom" | "validTo" | "fileUrl">>
   ): Promise<Document | undefined> {
     if (Object.keys(patch).length === 0) return undefined;
 
@@ -1201,12 +1287,14 @@ export class DatabaseStorage implements IStorage {
       const [updated] = await tx
         .update(documents)
         .set({
+          ...(patch.docType !== undefined ? { docType: patch.docType as any } : {}),
           ...(patch.title !== undefined ? { title: patch.title as any } : {}),
           ...(patch.docNumber !== undefined ? { docNumber: patch.docNumber as any } : {}),
           ...(patch.docDate !== undefined ? { docDate: patch.docDate as any } : {}),
           ...(patch.validFrom !== undefined ? { validFrom: patch.validFrom as any } : {}),
           ...(patch.validTo !== undefined ? { validTo: patch.validTo as any } : {}),
           ...(patch.fileUrl !== undefined ? { fileUrl: patch.fileUrl as any } : {}),
+          updatedByUserId: userId,
         })
         .where(eq(documents.id, id as any))
         .returning();
@@ -1217,11 +1305,8 @@ export class DatabaseStorage implements IStorage {
 
   async setDocumentScope(id: number, userId: number, objectId: number, scope: DocumentScope): Promise<Document | undefined> {
     return await db.transaction(async (tx) => {
-      const [ownedObject] = await tx
-        .select({ id: objects.id })
-        .from(objects)
-        .where(and(eq(objects.id, objectId as any), eq(objects.userId, userId as any)));
-      if (!ownedObject) return undefined;
+      if (!(await this.ownsObject(tx, userId, objectId))) return undefined;
+      if (scope !== "global") return undefined;
 
       const [existing] = await tx
         .select()
@@ -1229,12 +1314,14 @@ export class DatabaseStorage implements IStorage {
         .where(and(eq(documents.id, id as any), isNull(documents.deletedAt)));
       if (!existing) return undefined;
       if (existing.scope === "project" && existing.objectId !== objectId) return undefined;
+      if (existing.scope === "global") return existing;
 
       const [updated] = await tx
         .update(documents)
         .set({
-          scope,
-          objectId: scope === "project" ? objectId : null,
+          scope: "global",
+          objectId: null,
+          updatedByUserId: userId,
         } as any)
         .where(eq(documents.id, id as any))
         .returning();
@@ -1245,11 +1332,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDocument(id: number, userId: number, objectId: number): Promise<boolean> {
     return await db.transaction(async (tx) => {
-      const [ownedObject] = await tx
-        .select({ id: objects.id })
-        .from(objects)
-        .where(and(eq(objects.id, objectId as any), eq(objects.userId, userId as any)));
-      if (!ownedObject) return false;
+      if (!(await this.ownsObject(tx, userId, objectId))) return false;
 
       const [existing] = await tx
         .select()
@@ -1258,43 +1341,49 @@ export class DatabaseStorage implements IStorage {
       if (!existing) return false;
       if (existing.scope === "project" && existing.objectId !== objectId) return false;
 
-      if (existing.scope === "global") {
-        const [actAttachment] = await tx
-          .select({ id: actDocumentAttachments.id })
-          .from(actDocumentAttachments)
-          .where(eq(actDocumentAttachments.documentId, id as any))
-          .limit(1);
-        const [actMaterialUsage] = await tx
-          .select({ id: actMaterialUsages.id })
-          .from(actMaterialUsages)
-          .where(eq(actMaterialUsages.qualityDocumentId, id as any))
-          .limit(1);
-        if (actAttachment || actMaterialUsage) {
-          throw new DocumentInUseError();
-        }
+      if (await this.isDocumentInUse(tx, id)) {
+        throw new DocumentInUseError();
       }
 
       await tx
         .update(documents)
         .set({ deletedAt: new Date() } as any)
         .where(eq(documents.id, id as any));
+      await tx.delete(documentBindings).where(eq(documentBindings.documentId, id as any));
 
       return true;
     });
   }
 
-  async createBinding(data: InsertDocumentBinding): Promise<DocumentBinding> {
-    const [created] = await db.insert(documentBindings).values(data).returning();
-    return created;
+  async createBinding(data: InsertDocumentBinding, userId: number, objectId: number): Promise<DocumentBinding | undefined> {
+    return await db.transaction(async (tx) => {
+      if (!(await this.ownsObject(tx, userId, objectId))) return undefined;
+      if (!(await this.isDocumentVisibleForObject(tx, Number(data.documentId), objectId))) return undefined;
+      if (!(await this.isBindingTargetOwnedByObject(tx, data as any, objectId))) return undefined;
+
+      const [created] = await tx
+        .insert(documentBindings)
+        .values({
+          ...(data as any),
+          objectId: (data as any).objectId ?? objectId,
+        })
+        .returning();
+      return created;
+    });
   }
 
   async updateBinding(
     id: number,
+    userId: number,
+    objectId: number,
     patch: Partial<Pick<DocumentBinding, "useInActs" | "isPrimary" | "bindingRole">>
   ): Promise<DocumentBinding | undefined> {
     if (Object.keys(patch).length === 0) return undefined;
 
     return await db.transaction(async (tx) => {
+      if (!(await this.ownsObject(tx, userId, objectId))) return undefined;
+      if (!(await this.isBindingVisibleForObject(tx, id, objectId))) return undefined;
+
       const [existing] = await tx.select().from(documentBindings).where(eq(documentBindings.id, id as any));
       if (!existing) return undefined;
 

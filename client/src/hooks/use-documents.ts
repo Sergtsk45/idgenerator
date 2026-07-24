@@ -15,6 +15,7 @@ type DocumentViewMode = "project" | "global" | "all";
 type DocumentScope = "project" | "global";
 
 type DocumentPatch = {
+  docType?: string;
   title?: string | null;
   docNumber?: string | null;
   docDate?: string | null;
@@ -23,19 +24,21 @@ type DocumentPatch = {
   fileUrl?: string | null;
 };
 
-function viewModeFromParams(params?: { viewMode?: DocumentViewMode; scope?: string }): DocumentViewMode {
-  if (params?.viewMode) return params.viewMode;
-  if (params?.scope === "global" || params?.scope === "project") return params.scope;
-  return "project";
+export type ApiError = Error & { status?: number };
+
+export function createApiError(message: string, status?: number): ApiError {
+  const error = new Error(message) as ApiError;
+  error.status = status;
+  return error;
 }
 
-function documentsQueryKey(objectId?: number, params?: { query?: string; docType?: string; viewMode?: DocumentViewMode; scope?: string }) {
+function documentsQueryKey(objectId?: number, params?: { query?: string; docType?: string; viewMode?: DocumentViewMode }) {
   return [
     api.documents.list.path,
     objectId ?? null,
     String(params?.query ?? ""),
     params?.docType ? String(params.docType) : "",
-    viewModeFromParams(params),
+    params?.viewMode ?? "project",
   ] as const;
 }
 
@@ -43,12 +46,12 @@ async function invalidateDocuments(queryClient: ReturnType<typeof useQueryClient
   await queryClient.invalidateQueries({ queryKey: [api.documents.list.path] });
 }
 
-export function useDocuments(params?: { query?: string; docType?: string; viewMode?: DocumentViewMode; scope?: string }) {
+export function useDocuments(params?: { query?: string; docType?: string; viewMode?: DocumentViewMode }) {
   const currentObjectQuery = useCurrentObject();
   const objectId = (currentObjectQuery.data as any)?.id as number | undefined;
   const query = String(params?.query ?? "");
   const docType = params?.docType ? String(params.docType) : "";
-  const viewMode = viewModeFromParams(params);
+  const viewMode = params?.viewMode ?? "project";
 
   return useQuery({
     queryKey: documentsQueryKey(objectId, { query, docType, viewMode }),
@@ -81,7 +84,7 @@ export function useDeleteDocument(projectMaterialId?: number) {
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to delete document");
+        throw createApiError(errorData.message || "Failed to delete document", res.status);
       }
       return true;
     },

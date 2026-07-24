@@ -232,8 +232,8 @@ flowchart LR
 - `materials_catalog`: глобальный справочник материалов (наименование, ГОСТ/ТУ, ед. изм., параметры). Импортируется администраторами через API `POST /api/admin/materials-catalog/import`.
 - `project_materials`: материалы в рамках объекта (локальные либо привязанные к справочнику) + агрегаты для UI.
 - `material_batches`: партии/поставки материалов на объект.
-- `documents`: реестр документов качества (сертификаты/паспорта/протоколы и т.п.), scope: `project|global`, `object_id` для проектных документов. Активная видимость: `global` видны во всех объектах, `project` видны только в своём `object_id`; soft-deleted строки исключаются.
-- `document_bindings`: привязки документов к объекту/материалу/партии + флаги `useInActs`/`isPrimary`. Глобальные документы привязываются по ссылке без копирования записи документа.
+- `documents`: реестр документов качества (сертификаты/паспорта/протоколы и т.п.), scope: `project|global`, `object_id` для проектных документов, audit-поля `created_by_user_id`/`updated_by_user_id`. Активная видимость: `global` видны во всех объектах, `project` видны только в своём `object_id`; soft-deleted строки исключаются.
+- `document_bindings`: привязки документов к объекту/материалу/партии + флаги `useInActs`/`isPrimary`. Глобальные документы привязываются по ссылке без копирования записи документа. При soft-delete документа активные bindings удаляются транзакционно; исторические связи актов не трогаются.
 - `act_material_usages`: список материалов для п.3 АОСР "При выполнении работ применены…" (с порядком, опциональной привязкой к работе/партии/документу качества).
 - `act_document_attachments`: формальные приложения к АОСР (уникально по (actId, documentId)), отдельно от `attachments`.
 - `works`: позиции ВОР/ВОИР (код, описание, единицы, плановый объём, синонимы).
@@ -374,10 +374,10 @@ objects
 - **Documents**:
   - `GET /api/documents?viewMode=project|global|all&query=&docType=` — список документов в контексте текущего объекта (`project` по умолчанию)
   - `POST /api/documents` — создать документ; сервер выставляет `object_id` для `project` и `NULL` для `global`
-  - `PATCH /api/documents/:id` — редактировать поля документа (`title`, `docNumber`, `docDate`, `validFrom`, `validTo`, `fileUrl`)
-  - `PATCH /api/documents/:id/scope` — сменить `scope` (`global` отвязывает `object_id`, `project` назначает текущий объект)
-  - `DELETE /api/documents/:id` — soft-delete; для global возвращает `409`, если документ используется в актах
-- **Document Bindings**: `POST /api/document-bindings`, `PATCH /api/document-bindings/:id`, `DELETE /api/document-bindings/:id`
+  - `PATCH /api/documents/:id` — редактировать поля документа (`docType`, `title`, `docNumber`, `docDate`, `validFrom`, `validTo`, `fileUrl`)
+  - `PATCH /api/documents/:id/scope` — только публикация проектного документа в global (`{ scope: "global" }`); перенос global обратно в проект запрещён, для этого нужна отдельная операция копирования
+  - `DELETE /api/documents/:id` — soft-delete; возвращает `409`, если документ используется в `act_document_attachments`, `act_material_usages` или `task_materials`
+- **Document Bindings**: `POST /api/document-bindings`, `PATCH /api/document-bindings/:id`, `DELETE /api/document-bindings/:id` — mutations требуют текущий объект и проверяют владение target-объектом/материалом/партией
 - **Act material usages**: `GET /api/acts/:id/material-usages`, `PUT /api/acts/:id/material-usages`
 - **Act document attachments**: `GET /api/acts/:id/document-attachments`, `PUT /api/acts/:id/document-attachments`
 - **Works**: `GET /api/works`, `POST /api/works`

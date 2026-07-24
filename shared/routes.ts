@@ -643,6 +643,7 @@ export const api = {
       path: "/api/documents/:id",
       input: z
         .object({
+          docType: z.enum(["certificate", "declaration", "passport", "protocol", "scheme", "other"]).optional(),
           title: z.string().nullable().optional(),
           docNumber: z.string().nullable().optional(),
           docDate: z.string().nullable().optional(),
@@ -662,7 +663,7 @@ export const api = {
       method: "PATCH" as const,
       path: "/api/documents/:id/scope",
       input: z.object({
-        scope: documentScopeSchema,
+        scope: z.literal("global"),
       }),
       responses: {
         200: z.custom<typeof documents.$inferSelect>(),
@@ -703,6 +704,8 @@ export const api = {
       responses: {
         201: z.custom<typeof documentBindings.$inferSelect>(),
         400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+        404: z.object({ message: z.string() }),
       },
     },
     patch: {
@@ -718,6 +721,7 @@ export const api = {
       responses: {
         200: z.custom<typeof documentBindings.$inferSelect>(),
         400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
         404: z.object({ message: z.string() }),
       },
     },

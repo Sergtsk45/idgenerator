@@ -2,6 +2,34 @@
 
 ---
 
+## Задача: DOC-SCOPE-BL — Hardening и UX-бэклог документов
+- **Статус**: Завершена локально; staging/prod rollout требует доступа к окружениям
+- **Дата начала**: 2026-07-24
+- **Дата завершения**: 2026-07-24
+- **Описание**: Выполнены backlog-пункты для object-scoped документов: миграционная надёжность, 409 UX, docType PATCH, подтверждение публикации в global, защита удаления, binding ownership, picker-фильтры, запрет global → project, audit-поля и расширенные smoke-тесты.
+- **Шаги выполнения**:
+  - [x] `BL-002`: `0019` backfill orphan objects через явного blocked legacy owner
+  - [x] `BL-003`: typed delete error status и русский UX для `409`
+  - [x] `BL-004`: `docType` добавлен в PATCH contract/storage/UI/tests
+  - [x] `BL-005`: confirm перед «Сделать глобальным»
+  - [x] `BL-006`: единая защита удаления для project/global с проверкой актов и task materials
+  - [x] `BL-007`: bindings удаляются транзакционно при soft-delete документа без исторических актовых ссылок
+  - [x] `BL-008`: `/source-data` показывает `Проектные N · Глобальные M`
+  - [x] `BL-009`: picker документов получил фильтры scope, бейджи и исключение повторной привязки
+  - [x] `BL-010`: API запрещает неявный global → project
+  - [x] `BL-011`: list API/hooks используют только `viewMode`
+  - [x] `BL-012`: сегмент проекта показывает краткое имя текущего объекта
+  - [x] `BL-013`: действия карточки перенесены в компактное меню
+  - [x] `BL-014`: добавлены nullable audit-ссылки `created_by_user_id`/`updated_by_user_id`
+  - [x] `BL-015/016`: добавлены расширенные smoke/regression-тесты; полноценные runtime PostgreSQL integration остаются задачей CI-инфраструктуры
+  - [ ] `BL-001`: повторить preflight/postflight на staging и production после предоставления доступа и backup production
+- **Проверка**:
+  - [x] `npm run check`
+  - [x] `npm test`
+- **Зависимости**: доступ к staging/prod БД для полного rollout `BL-001`
+
+---
+
 ## Задача: DOC-SCOPE — Разделение документов на проектные и глобальные
 - **Статус**: Завершена
 - **Дата начала**: 2026-07-24

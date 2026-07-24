@@ -70,11 +70,71 @@ WHERE d."id" = ro."document_id"
   AND d."object_id" IS NULL
   AND d."deleted_at" IS NULL;
 
+WITH binding_objects AS (
+  SELECT
+    db."document_id",
+    db."object_id"
+  FROM "document_bindings" db
+  WHERE db."object_id" IS NOT NULL
+
+  UNION
+
+  SELECT
+    db."document_id",
+    pm."object_id"
+  FROM "document_bindings" db
+  JOIN "project_materials" pm
+    ON pm."id" = db."project_material_id"
+  WHERE pm."object_id" IS NOT NULL
+
+  UNION
+
+  SELECT
+    db."document_id",
+    mb."object_id"
+  FROM "document_bindings" db
+  JOIN "material_batches" mb
+    ON mb."id" = db."batch_id"
+  WHERE mb."object_id" IS NOT NULL
+),
+binding_object_stats AS (
+  SELECT
+    "document_id",
+    COUNT(DISTINCT "object_id") AS "object_count"
+  FROM binding_objects
+  GROUP BY "document_id"
+),
+unresolved_project_documents AS (
+  SELECT
+    d."id",
+    CASE
+      WHEN COALESCE(bos."object_count", 0) = 0 THEN 'no_binding_object'
+      ELSE 'conflicting_binding_objects'
+    END AS "reason",
+    COALESCE(bos."object_count", 0) AS "object_count"
+  FROM "documents" d
+  LEFT JOIN binding_object_stats bos
+    ON bos."document_id" = d."id"
+  WHERE d."scope" = 'project'
+    AND d."object_id" IS NULL
+    AND d."deleted_at" IS NULL
+)
 UPDATE "documents" d
-SET "deleted_at" = now()
-WHERE d."scope" = 'project'
-  AND d."object_id" IS NULL
-  AND d."deleted_at" IS NULL;
+SET
+  "deleted_at" = now(),
+  "meta" = jsonb_set(
+    COALESCE(d."meta", '{}'::jsonb),
+    '{scopeMigration0026}',
+    jsonb_build_object(
+      'action', 'soft_deleted_before_scope_check',
+      'reason', upd."reason",
+      'bindingObjectCount', upd."object_count",
+      'at', now()
+    ),
+    true
+  )
+FROM unresolved_project_documents upd
+WHERE d."id" = upd."id";
 
 DO $$
 BEGIN

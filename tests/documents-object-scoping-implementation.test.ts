@@ -18,7 +18,12 @@ test("documents object-id migration adds FK, indexes, backfill and active-row sc
   assert.match(sql, /CREATE INDEX IF NOT EXISTS "documents_scope_object_idx"\s+ON "documents" \("scope", "object_id"\)/);
   assert.match(sql, /JOIN "project_materials" pm\s+ON pm\."id" = db\."project_material_id"/);
   assert.match(sql, /JOIN "material_batches" mb\s+ON mb\."id" = db\."batch_id"/);
-  assert.match(sql, /SET "deleted_at" = now\(\)/);
+  assert.match(sql, /SET\s+"deleted_at" = now\(\)/);
+  assert.match(sql, /unresolved_project_documents/);
+  assert.match(sql, /scopeMigration0026/);
+  assert.match(sql, /soft_deleted_before_scope_check/);
+  assert.match(sql, /no_binding_object/);
+  assert.match(sql, /conflicting_binding_objects/);
   assert.match(sql, /"deleted_at" IS NOT NULL\s+OR \("scope" = 'global' AND "object_id" IS NULL\)\s+OR \("scope" = 'project' AND "object_id" IS NOT NULL\)/);
 });
 
@@ -32,3 +37,33 @@ test("storage document visibility is current-object project plus global for all 
   assert.match(storage, /isNull\(documents\.deletedAt\)/);
 });
 
+test("storage uses one in-use guard for project/global deletes and clears bindings after soft-delete", async () => {
+  const storage = await readFile("server/storage.ts", "utf8");
+
+  assert.match(storage, /private async isDocumentInUse\(tx: any,\s+documentId: number\)/);
+  assert.match(storage, /from\(actDocumentAttachments\)[\s\S]*eq\(actDocumentAttachments\.documentId,\s+documentId as any\)/);
+  assert.match(storage, /from\(actMaterialUsages\)[\s\S]*eq\(actMaterialUsages\.qualityDocumentId,\s+documentId as any\)/);
+  assert.match(storage, /from\(taskMaterials\)[\s\S]*eq\(taskMaterials\.qualityDocumentId,\s+documentId as any\)/);
+  assert.match(storage, /if \(await this\.isDocumentInUse\(tx,\s+id\)\) \{\s+throw new DocumentInUseError\(\);\s+\}/);
+  assert.match(storage, /update\(documents\)[\s\S]*set\(\{ deletedAt: new Date\(\) \} as any\)[\s\S]*delete\(documentBindings\)\.where\(eq\(documentBindings\.documentId,\s+id as any\)\)/);
+});
+
+test("storage refuses global-to-project scope demotion", async () => {
+  const storage = await readFile("server/storage.ts", "utf8");
+
+  assert.match(storage, /if \(scope !== "global"\) return undefined;/);
+  assert.match(storage, /if \(existing\.scope === "global"\) return existing;/);
+  assert.match(storage, /scope: "global",\s+objectId: null/s);
+});
+
+test("documents audit migration adds nullable user references and indexes", async () => {
+  const sql = await readFile("migrations/0027_documents_audit_user_ids.sql", "utf8");
+
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS "created_by_user_id" INTEGER/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS "updated_by_user_id" INTEGER/);
+  assert.match(sql, /documents_created_by_user_id_fkey/);
+  assert.match(sql, /documents_updated_by_user_id_fkey/);
+  assert.match(sql, /ON DELETE SET NULL/);
+  assert.match(sql, /documents_created_by_user_id_idx/);
+  assert.match(sql, /documents_updated_by_user_id_idx/);
+});
