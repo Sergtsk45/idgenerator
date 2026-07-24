@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-07-24] - Перенос оставшейся документации из TelegramJurnalRabot
+
+### Добавлено
+- `docs/stilegidtopus/styleguide-odoo-tjr.md` — спецификация Odoo-стайлгайда TJR (перенесено из архивного репозитория TelegramJurnalRabot).
+- `docs/stilegidtopus/styleguide-odoo-tjr.html` — live preview стайлгайда.
+- `docs/tasktrecker_git_remont.md` — трекер задач по git-рефакторингу/ремонту веток (перенесено из TelegramJurnalRabot).
+
+---
+
 ## [2026-07-22] - Исправление критических findings ревью ветки `feature/tablet-ui-v2` (шаг 1)
 
 ### Изменено

@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Style Guide · ТелеграмЖурналРабот × Odoo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & BASE ─── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:72px}
+body{font-family:'Inter',system-ui,sans-serif;background:#FAFAF9;color:#1C1917;line-height:1.6;font-size:15px}
+
+/* ─── DESIGN TOKENS ─── */
+:root{
+  --p900:#0C4A6E;--p700:#0369A1;--p500:#0EA5E9;--p300:#7DD3FC;--p100:#E0F2FE;--p50:#F0F9FF;
+  --success:#16A34A;--success-bg:#F0FDF4;
+  --warning:#D97706;--warning-bg:#FFFBEB;
+  --danger:#DC2626;--danger-bg:#FEF2F2;
+  --info:#2563EB;--info-bg:#EFF6FF;
+  --g900:#1C1917;--g700:#44403C;--g500:#78716C;--g300:#D6D3D1;--g200:#E7E5E4;--g100:#F5F5F4;--g50:#FAFAF9;
+  --white:#FFFFFF;
+  --radius-sm:4px;--radius-md:8px;--radius-lg:12px;--radius-xl:16px;--radius-pill:9999px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+  --shadow-lg:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.04);
+}
+
+/* ─── TOP NAV ─── */
+.top-bar{position:fixed;top:0;left:0;right:0;height:56px;background:var(--white);border-bottom:1px solid var(--g200);display:flex;align-items:center;padding:0 24px;z-index:100;gap:16px}
+.top-bar .logo{width:32px;height:32px;background:var(--p500);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0}
+.top-bar h1{font-size:15px;font-weight:600;white-space:nowrap}
+.top-bar .ver{font-size:11px;color:var(--g500);margin-left:auto;white-space:nowrap}
+
+/* ─── SIDEBAR ─── */
+.sidebar{position:fixed;top:56px;left:0;bottom:0;width:240px;background:var(--white);border-right:1px solid var(--g200);overflow-y:auto;padding:16px 0;z-index:90}
+.sidebar a{display:flex;align-items:center;gap:8px;padding:8px 20px;font-size:13px;color:var(--g700);text-decoration:none;transition:all .15s}
+.sidebar a:hover{background:var(--g100);color:var(--g900)}
+.sidebar a.active{background:var(--p50);color:var(--p700);font-weight:600;border-right:3px solid var(--p500)}
+.sidebar .sec-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--g500);padding:20px 20px 6px;font-weight:600}
+.sidebar .num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--g100);font-size:10px;font-weight:600;color:var(--g500);flex-shrink:0}
+
+/* ─── MAIN ─── */
+.main{margin-left:240px;margin-top:56px;padding:32px 40px 80px}
+.main>section{max-width:1060px;margin:0 auto 56px}
+
+/* ─── SECTION HEADERS ─── */
+.sec-h{display:flex;align-items:center;gap:12px;margin-bottom:24px;padding-bottom:12px;border-bottom:2px solid var(--g200)}
+.sec-h .sec-num{font-size:28px;font-weight:700;color:var(--p500);line-height:1}
+.sec-h h2{font-size:22px;font-weight:700;color:var(--g900)}
+h3{font-size:16px;font-weight:600;color:var(--g900);margin:28px 0 12px}
+h4{font-size:14px;font-weight:600;color:var(--g700);margin:20px 0 8px}
+p,.desc{font-size:14px;color:var(--g700);margin-bottom:12px;max-width:680px}
+.note{font-size:13px;color:var(--g500);padding:12px 16px;background:var(--p50);border-left:3px solid var(--p300);border-radius:0 var(--radius-md) var(--radius-md) 0;margin:12px 0}
+
+/* ─── COLLAPSIBLE ─── */
+details{margin-bottom:16px;border:1px solid var(--g200);border-radius:var(--radius-lg);overflow:hidden}
+details[open]{box-shadow:var(--shadow-sm)}
+summary{padding:14px 20px;font-weight:600;font-size:14px;cursor:pointer;background:var(--white);list-style:none;display:flex;align-items:center;gap:8px;user-select:none;transition:background .15s}
+summary:hover{background:var(--g50)}
+summary::before{content:'▸';font-size:12px;color:var(--g500);transition:transform .2s}
+details[open] summary::before{transform:rotate(90deg)}
+details .inner{padding:20px;background:var(--g50);border-top:1px solid var(--g200)}
+
+/* ─── COLOR GRID ─── */
+.color-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin:16px 0}
+.color-card{border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--g200);background:var(--white)}
+.color-card .swatch{height:52px}
+.color-card .meta{padding:10px 12px;font-size:12px}
+.color-card .meta strong{display:block;font-size:13px;color:var(--g900)}
+.color-card .meta span{color:var(--g500)}
+.color-card .meta code{font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--g100);padding:1px 5px;border-radius:3px}
+
+/* ─── COMPONENT PREVIEWS ─── */
+.preview-box{background:var(--g100);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:24px;margin:16px 0;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;justify-content:center}
+.preview-box.col{flex-direction:column;align-items:stretch}
+.preview-box.dark-bg{background:#1C1917}
+
+/* ─── LIVE CARD ─── */
+.o-card{background:var(--white);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm);transition:box-shadow .15s,transform .1s;cursor:default;width:100%;max-width:380px}
+.o-card:hover{box-shadow:var(--shadow-md)}
+.o-card:active{transform:scale(.995)}
+.o-card .card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.o-card .card-title{font-weight:600;font-size:14px;color:var(--g900)}
+.o-card .card-sub{font-size:12px;color:var(--g500);margin-top:2px}
+.o-card .card-body{font-size:13px;color:var(--g700);margin-bottom:12px}
+.o-card .card-actions{display:flex;gap:8px}
+
+/* ─── LIVE BADGE ─── */
+.o-badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:var(--radius-pill);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.o-badge.success{background:var(--success-bg);color:var(--success)}
+.o-badge.warning{background:var(--warning-bg);color:var(--warning)}
+.o-badge.danger{background:var(--danger-bg);color:var(--danger)}
+.o-badge.info{background:var(--info-bg);color:var(--info)}
+.o-badge.neutral{background:var(--g100);color:var(--g700)}
+
+/* ─── LIVE BUTTONS ─── */
+.o-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;transition:all .15s;white-space:nowrap}
+.o-btn.primary{background:var(--p500);color:#fff;padding:8px 22px;border-radius:var(--radius-pill);height:36px}
+.o-btn.primary:hover{background:var(--p700)}
+.o-btn.secondary{background:transparent;color:var(--g700);padding:8px 20px;border-radius:var(--radius-pill);border:1px solid var(--g300);height:36px}
+.o-btn.secondary:hover{background:var(--g100);border-color:var(--g500)}
+.o-btn.ghost{background:transparent;color:var(--p500);padding:4px 10px;border-radius:var(--radius-md)}
+.o-btn.ghost:hover{background:var(--p50)}
+.o-btn.icon{width:36px;height:36px;padding:0;border-radius:var(--radius-md);background:transparent;color:var(--g700);font-size:18px}
+.o-btn.icon:hover{background:var(--g100)}
+.o-btn.fab{width:56px;height:56px;border-radius:50%;background:var(--p500);color:#fff;font-size:24px;box-shadow:var(--shadow-lg);padding:0}
+.o-btn.fab:hover{background:var(--p700);transform:scale(1.05)}
+
+/* ─── LIVE FORM ─── */
+.o-field{margin-bottom:16px}
+.o-field label{display:block;font-size:13px;font-weight:500;color:var(--g700);margin-bottom:4px}
+.o-field label .req{color:var(--danger);margin-left:2px}
+.o-input{width:100%;height:40px;padding:10px 12px;border:1px solid var(--g300);border-radius:var(--radius-md);font-size:14px;font-family:inherit;background:var(--white);color:var(--g900);outline:none;transition:border-color .15s,box-shadow .15s}
+.o-input:focus{border-color:var(--p500);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+.o-input.error{border-color:var(--danger);box-shadow:0 0 0 3px rgba(220,38,38,.1)}
+.o-input::placeholder{color:var(--g500)}
+.o-field .hint{font-size:12px;color:var(--g500);margin-top:4px}
+.o-field .err-msg{font-size:12px;color:var(--danger);margin-top:4px;display:flex;align-items:center;gap:4px;animation:errIn .2s ease}
+@keyframes errIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─── LIVE TABLE ─── */
+.o-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--g200);border-radius:var(--radius-lg);margin:16px 0}
+.o-table{width:100%;border-collapse:collapse;min-width:500px}
+.o-table thead th{position:sticky;top:0;background:var(--g100);border-bottom:2px solid var(--g300);padding:8px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g700);text-align:left;white-space:nowrap}
+.o-table tbody td{padding:10px 12px;font-size:13px;border-bottom:1px solid var(--g200);vertical-align:top;color:var(--g900)}
+.o-table tbody tr:nth-child(even){background:var(--g50)}
+.o-table tbody tr:hover{background:var(--p50)}
+.o-table .num-col{text-align:right;font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',monospace;font-size:12px}
+.scroll-hint{text-align:center;font-size:11px;color:var(--g500);padding:6px}
+
+/* ─── PILL TABS ─── */
+.pill-tabs{display:flex;gap:8px;overflow-x:auto;padding:4px;scrollbar-width:none;-ms-overflow-style:none}
+.pill-tabs::-webkit-scrollbar{display:none}
+.pill-tab{padding:6px 18px;border-radius:var(--radius-pill);font-size:13px;white-space:nowrap;cursor:pointer;transition:all .2s;border:1px solid var(--g300);color:var(--g700);background:transparent;font-family:inherit;font-weight:500}
+.pill-tab.active{background:var(--p500);color:#fff;border-color:var(--p500);font-weight:600}
+.pill-tab:not(.active):hover{background:var(--g100)}
+
+/* ─── TOAST PREVIEWS ─── */
+.o-toast{padding:12px 16px;border-radius:var(--radius-md);box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:10px;font-size:13px;min-width:300px;max-width:420px;position:relative;animation:toastIn .3s ease}
+.o-toast .icon{font-size:18px;flex-shrink:0}
+.o-toast .close{position:absolute;right:10px;top:10px;cursor:pointer;opacity:.5;font-size:14px}
+.o-toast.t-success{background:var(--success-bg);border-left:4px solid var(--success);color:#14532D}
+.o-toast.t-error{background:var(--danger-bg);border-left:4px solid var(--danger);color:#7F1D1D}
+.o-toast.t-warning{background:var(--warning-bg);border-left:4px solid var(--warning);color:#713F12}
+.o-toast.t-info{background:var(--info-bg);border-left:4px solid var(--info);color:#1E3A5F}
+@keyframes toastIn{from{transform:translateY(-12px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ─── SKELETON ─── */
+.o-skel{border-radius:var(--radius-sm);background:linear-gradient(90deg,var(--g200) 25%,var(--g100) 50%,var(--g200) 75%);background-size:200% 100%;animation:shimmer 1.5s ease-in-out infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ─── WIREFRAME PHONE ─── */
+.phone-frame{width:375px;min-height:680px;border:2px solid var(--g300);border-radius:32px;overflow:hidden;background:var(--g50);position:relative;flex-shrink:0;box-shadow:var(--shadow-lg)}
+.phone-frame .pf-header{background:var(--white);border-bottom:1px solid var(--g200);padding:12px 16px;display:flex;align-items:center;gap:10px;min-height:52px}
+.phone-frame .pf-header .pf-back{font-size:18px;cursor:pointer;color:var(--g700)}
+.phone-frame .pf-header .pf-title{font-size:15px;font-weight:600;flex:1}
+.phone-frame .pf-header .pf-sub{font-size:11px;color:var(--g500);margin-top:1px}
+.phone-frame .pf-header .pf-logo{width:28px;height:28px;border-radius:50%;background:var(--p500);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.phone-frame .pf-header .pf-avatar{width:28px;height:28px;border-radius:50%;background:var(--g200);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--g500)}
+.phone-frame .pf-body{padding:12px;min-height:520px;overflow-y:auto;max-height:540px}
+.phone-frame .pf-bnav{position:absolute;bottom:0;left:0;right:0;height:56px;background:var(--white);border-top:1px solid var(--g200);display:flex;justify-content:space-around;align-items:center;padding:0 4px}
+.phone-frame .pf-bnav .bnav-item{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;color:var(--g500);cursor:pointer;padding:4px 8px;border-radius:var(--radius-md);transition:color .15s}
+.phone-frame .pf-bnav .bnav-item.active{color:var(--p700);font-weight:600}
+.phone-frame .pf-bnav .bnav-item .bi{font-size:18px;line-height:1}
+
+/* ─── WIREFRAME INNER ELEMENTS ─── */
+.wf-card{background:var(--white);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:12px;margin-bottom:10px;font-size:12px}
+.wf-card .wf-row{display:flex;justify-content:space-between;align-items:center}
+.wf-card .wf-title{font-weight:600;font-size:13px;color:var(--g900)}
+.wf-card .wf-desc{color:var(--g500);font-size:11px;margin-top:3px}
+.wf-progress{height:4px;background:var(--g200);border-radius:2px;margin-top:8px;overflow:hidden}
+.wf-progress .bar{height:100%;border-radius:2px;transition:width .5s ease}
+.wf-sep{text-align:center;font-size:11px;color:var(--g500);padding:8px 0;display:flex;align-items:center;gap:8px}
+.wf-sep::before,.wf-sep::after{content:'';flex:1;height:1px;background:var(--g200)}
+.wf-bubble{padding:8px 12px;border-radius:14px;font-size:12px;max-width:80%;margin-bottom:8px;line-height:1.4}
+.wf-bubble.user{background:var(--p100);margin-left:auto;border-bottom-right-radius:4px;color:var(--g900)}
+.wf-bubble.ai{background:var(--white);border:1px solid var(--success);border-left:3px solid var(--success);border-radius:var(--radius-lg);margin-right:auto;padding:10px 12px}
+.wf-bubble.ai .ai-head{font-size:11px;font-weight:600;color:var(--success);margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.wf-bubble.ai .ai-row{font-size:11px;color:var(--g700);padding:1px 0}
+.wf-overline{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--g500);font-weight:600;margin:14px 0 6px}
+.wf-stat-card{background:var(--white);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:box-shadow .15s}
+.wf-stat-card:hover{box-shadow:var(--shadow-md)}
+.wf-stat-card .sc-icon{font-size:18px;margin-right:8px}
+.wf-stat-card .sc-label{font-size:13px;font-weight:500;color:var(--g900)}
+.wf-stat-card .sc-count{font-size:13px;font-weight:600;color:var(--g500)}
+.wf-stat-card .sc-arrow{color:var(--g300);font-size:16px}
+.wf-chip-row{display:flex;gap:6px;overflow-x:auto;padding:2px 0;scrollbar-width:none}
+.wf-chip-row::-webkit-scrollbar{display:none}
+.wf-chip{flex-shrink:0;background:var(--white);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:8px 10px;font-size:11px;min-width:100px}
+.wf-chip .wf-chip-role{font-weight:600;color:var(--g900);font-size:11px;margin-bottom:2px}
+.wf-chip .wf-chip-name{color:var(--g500);font-size:10px}
+.wf-gantt-row{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--g200);font-size:11px}
+.wf-gantt-row .gr-name{width:90px;flex-shrink:0;font-weight:500;font-size:11px;color:var(--g900)}
+.wf-gantt-row .gr-bar-area{flex:1;height:18px;background:var(--g100);border-radius:3px;position:relative;overflow:hidden}
+.wf-gantt-row .gr-bar{height:100%;border-radius:3px;position:absolute;top:0}
+.wf-gantt-header{display:flex;gap:6px;padding:4px 0 6px;border-bottom:2px solid var(--g300);font-size:9px;color:var(--g500);text-transform:uppercase}
+.wf-gantt-header .gr-name{width:90px;flex-shrink:0;font-weight:600}
+.wf-gantt-header .gr-dates{flex:1;display:flex;justify-content:space-between}
+
+/* Worklog list item */
+.wf-wl-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--g200)}
+.wf-wl-date{flex-shrink:0;width:36px;text-align:center}
+.wf-wl-date .day{font-size:18px;font-weight:700;color:var(--g900);line-height:1}
+.wf-wl-date .dow{font-size:9px;color:var(--g500);text-transform:uppercase}
+.wf-wl-content{flex:1;font-size:12px;color:var(--g700)}
+.wf-wl-content .wl-head{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+
+/* ─── MIGRATION TABLE ─── */
+.mig-table{width:100%;border-collapse:collapse;font-size:13px}
+.mig-table th{background:var(--g100);padding:10px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;border-bottom:2px solid var(--g300);color:var(--g700);white-space:nowrap}
+.mig-table td{padding:10px 12px;border-bottom:1px solid var(--g200);vertical-align:top}
+.mig-table tr:hover{background:var(--p50)}
+.mig-table .prio{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.prio.critical{background:var(--danger)}
+.prio.high{background:var(--warning)}
+.prio.medium{background:var(--success)}
+.prio.low{background:var(--p500)}
+
+/* ─── PHASE TIMELINE ─── */
+.phase-tl{display:flex;flex-direction:column;gap:0;margin:20px 0}
+.phase-item{display:flex;gap:16px;position:relative}
+.phase-item .phase-line{width:24px;display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.phase-item .phase-dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--p500);background:var(--white);z-index:1;flex-shrink:0}
+.phase-item .phase-stem{flex:1;width:2px;background:var(--g300)}
+.phase-item:last-child .phase-stem{display:none}
+.phase-item .phase-content{padding-bottom:24px;flex:1}
+.phase-item .phase-label{font-size:14px;font-weight:600;color:var(--g900);margin-bottom:4px}
+.phase-item .phase-desc{font-size:12px;color:var(--g500);line-height:1.5}
+.phase-item .phase-time{font-size:11px;font-weight:600;color:var(--p500);margin-top:4px}
+
+/* ─── COMPARISON TABLE ─── */
+.cmp-table{width:100%;border-collapse:collapse;font-size:13px;margin:16px 0}
+.cmp-table th{background:var(--g100);padding:8px 12px;font-weight:600;font-size:12px;text-align:left;border-bottom:2px solid var(--g300);color:var(--g700)}
+.cmp-table td{padding:8px 12px;border-bottom:1px solid var(--g200)}
+.cmp-table tr:nth-child(even){background:var(--g50)}
+.cmp-table .old{color:var(--danger);font-size:12px}
+.cmp-table .new{color:var(--success);font-size:12px}
+
+/* ─── TYPOGRAPHY SPECIMEN ─── */
+.type-row{display:flex;align-items:baseline;gap:24px;padding:10px 0;border-bottom:1px solid var(--g200)}
+.type-row .t-role{width:120px;font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.04em;font-weight:600;flex-shrink:0}
+.type-row .t-sample{flex:1}
+.type-row .t-meta{font-size:11px;color:var(--g500);font-family:'JetBrains Mono',monospace;flex-shrink:0;text-align:right;width:140px}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .main{margin-left:0;padding:24px 16px 80px}
+  .phone-frame{width:100%;min-width:320px}
+  .preview-box{padding:16px}
+  .color-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+}
+
+/* ─── CODE ─── */
+code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--g100);padding:2px 6px;border-radius:4px;color:var(--p900)}
+.code-block{background:#1C1917;color:#E7E5E4;padding:16px 20px;border-radius:var(--radius-lg);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.7;overflow-x:auto;margin:12px 0;white-space:pre}
+.code-block .cm{color:#78716C}
+.code-block .kw{color:#7DD3FC}
+.code-block .str{color:#86EFAC}
+.code-block .prop{color:#FCD34D}
+
+/* ─── NAV DIAGRAM ─── */
+.nav-diagram{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}
+.nav-box{background:var(--white);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:12px 16px;font-size:12px;min-width:160px;flex:1}
+.nav-box .nb-route{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--p500);margin-bottom:4px}
+.nav-box .nb-name{font-weight:600;color:var(--g900)}
+.nav-box .nb-type{font-size:10px;color:var(--g500);margin-top:2px}
+.nav-box.sub{border-left:3px solid var(--p300)}
+</style>
+</head>
+<body>
+
+<!-- ─── TOP BAR ─── -->
+<div class="top-bar">
+  <div class="logo">⚡</div>
+  <h1>Style Guide · ТелеграмЖурналРабот × Odoo</h1>
+  <span class="ver">v1.0 · 22.03.2026</span>
+</div>
+
+<!-- ─── SIDEBAR ─── -->
+<nav class="sidebar" id="sidebar">
+  <div class="sec-label">Фундамент</div>
+  <a href="#tokens" class="active"><span class="num">1</span> Дизайн-токены</a>
+  <a href="#typography"><span class="num">2</span> Типографика</a>
+  <div class="sec-label">Компоненты</div>
+  <a href="#atoms"><span class="num">3</span> Атомарные компоненты</a>
+  <a href="#wireframes"><span class="num">4</span> Wireframes экранов</a>
+  <div class="sec-label">Система</div>
+  <a href="#responsive"><span class="num">5</span> Адаптация</a>
+  <a href="#states"><span class="num">6</span> Состояния UX</a>
+  <a href="#navigation"><span class="num">7</span> Навигация</a>
+  <div class="sec-label">План</div>
+  <a href="#migration"><span class="num">8</span> Миграция</a>
+</nav>
+
+<!-- ─── MAIN ─── -->
+<div class="main">
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- 1. TOKENS -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="tokens">
+  <div class="sec-h"><span class="sec-num">01</span><h2>Дизайн-токены</h2></div>
+  <p>Философия Odoo — плоский, чистый UI без глубоких теней и glassmorphism. Акцент через цвет и типографику.</p>
+  <div class="note">Голубые тона бренда <strong>ТелеграмЖурналРабот</strong> сохраняются. Фиолетовый Odoo (#714B67) НЕ используется.</div>
+
+  <h3>Основная палитра (Brand)</h3>
+  <div class="color-grid">
+    <div class="color-card"><div class="swatch" style="background:#0C4A6E"></div><div class="meta"><strong>Primary 900</strong><code>#0C4A6E</code><br><span>Заголовки, акценты</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#0369A1"></div><div class="meta"><strong>Primary 700</strong><code>#0369A1</code><br><span>Активный BottomNav</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#0EA5E9"></div><div class="meta"><strong>Primary 500</strong><code>#0EA5E9</code><br><span>Кнопки CTA, ссылки</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#7DD3FC"></div><div class="meta"><strong>Primary 300</strong><code>#7DD3FC</code><br><span>Hover, бордеры</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#E0F2FE"></div><div class="meta"><strong>Primary 100</strong><code>#E0F2FE</code><br><span>Фон badge, карточек</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#F0F9FF"></div><div class="meta"><strong>Primary 50</strong><code>#F0F9FF</code><br><span>Subtle background</span></div></div>
+  </div>
+
+  <h3>Семантические цвета</h3>
+  <div class="color-grid">
+    <div class="color-card"><div class="swatch" style="background:#16A34A"></div><div class="meta"><strong>Success</strong><code>#16A34A</code><br><span>Принято, завершено</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#F0FDF4"></div><div class="meta"><strong>Success BG</strong><code>#F0FDF4</code><br><span>Фон зелёных badge</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#D97706"></div><div class="meta"><strong>Warning</strong><code>#D97706</code><br><span>В работе, внимание</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#FFFBEB"></div><div class="meta"><strong>Warning BG</strong><code>#FFFBEB</code><br><span>Фон жёлтых badge</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#DC2626"></div><div class="meta"><strong>Danger</strong><code>#DC2626</code><br><span>Ошибка, отклонено</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#FEF2F2"></div><div class="meta"><strong>Danger BG</strong><code>#FEF2F2</code><br><span>Фон красных badge</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#2563EB"></div><div class="meta"><strong>Info</strong><code>#2563EB</code><br><span>Информация</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#EFF6FF"></div><div class="meta"><strong>Info BG</strong><code>#EFF6FF</code><br><span>Фон синих badge</span></div></div>
+  </div>
+
+  <h3>Нейтральные (тёплые серые, Odoo-стиль)</h3>
+  <div class="color-grid">
+    <div class="color-card"><div class="swatch" style="background:#1C1917"></div><div class="meta"><strong>Gray 900</strong><code>#1C1917</code><br><span>Основной текст</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#44403C"></div><div class="meta"><strong>Gray 700</strong><code>#44403C</code><br><span>Вторичный текст</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#78716C"></div><div class="meta"><strong>Gray 500</strong><code>#78716C</code><br><span>Placeholder, hint</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#D6D3D1"></div><div class="meta"><strong>Gray 300</strong><code>#D6D3D1</code><br><span>Бордеры</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#E7E5E4"></div><div class="meta"><strong>Gray 200</strong><code>#E7E5E4</code><br><span>Бордеры таблиц</span></div></div>
+    <div class="color-card"><div class="swatch" style="background:#F5F5F4;border:1px solid #E7E5E4"></div><div class="meta"><strong>Gray 100</strong><code>#F5F5F4</code><br><span>Фон зебры, секций</span></div></div>
+  </div>
+
+  <h3>Было → Стало</h3>
+  <table class="cmp-table">
+    <thead><tr><th>Аспект</th><th>Текущий (shadcn / glass)</th><th>Odoo-стиль (целевой)</th></tr></thead>
+    <tbody>
+      <tr><td>Тени</td><td class="old">Glassmorphism, blur</td><td class="new">Плоские, едва заметные</td></tr>
+      <tr><td>Фон карточки</td><td class="old">Полупрозрачный (.glass-card)</td><td class="new">Сплошной белый + border</td></tr>
+      <tr><td>Бордеры</td><td class="old">Скрытые / мягкие</td><td class="new">Явные 1px solid</td></tr>
+      <tr><td>Скругления</td><td class="old">6–9px</td><td class="new">8–12px</td></tr>
+      <tr><td>Анимации</td><td class="old">Framer Motion везде</td><td class="new">CSS transitions, минимум</td></tr>
+      <tr><td>Иконки</td><td class="old">Lucide, разный strokeWidth</td><td class="new">Lucide strokeWidth=1.5</td></tr>
+      <tr><td>Кнопки</td><td class="old">shadcn variants</td><td class="new">Pill CTA + ghost</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- 2. TYPOGRAPHY -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="typography">
+  <div class="sec-h"><span class="sec-num">02</span><h2>Типографика</h2></div>
+  <p>Inter остаётся основным шрифтом (читаемость на мобильных). Outfit убирается — одна семья для единообразия.</p>
+
+  <div style="border:1px solid var(--g200);border-radius:var(--radius-lg);overflow:hidden;margin:16px 0">
+    <div class="type-row" style="border:none;padding:10px 16px;background:var(--g100)">
+      <span class="t-role" style="color:var(--g700)">Роль</span><span class="t-sample" style="font-weight:600;font-size:12px;color:var(--g700)">Пример</span><span class="t-meta" style="color:var(--g700)">Параметры</span>
+    </div>
+    <div class="type-row" style="padding:10px 16px"><span class="t-role">Page Title</span><span class="t-sample" style="font-size:20px;font-weight:600">Общий журнал работ</span><span class="t-meta">20px / 600 / 28</span></div>
+    <div class="type-row" style="padding:10px 16px"><span class="t-role">Section Title</span><span class="t-sample" style="font-size:16px;font-weight:600">Стороны / участники</span><span class="t-meta">16px / 600 / 24</span></div>
+    <div class="type-row" style="padding:10px 16px"><span class="t-role">Card Title</span><span class="t-sample" style="font-size:14px;font-weight:600">Акт №14 — Фундамент</span><span class="t-meta">14px / 600 / 20</span></div>
+    <div class="type-row" style="padding:10px 16px"><span class="t-role">Body</span><span class="t-sample" style="font-size:14px">Устройство монолитного фундамента блок А</span><span class="t-meta">14px / 400 / 20</span></div>
+    <div class="type-row" style="padding:10px 16px"><span class="t-role">Body Small</span><span class="t-sample" style="font-size:13px;color:var(--g700)">03.03 — 07.03.2026 · Бетон М350</span><span class="t-meta">13px / 400 / 18</span></div>
+    <div class="type-row" style="padding:10px 16px"><span class="t-role">Caption</span><span class="t-sample" style="font-size:12px;color:var(--g500)">Последнее обновление: 20.03.2026</span><span class="t-meta">12px / 400 / 16</span></div>
+    <div class="type-row" style="padding:10px 16px"><span class="t-role">Overline</span><span class="t-sample" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--g500)">ОСНОВНЫЕ ДАННЫЕ</span><span class="t-meta">11px / 600 / 14</span></div>
+    <div class="type-row" style="padding:10px 16px;border:none"><span class="t-role">Mono</span><span class="t-sample" style="font-size:13px;font-family:'JetBrains Mono',monospace">125.50 м³ · 2.1.3</span><span class="t-meta">JBM 13px / 400</span></div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- 3. ATOMS -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="atoms">
+  <div class="sec-h"><span class="sec-num">03</span><h2>Атомарные компоненты</h2></div>
+
+  <!-- CARDS -->
+  <details open>
+    <summary>Карточки (Card)</summary>
+    <div class="inner">
+      <p>Odoo-стиль: белый фон, тонкий border, минимальная тень. Без glassmorphism.</p>
+      <div class="preview-box">
+        <div class="o-card">
+          <div class="card-head"><div><div class="card-title">Акт №14</div><div class="card-sub">01.03 — 05.03.2026</div></div><span class="o-badge success">Принято</span></div>
+          <div class="card-body">Устройство монолитного фундамента</div>
+          <div style="height:4px;background:var(--g200);border-radius:2px;margin-bottom:12px;overflow:hidden"><div style="width:100%;height:100%;background:var(--success);border-radius:2px"></div></div>
+          <div class="card-actions"><button class="o-btn secondary">PDF ↓</button><button class="o-btn ghost">Подробнее →</button></div>
+        </div>
+        <div class="o-card">
+          <div class="card-head"><div><div class="card-title">Акт №15</div><div class="card-sub">03.03 — 07.03.2026</div></div><span class="o-badge warning">В работе</span></div>
+          <div class="card-body">Армирование плиты перекрытия</div>
+          <div style="padding:6px 10px;background:var(--warning-bg);border-radius:var(--radius-md);font-size:11px;color:#713F12;margin-bottom:12px">⚠ Не хватает 2 документов качества</div>
+          <div class="card-actions"><button class="o-btn ghost">Подробнее →</button></div>
+        </div>
+      </div>
+
+      <h4>Stat Card</h4>
+      <div class="preview-box" style="max-width:420px">
+        <div class="o-card" style="max-width:100%">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--g500);font-weight:600;margin-bottom:4px">Материалы</div>
+          <div style="font-size:28px;font-weight:700;color:var(--g900);line-height:1">128</div>
+          <div style="font-size:12px;color:var(--success);margin-top:4px">+12 за неделю</div>
+          <div style="height:4px;background:var(--g200);border-radius:2px;margin:10px 0;overflow:hidden"><div style="width:76%;height:100%;background:var(--p500);border-radius:2px"></div></div>
+          <div class="card-actions"><button class="o-btn primary" style="font-size:12px;height:32px;padding:6px 16px">+ Поставка</button><button class="o-btn secondary" style="font-size:12px;height:32px;padding:6px 16px">📷 Скан</button></div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- BUTTONS -->
+  <details>
+    <summary>Кнопки (Button)</summary>
+    <div class="inner">
+      <p>Odoo-стиль: pill-shape для primary, ghost для вторичных действий.</p>
+      <div class="preview-box">
+        <button class="o-btn primary">+ Добавить акт</button>
+        <button class="o-btn secondary">Экспорт PDF</button>
+        <button class="o-btn ghost">Подробнее →</button>
+        <button class="o-btn icon">⋮</button>
+        <button class="o-btn fab">+</button>
+      </div>
+      <div class="preview-box dark-bg">
+        <button class="o-btn primary">На тёмном фоне</button>
+        <button class="o-btn secondary" style="color:#E7E5E4;border-color:#78716C">Secondary</button>
+      </div>
+    </div>
+  </details>
+
+  <!-- BADGES -->
+  <details>
+    <summary>Badges / Chips</summary>
+    <div class="inner">
+      <p>Pill-shaped, цветной фон + тёмный текст. Без outline.</p>
+      <div class="preview-box">
+        <span class="o-badge success">Принято</span>
+        <span class="o-badge warning">В работе</span>
+        <span class="o-badge danger">Отклонено</span>
+        <span class="o-badge info">Справочник</span>
+        <span class="o-badge neutral">Локальный</span>
+      </div>
+    </div>
+  </details>
+
+  <!-- FORM -->
+  <details>
+    <summary>Форма (Form)</summary>
+    <div class="inner">
+      <p>Odoo-стиль: лейбл сверху, полная ширина, группировка через overline-секции.</p>
+      <div class="preview-box col" style="max-width:480px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--g500);font-weight:600;margin-bottom:8px">Основные данные</div>
+        <div class="o-field"><label>Наименование работы <span class="req">*</span></label><input class="o-input" value="Устройство монолитного фундамента"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="o-field"><label>Дата начала <span class="req">*</span></label><input class="o-input" value="03.03.2026" type="text"></div>
+          <div class="o-field"><label>Дата окончания</label><input class="o-input" value="07.03.2026" type="text"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+          <div class="o-field"><label>Объём</label><input class="o-input" value="125.5"><div class="hint">ⓘ Макс. по смете: 200 м³</div></div>
+          <div class="o-field"><label>Единица</label><select class="o-input" style="cursor:pointer"><option>м³</option><option>т</option><option>м²</option></select></div>
+        </div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--g500);font-weight:600;margin:12px 0 8px">Пример ошибки валидации</div>
+        <div class="o-field"><label>Обязательное поле <span class="req">*</span></label><input class="o-input error" value="" placeholder="Введите значение"><div class="err-msg">⚠ Обязательное поле</div></div>
+      </div>
+    </div>
+  </details>
+
+  <!-- TABLE -->
+  <details>
+    <summary>Таблица (Table)</summary>
+    <div class="inner">
+      <p>Odoo list view: compact, zebra, sticky header, горизонтальный скролл. <strong>Шапки таблиц ЖР без изменений.</strong></p>
+      <div class="scroll-hint">← Прокрутите →</div>
+      <div class="o-table-wrap">
+        <table class="o-table">
+          <thead><tr><th>№</th><th>Дата</th><th>Наименование работ</th><th>Объём</th><th>Ед.</th><th>Статус</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td style="white-space:nowrap">03.03.26</td><td>Устройство монолитного фундамента (полимонолит.)</td><td class="num-col">125.50</td><td>м³</td><td><span class="o-badge success">Принято</span></td></tr>
+            <tr><td>2</td><td style="white-space:nowrap">04.03.26</td><td>Армирование плиты перекрытия</td><td class="num-col">45.00</td><td>т</td><td><span class="o-badge warning">В работе</span></td></tr>
+            <tr><td>3</td><td style="white-space:nowrap">04.03.26</td><td>Бетонирование перекрытия этаж 1</td><td class="num-col">78.20</td><td>м³</td><td><span class="o-badge success">Принято</span></td></tr>
+            <tr><td>4</td><td style="white-space:nowrap">05.03.26</td><td>Гидроизоляция фундамента</td><td class="num-col">230.00</td><td>м²</td><td><span class="o-badge neutral">Черновик</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
+  <!-- PILL TABS -->
+  <details>
+    <summary>Pill Tabs</summary>
+    <div class="inner">
+      <p>Замена shadcn Tabs. Горизонтальный скролл, snap.</p>
+      <div class="preview-box col" style="max-width:480px">
+        <div class="pill-tabs" id="demo-tabs">
+          <button class="pill-tab" onclick="switchTab(this)">Разд. 1</button>
+          <button class="pill-tab" onclick="switchTab(this)">Разд. 2</button>
+          <button class="pill-tab active" onclick="switchTab(this)">Разд. 3</button>
+          <button class="pill-tab" onclick="switchTab(this)">Разд. 4</button>
+          <button class="pill-tab" onclick="switchTab(this)">Разд. 5</button>
+          <button class="pill-tab" onclick="switchTab(this)">Титул</button>
+        </div>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- 4. WIREFRAMES -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="wireframes">
+  <div class="sec-h"><span class="sec-num">04</span><h2>Wireframes экранов</h2></div>
+  <p>Интерактивные каркасы ключевых экранов приложения. Каждый отрисован в стиле Odoo с голубым брендом.</p>
+
+  <!-- WIREFRAME SELECTOR -->
+  <div class="pill-tabs" id="wf-tabs" style="margin-bottom:20px">
+    <button class="pill-tab active" onclick="showWF('home',this)">Главная</button>
+    <button class="pill-tab" onclick="showWF('schedule',this)">График</button>
+    <button class="pill-tab" onclick="showWF('acts',this)">Акты</button>
+    <button class="pill-tab" onclick="showWF('worklog',this)">Журнал</button>
+    <button class="pill-tab" onclick="showWF('source',this)">Исходные</button>
+  </div>
+
+  <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+    <!-- PHONE -->
+    <div class="phone-frame" id="wf-phone">
+      <!-- Wireframes injected by JS -->
+    </div>
+    <!-- ANNOTATIONS -->
+    <div id="wf-notes" style="flex:1;min-width:260px;font-size:13px;color:var(--g700)"></div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- 5. RESPONSIVE -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="responsive">
+  <div class="sec-h"><span class="sec-num">05</span><h2>Планшетная / десктопная адаптация</h2></div>
+
+  <h3>Брейкпоинты</h3>
+  <div class="preview-box col" style="gap:0">
+    <div style="display:flex;align-items:stretch;gap:0;border:1px solid var(--g200);border-radius:var(--radius-lg);overflow:hidden">
+      <div style="background:var(--p100);padding:16px 20px;flex:1;border-right:1px solid var(--g200)">
+        <div style="font-size:12px;font-weight:600;color:var(--p700)">Mobile</div>
+        <div style="font-size:11px;color:var(--g500);margin-top:2px">&lt; 768px</div>
+        <div style="font-size:11px;color:var(--g700);margin-top:8px">BottomNav · 1 колонка · Sheet-модалки</div>
+      </div>
+      <div style="background:var(--info-bg);padding:16px 20px;flex:1;border-right:1px solid var(--g200)">
+        <div style="font-size:12px;font-weight:600;color:var(--info)">Tablet</div>
+        <div style="font-size:11px;color:var(--g500);margin-top:2px">768–1024px</div>
+        <div style="font-size:11px;color:var(--g700);margin-top:8px">BottomNav · Master-detail · Dialog</div>
+      </div>
+      <div style="background:var(--success-bg);padding:16px 20px;flex:1">
+        <div style="font-size:12px;font-weight:600;color:var(--success)">Desktop</div>
+        <div style="font-size:11px;color:var(--g500);margin-top:2px">&gt; 1024px</div>
+        <div style="font-size:11px;color:var(--g700);margin-top:8px">Sidebar 220px · Grid · max-width 1200</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Адаптация по компонентам</h3>
+  <div class="o-table-wrap">
+    <table class="o-table" style="min-width:650px">
+      <thead><tr><th>Компонент</th><th>Mobile</th><th>Tablet</th><th>Desktop</th></tr></thead>
+      <tbody>
+        <tr><td style="font-weight:500">Навигация</td><td>BottomNav 5 табов</td><td>BottomNav 5 табов</td><td>Sidebar 220px</td></tr>
+        <tr><td style="font-weight:500">Карточки актов</td><td>1 колонка 100%</td><td>1 колонка max 600px</td><td>2 колонки grid</td></tr>
+        <tr><td style="font-weight:500">Материалы</td><td>Список карточек</td><td>Master-detail split</td><td>3 колонки + detail</td></tr>
+        <tr><td style="font-weight:500">Таблица ЖР</td><td>Горизонт. скролл</td><td>Полная ширина</td><td>Полная ширина</td></tr>
+        <tr><td style="font-weight:500">Гант</td><td>Задачи 160px, скролл</td><td>Задачи 280px + Гант</td><td>Задачи 400px + Гант</td></tr>
+        <tr><td style="font-weight:500">Формы</td><td>1 колонка</td><td>2 колонки</td><td>2 кол. max 800px</td></tr>
+        <tr><td style="font-weight:500">Модалки</td><td>Full-screen Sheet</td><td>Dialog 560px</td><td>Dialog 640px</td></tr>
+        <tr><td style="font-weight:500">FAB</td><td>Fixed bottom-right</td><td>Fixed bottom-right</td><td>Inline button</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- 6. STATES -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="states">
+  <div class="sec-h"><span class="sec-num">06</span><h2>Состояния UX</h2></div>
+
+  <details open>
+    <summary>Skeleton-загрузка</summary>
+    <div class="inner">
+      <p>Минимальный скелет, повторяющий структуру. НЕ спиннер для начальной загрузки.</p>
+      <div class="preview-box col" style="max-width:420px">
+        <div style="font-size:12px;font-weight:600;color:var(--g500);margin-bottom:8px">Skeleton: Card</div>
+        <div class="o-card" style="max-width:100%">
+          <div style="display:flex;justify-content:space-between;margin-bottom:10px"><div class="o-skel" style="width:160px;height:16px"></div><div class="o-skel" style="width:60px;height:18px;border-radius:var(--radius-pill)"></div></div>
+          <div class="o-skel" style="width:100%;height:12px;margin-bottom:6px"></div>
+          <div class="o-skel" style="width:70%;height:12px;margin-bottom:12px"></div>
+          <div class="o-skel" style="width:100%;height:4px;border-radius:2px;margin-bottom:12px"></div>
+          <div style="display:flex;gap:8px"><div class="o-skel" style="width:80px;height:32px;border-radius:var(--radius-pill)"></div><div class="o-skel" style="width:100px;height:32px;border-radius:var(--radius-pill)"></div></div>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:var(--g500);margin:12px 0 8px">Skeleton: Table row</div>
+        <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--g200)">
+          <div class="o-skel" style="width:30px;height:14px"></div>
+          <div class="o-skel" style="width:70px;height:14px"></div>
+          <div class="o-skel" style="flex:1;height:14px"></div>
+          <div class="o-skel" style="width:50px;height:14px"></div>
+        </div>
+        <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--g200)">
+          <div class="o-skel" style="width:30px;height:14px"></div>
+          <div class="o-skel" style="width:70px;height:14px"></div>
+          <div class="o-skel" style="flex:1;height:14px"></div>
+          <div class="o-skel" style="width:50px;height:14px"></div>
+        </div>
+        <div style="display:flex;gap:12px;padding:10px 0">
+          <div class="o-skel" style="width:30px;height:14px"></div>
+          <div class="o-skel" style="width:70px;height:14px"></div>
+          <div class="o-skel" style="flex:1;height:14px"></div>
+          <div class="o-skel" style="width:50px;height:14px"></div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>Toast-нотификации</summary>
+    <div class="inner">
+      <p>Верхний край, auto-dismiss. Border-left для цветовой индикации.</p>
+      <div class="preview-box col" style="gap:12px;align-items:flex-start">
+        <div class="o-toast t-success"><span class="icon">✓</span> Акт №14 успешно создан<span class="close">✕</span></div>
+        <div class="o-toast t-error"><span class="icon">✕</span> Не удалось сохранить. Попробуйте снова.<span class="close">✕</span></div>
+        <div class="o-toast t-warning"><span class="icon">⚠</span> 3 материала без документов качества<span class="close">✕</span></div>
+        <div class="o-toast t-info"><span class="icon">ⓘ</span> PDF формируется, это займёт ~10 сек.<span class="close">✕</span></div>
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>Пагинация / Infinite Scroll</summary>
+    <div class="inner">
+      <table class="cmp-table" style="max-width:600px">
+        <thead><tr><th>Экран</th><th>Стратегия</th></tr></thead>
+        <tbody>
+          <tr><td>Акты</td><td>Infinite scroll (по 10)</td></tr>
+          <tr><td>Журнал (Разд.3)</td><td>Infinite scroll (по дате)</td></tr>
+          <tr><td>Журнал (таблицы)</td><td>Кнопочная пагинация</td></tr>
+          <tr><td>Материалы</td><td>Infinite scroll + поиск</td></tr>
+          <tr><td>Чат (Home)</td><td>Reverse infinite scroll</td></tr>
+          <tr><td>Гант</td><td>Без пагинации (все сразу)</td></tr>
+        </tbody>
+      </table>
+      <div class="preview-box" style="max-width:420px;flex-direction:column;align-items:center;gap:8px">
+        <div style="font-size:12px;font-weight:600;color:var(--g500)">Кнопочная пагинация (таблицы ЖР)</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:12px;color:var(--g500);margin-right:8px">1–20 из 156</span>
+          <button style="width:32px;height:32px;border:1px solid var(--g300);border-radius:var(--radius-md);background:var(--white);cursor:pointer;font-size:12px">◄</button>
+          <button style="width:32px;height:32px;border:none;border-radius:var(--radius-md);background:var(--p500);color:#fff;cursor:pointer;font-size:12px;font-weight:600">1</button>
+          <button style="width:32px;height:32px;border:1px solid var(--g300);border-radius:var(--radius-md);background:var(--white);cursor:pointer;font-size:12px">2</button>
+          <button style="width:32px;height:32px;border:1px solid var(--g300);border-radius:var(--radius-md);background:var(--white);cursor:pointer;font-size:12px">3</button>
+          <span style="font-size:12px;color:var(--g500)">…</span>
+          <button style="width:32px;height:32px;border:1px solid var(--g300);border-radius:var(--radius-md);background:var(--white);cursor:pointer;font-size:12px">8</button>
+          <button style="width:32px;height:32px;border:1px solid var(--g300);border-radius:var(--radius-md);background:var(--white);cursor:pointer;font-size:12px">►</button>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>Empty State / Error State</summary>
+    <div class="inner">
+      <div class="preview-box" style="gap:32px">
+        <div style="text-align:center;padding:32px;max-width:280px">
+          <div style="font-size:42px;margin-bottom:12px;opacity:.4">📋</div>
+          <div style="font-size:15px;font-weight:600;color:var(--g700);margin-bottom:6px">Пока нет актов</div>
+          <div style="font-size:12px;color:var(--g500);margin-bottom:16px">Сформируйте акты из графика работ или добавьте вручную</div>
+          <button class="o-btn primary">Сформировать акты</button>
+        </div>
+        <div style="text-align:center;padding:32px;max-width:280px">
+          <div style="font-size:42px;margin-bottom:12px;opacity:.5">⚠</div>
+          <div style="font-size:15px;font-weight:600;color:var(--g700);margin-bottom:6px">Не удалось загрузить</div>
+          <div style="font-size:12px;color:var(--g500);margin-bottom:16px">Проверьте подключение к интернету и попробуйте снова</div>
+          <button class="o-btn primary">Повторить ↻</button>
+        </div>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- 7. NAVIGATION -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="navigation">
+  <div class="sec-h"><span class="sec-num">07</span><h2>Навигация и роутинг</h2></div>
+
+  <h3>Карта маршрутов</h3>
+  <div class="nav-diagram">
+    <div class="nav-box"><div class="nb-route">/</div><div class="nb-name">Home (чат)</div><div class="nb-type">Header: ⚡ ссылка</div></div>
+    <div class="nav-box"><div class="nb-route">/works</div><div class="nb-name">ВОР / ВОИР</div><div class="nb-type">BottomNav: ВОР</div></div>
+    <div class="nav-box"><div class="nb-route">/schedule</div><div class="nb-name">График (Гант)</div><div class="nb-type">BottomNav: График</div></div>
+    <div class="nav-box"><div class="nb-route">/acts</div><div class="nb-name">Акты АОСР</div><div class="nb-type">BottomNav: Акты</div></div>
+    <div class="nav-box sub"><div class="nb-route">/acts/:id</div><div class="nb-name">Детали акта</div><div class="nb-type">Subpage ← назад</div></div>
+    <div class="nav-box"><div class="nb-route">/worklog</div><div class="nb-name">Журнал работ</div><div class="nb-type">BottomNav: ЖР</div></div>
+    <div class="nav-box"><div class="nb-route">/source-data</div><div class="nb-name">Исходные данные</div><div class="nb-type">BottomNav: Исходные</div></div>
+    <div class="nav-box sub"><div class="nb-route">/source-data/materials</div><div class="nb-name">Материалы</div><div class="nb-type">Subpage ← назад</div></div>
+    <div class="nav-box sub"><div class="nb-route">/source-data/materials/:id</div><div class="nb-name">Детали материала</div><div class="nb-type">Subpage ← назад</div></div>
+    <div class="nav-box sub"><div class="nb-route">/source-data/documents</div><div class="nb-name">Документы</div><div class="nb-type">Subpage ← назад</div></div>
+    <div class="nav-box"><div class="nb-route">/settings</div><div class="nb-name">Настройки</div><div class="nb-type">Бургер-меню</div></div>
+  </div>
+
+  <h3>Модальные vs Full-page</h3>
+  <table class="cmp-table" style="max-width:700px">
+    <thead><tr><th>Модальное окно (Sheet / Dialog)</th><th>Full-page (отдельный route)</th></tr></thead>
+    <tbody>
+      <tr><td>Быстрое действие (&lt; 3 полей)</td><td>Сложная форма (4+ полей)</td></tr>
+      <tr><td>Подтверждение удаления</td><td>Детали акта / материала</td></tr>
+      <tr><td>Выбор шаблонов PDF</td><td>Создание нового акта</td></tr>
+      <tr><td>Фильтр / сортировка</td><td>Редактирование записи</td></tr>
+      <tr><td>Kebab-меню (⋮)</td><td>Импорт Excel</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- 8. MIGRATION -->
+<!-- ════════════════════════════════════════════════════════ -->
+<section id="migration">
+  <div class="sec-h"><span class="sec-num">08</span><h2>Таблица миграции</h2></div>
+  <p>Порядок: фундамент → high-traffic → фичи → polish. Общая оценка ~72 часа / 5-6 недель.</p>
+
+  <div class="o-table-wrap">
+    <table class="mig-table" style="min-width:750px">
+      <thead><tr><th>#</th><th>Компонент</th><th>Приоритет</th><th>Причина</th><th>Зависимости</th><th>Часы</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td style="font-weight:600">CSS-токены + Tailwind config</td><td><span class="prio critical"></span>Критично</td><td>Фундамент всего UI</td><td>—</td><td class="num-col">3</td></tr>
+        <tr><td>2</td><td style="font-weight:600">OdooCard</td><td><span class="prio critical"></span>Критично</td><td>Используется на каждом экране</td><td>#1</td><td class="num-col">2</td></tr>
+        <tr><td>3</td><td style="font-weight:600">OdooButton</td><td><span class="prio critical"></span>Критично</td><td>Повсеместное использование</td><td>#1</td><td class="num-col">2</td></tr>
+        <tr><td>4</td><td style="font-weight:600">OdooBadge</td><td><span class="prio critical"></span>Критично</td><td>Статусы актов, материалов, ЖР</td><td>#1</td><td class="num-col">1</td></tr>
+        <tr><td>5</td><td style="font-weight:600">Header.tsx</td><td><span class="prio critical"></span>Критично</td><td>Блокирует все страницы</td><td>#1, #3</td><td class="num-col">3</td></tr>
+        <tr><td>6</td><td style="font-weight:600">BottomNav.tsx</td><td><span class="prio critical"></span>Критично</td><td>Блокирует все страницы</td><td>#1</td><td class="num-col">2</td></tr>
+        <tr><td>7</td><td>OdooForm inputs</td><td><span class="prio high"></span>Высокий</td><td>Формы редактирования</td><td>#1</td><td class="num-col">3</td></tr>
+        <tr><td>8</td><td>OdooTable</td><td><span class="prio high"></span>Высокий</td><td>Sticky header + скролл</td><td>#1</td><td class="num-col">3</td></tr>
+        <tr><td>9</td><td>Skeleton / Empty / Error</td><td><span class="prio high"></span>Высокий</td><td>UX-паттерны везде</td><td>#1, #2</td><td class="num-col">3</td></tr>
+        <tr><td>10</td><td>Toast система</td><td><span class="prio high"></span>Высокий</td><td>Обратная связь пользователю</td><td>#1</td><td class="num-col">2</td></tr>
+        <tr><td>11</td><td>PillTabs</td><td><span class="prio high"></span>Высокий</td><td>Замена shadcn Tabs</td><td>#1</td><td class="num-col">2</td></tr>
+        <tr><td>12</td><td>Home.tsx</td><td><span class="prio medium"></span>Средний</td><td>Чат + AI-card</td><td>#1–6, #9</td><td class="num-col">4</td></tr>
+        <tr><td>13</td><td>Acts.tsx</td><td><span class="prio medium"></span>Средний</td><td>Infinite scroll + карточки</td><td>#1–6, #4, #9</td><td class="num-col">4</td></tr>
+        <tr><td>14</td><td>WorkLog.tsx</td><td><span class="prio medium"></span>Средний</td><td>Pill tabs + таблицы (шапки as-is)</td><td>#1–6, #8, #11</td><td class="num-col">5</td></tr>
+        <tr><td>15</td><td>Schedule.tsx</td><td><span class="prio medium"></span>Средний</td><td>Гант: цвета полос</td><td>#1–6</td><td class="num-col">4</td></tr>
+        <tr><td>16</td><td>SourceData.tsx</td><td><span class="prio medium"></span>Средний</td><td>Дашборд + drill-down</td><td>#1–6, #2, #4</td><td class="num-col">4</td></tr>
+        <tr><td>17</td><td>Works.tsx</td><td><span class="prio medium"></span>Средний</td><td>Карточки + импорт + поиск</td><td>#1–6, #2, #8</td><td class="num-col">3</td></tr>
+        <tr><td>18</td><td>ActDetail subpage</td><td><span class="prio low"></span>Низкий</td><td>Accordion + PDF export</td><td>#1–6, #7</td><td class="num-col">4</td></tr>
+        <tr><td>19</td><td>SourceMaterials / Detail</td><td><span class="prio low"></span>Низкий</td><td>Список + детали</td><td>#1–6, #2, #7</td><td class="num-col">5</td></tr>
+        <tr><td>20</td><td>SourceDocuments</td><td><span class="prio low"></span>Низкий</td><td>Реестр документов</td><td>#1–6, #2, #4</td><td class="num-col">3</td></tr>
+        <tr><td>21</td><td>Settings.tsx</td><td><span class="prio low"></span>Низкий</td><td>Минимальные правки</td><td>#1, #3</td><td class="num-col">2</td></tr>
+        <tr><td>22</td><td>Tablet / Desktop</td><td><span class="prio low"></span>Низкий</td><td>Sidebar, grid, master-detail</td><td>#1–21</td><td class="num-col">8</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Этапы</h3>
+  <div class="phase-tl">
+    <div class="phase-item"><div class="phase-line"><div class="phase-dot" style="background:var(--danger);border-color:var(--danger)"></div><div class="phase-stem"></div></div><div class="phase-content"><div class="phase-label">Этап 1 — Фундамент</div><div class="phase-desc">CSS-токены, OdooCard, OdooButton, OdooBadge, Header, BottomNav</div><div class="phase-time">~13 ч · 1 неделя</div></div></div>
+    <div class="phase-item"><div class="phase-line"><div class="phase-dot" style="background:var(--warning);border-color:var(--warning)"></div><div class="phase-stem"></div></div><div class="phase-content"><div class="phase-label">Этап 2 — Базовые паттерны</div><div class="phase-desc">Form inputs, Table, Skeleton/Empty/Error, Toast, PillTabs</div><div class="phase-time">~13 ч · 1 неделя</div></div></div>
+    <div class="phase-item"><div class="phase-line"><div class="phase-dot" style="background:var(--success);border-color:var(--success)"></div><div class="phase-stem"></div></div><div class="phase-content"><div class="phase-label">Этап 3 — Экраны</div><div class="phase-desc">Home, Acts, WorkLog, Schedule, SourceData, Works</div><div class="phase-time">~24 ч · 2 недели</div></div></div>
+    <div class="phase-item"><div class="phase-line"><div class="phase-dot" style="background:var(--p500);border-color:var(--p500)"></div><div class="phase-stem"></div></div><div class="phase-content"><div class="phase-label">Этап 4 — Subpages + Polish</div><div class="phase-desc">ActDetail, SourceMaterials/Detail, SourceDocuments, Settings</div><div class="phase-time">~14 ч · 1 неделя</div></div></div>
+    <div class="phase-item"><div class="phase-line"><div class="phase-dot" style="background:var(--g500);border-color:var(--g500)"></div><div class="phase-stem"></div></div><div class="phase-content"><div class="phase-label">Этап 5 — Адаптивность</div><div class="phase-desc">Tablet sidebar, Desktop layout, Grid, Master-detail</div><div class="phase-time">~8 ч · 1 неделя</div></div></div>
+  </div>
+
+  <div class="note">
+    <strong>Что НЕ меняется:</strong> шапки таблиц ЖР (Разд. 1–5), Wouter, TanStack Query, Zustand, Radix primitives, Tailwind CSS, JetBrains Mono для данных.
+  </div>
+</section>
+
+</div><!-- /main -->
+
+<script>
+// ─── SIDEBAR ACTIVE STATE ───
+const links = document.querySelectorAll('.sidebar a');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const a = document.querySelector(`.sidebar a[href="#${e.target.id}"]`);
+      if (a) a.classList.add('active');
+    }
+  });
+}, { rootMargin: '-80px 0px -60% 0px' });
+document.querySelectorAll('section[id]').forEach(s => observer.observe(s));
+
+// ─── PILL TAB SWITCH ───
+function switchTab(el) {
+  el.parentElement.querySelectorAll('.pill-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ─── WIREFRAME RENDERER ───
+const bnav = (active) => `
+<div class="pf-bnav">
+  <div class="bnav-item ${active==='works'?'active':''}"><div class="bi">📋</div>ВОР</div>
+  <div class="bnav-item ${active==='schedule'?'active':''}"><div class="bi">📅</div>График</div>
+  <div class="bnav-item ${active==='acts'?'active':''}"><div class="bi">📄</div>Акты</div>
+  <div class="bnav-item ${active==='worklog'?'active':''}"><div class="bi">💬</div>ЖР</div>
+  <div class="bnav-item ${active==='source'?'active':''}"><div class="bi">📁</div>Исходные</div>
+</div>`;
+
+const wireframes = {
+  home: {
+    html: `
+<div class="pf-header">
+  <div class="pf-logo">⚡</div>
+  <div><div class="pf-title">ТелеграмЖурналРабот</div><div class="pf-sub">ЖК Сосны, Корпус 2</div></div>
+  <div class="pf-avatar" style="margin-left:auto">👤</div>
+</div>
+<div class="pf-body" style="padding-bottom:70px">
+  <div class="wf-sep">📅 03.03.2026</div>
+  <div class="wf-bubble user">Залили бетон в блок А, 45 кубов, марка М350, Корнеев принимал<div style="font-size:10px;color:var(--g500);text-align:right;margin-top:4px">10:32</div></div>
+  <div class="wf-bubble ai">
+    <div class="ai-head">✓ РАБОТА СОПОСТАВЛЕНА</div>
+    <div class="ai-row"><strong>Код:</strong> 2.1.3</div>
+    <div class="ai-row"><strong>Работа:</strong> Бетонирование фунд.</div>
+    <div class="ai-row"><strong>Объём:</strong> 45 м³</div>
+    <div class="ai-row"><strong>Дата:</strong> 03.03.2026</div>
+    <div class="ai-row"><strong>Место:</strong> Блок А</div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="o-btn primary" style="font-size:11px;height:28px;padding:4px 14px">Принять ✓</button>
+      <button class="o-btn secondary" style="font-size:11px;height:28px;padding:4px 14px">Изменить ✎</button>
+    </div>
+  </div>
+  <div class="wf-bubble user" style="margin-top:6px">Армирование перекрытия, 12 тонн, А500С d16<div style="font-size:10px;color:var(--g500);text-align:right;margin-top:4px">11:15</div></div>
+  <div style="background:var(--white);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:10px 12px;margin-top:6px;max-width:80%">
+    <div style="font-size:11px;color:var(--g500);display:flex;align-items:center;gap:6px">⏳ Обрабатывается...</div>
+    <div style="height:3px;background:var(--g200);border-radius:2px;margin-top:6px;overflow:hidden"><div style="width:60%;height:100%;background:var(--p300);border-radius:2px;animation:shimmer 1.5s infinite"></div></div>
+  </div>
+  <div style="height:60px"></div>
+  <div style="position:absolute;bottom:60px;left:12px;right:12px;background:var(--white);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:8px 12px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-sm)">
+    <input style="flex:1;border:none;outline:none;font-size:13px;font-family:inherit;color:var(--g900)" placeholder="Опишите выполненные работы...">
+    <span style="font-size:16px;cursor:pointer">📎</span>
+    <button class="o-btn primary" style="font-size:12px;height:30px;padding:4px 14px">Отпр</button>
+  </div>
+</div>
+${bnav('home')}`,
+    notes: `<h4>Главная (Home) — Чат-журнал</h4>
+<p>Основной экран для ввода данных о выполненных работах в свободной форме.</p>
+<p><strong>Ключевые паттерны:</strong></p>
+<ul style="font-size:13px;padding-left:20px;margin:8px 0;line-height:1.8">
+  <li><strong>Date separator</strong> — Odoo chatter style</li>
+  <li><strong>User bubble</strong> — правый край, голубой фон (--primary-100)</li>
+  <li><strong>AI card</strong> — левый край, зелёный border-left при успешном сопоставлении</li>
+  <li><strong>Processing state</strong> — shimmer-анимация</li>
+  <li><strong>Input bar</strong> — sticky внизу, над BottomNav</li>
+</ul>
+<p><strong>Доступ:</strong> через иконку ⚡ в Header (не в BottomNav)</p>`
+  },
+
+  schedule: {
+    html: `
+<div class="pf-header">
+  <div class="pf-back">←</div>
+  <div><div class="pf-title">График работ</div><div class="pf-sub">ЖК Сосны, Корпус 2</div></div>
+  <div style="margin-left:auto;font-size:16px">🔍</div>
+</div>
+<div class="pf-body">
+  <div class="wf-card">
+    <div style="font-size:12px;font-weight:600;color:var(--g900)">📊 График сформирован</div>
+    <div style="font-size:11px;color:var(--g500);margin-top:3px">Обновлено: 20.03.2026 · 24 задачи</div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 8px">
+    <span style="font-size:13px;font-weight:600">◄ Март 2026 ►</span>
+    <div style="display:flex;gap:2px">
+      <button style="padding:4px 10px;font-size:11px;background:var(--p500);color:#fff;border:none;border-radius:var(--radius-pill);cursor:pointer">Неделя</button>
+      <button style="padding:4px 10px;font-size:11px;background:transparent;color:var(--g500);border:1px solid var(--g300);border-radius:var(--radius-pill);cursor:pointer">Месяц</button>
+    </div>
+  </div>
+  <div style="border:1px solid var(--g200);border-radius:var(--radius-lg);overflow:hidden">
+    <div class="wf-gantt-header">
+      <div class="gr-name">Задача</div>
+      <div class="gr-dates"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
+    </div>
+    <div class="wf-gantt-row"><div class="gr-name">Фундамент<br><span style="font-size:9px;color:var(--g500)">акт 1 · 120ч</span></div><div class="gr-bar-area"><div class="gr-bar" style="left:0;width:85%;background:var(--success)"></div></div></div>
+    <div class="wf-gantt-row"><div class="gr-name">Армирование<br><span style="font-size:9px;color:var(--g500)">акт 2 · 80ч</span></div><div class="gr-bar-area"><div class="gr-bar" style="left:20%;width:55%;background:var(--p500)"></div></div></div>
+    <div class="wf-gantt-row"><div class="gr-name">Бетон плита<br><span style="font-size:9px;color:var(--g500)">акт 3 · 60ч</span></div><div class="gr-bar-area"><div class="gr-bar" style="left:40%;width:40%;background:var(--p500)"></div></div></div>
+    <div class="wf-gantt-row"><div class="gr-name">Гидроизол.<br><span style="font-size:9px;color:var(--g500)">акт 4 · 40ч</span></div><div class="gr-bar-area"><div class="gr-bar" style="left:60%;width:30%;background:var(--g300)"></div></div></div>
+    <div class="wf-gantt-row" style="border:none"><div class="gr-name">Кладка<br><span style="font-size:9px;color:var(--g500)">акт 5 · 90ч</span></div><div class="gr-bar-area"><div class="gr-bar" style="left:75%;width:25%;background:var(--g300)"></div></div></div>
+  </div>
+  <div style="display:flex;gap:12px;margin-top:12px;font-size:10px;color:var(--g500);flex-wrap:wrap">
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--success);vertical-align:middle;margin-right:3px"></span>завершено</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--p500);vertical-align:middle;margin-right:3px"></span>в работе</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--g300);vertical-align:middle;margin-right:3px"></span>план</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--danger);vertical-align:middle;margin-right:3px"></span>просрочено</span>
+  </div>
+</div>
+${bnav('schedule')}`,
+    notes: `<h4>График работ (Schedule) — Гант</h4>
+<p>Диаграмма Ганта с задачами по актам.</p>
+<p><strong>Ключевые паттерны:</strong></p>
+<ul style="font-size:13px;padding-left:20px;margin:8px 0;line-height:1.8">
+  <li><strong>Info-card</strong> — сводка по источнику данных</li>
+  <li><strong>Period switcher</strong> — pill-кнопки Неделя/Месяц</li>
+  <li><strong>Gantt bars</strong> — 4 цвета по статусу</li>
+  <li><strong>Метаданные</strong> — «акт N · Xч» под именем задачи</li>
+  <li><strong>Touch</strong> — горизонтальный скролл для дат</li>
+</ul>
+<p><strong>На планшете:</strong> задачи 280px, Гант видим без скролла</p>`
+  },
+
+  acts: {
+    html: `
+<div class="pf-header">
+  <div class="pf-back">←</div>
+  <div><div class="pf-title">Акты АОСР</div><div class="pf-sub">ЖК Сосны, Корпус 2</div></div>
+  <div style="margin-left:auto;font-size:16px">🔍</div>
+</div>
+<div class="pf-body">
+  <button class="o-btn primary" style="width:100%;margin-bottom:12px;height:40px;font-size:13px">Сформировать / обновить из графика ↻</button>
+  <div style="font-size:11px;color:var(--g500);margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <span>14 актов</span>·<span style="color:var(--success)">8 принято</span>·<span style="color:var(--warning)">3 в работе</span>·<span>3 черновик</span>
+  </div>
+  <div class="wf-card">
+    <div class="wf-row"><span class="wf-title">Акт №1</span><span class="o-badge success" style="font-size:10px">Принято</span></div>
+    <div class="wf-desc">01.03 — 05.03.2026</div>
+    <div style="font-size:12px;color:var(--g700);margin-top:4px">Устройство монолитного фундамента</div>
+    <div style="font-size:11px;color:var(--g500);margin-top:6px">Шаблоны: 6 из 28</div>
+    <div class="wf-progress"><div class="bar" style="width:100%;background:var(--success)"></div></div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="o-btn secondary" style="font-size:11px;height:28px;padding:4px 14px">PDF ↓</button>
+      <button class="o-btn ghost" style="font-size:11px">Подробнее →</button>
+    </div>
+  </div>
+  <div class="wf-card">
+    <div class="wf-row"><span class="wf-title">Акт №2</span><span class="o-badge warning" style="font-size:10px">В работе</span></div>
+    <div class="wf-desc">03.03 — 07.03.2026</div>
+    <div style="font-size:12px;color:var(--g700);margin-top:4px">Армирование плиты перекрытия</div>
+    <div style="padding:4px 8px;background:var(--warning-bg);border-radius:6px;font-size:10px;color:#713F12;margin-top:6px">⚠ Не хватает 2 документов качества</div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="o-btn ghost" style="font-size:11px">Подробнее →</button>
+    </div>
+  </div>
+  <div class="wf-card">
+    <div class="wf-row"><span class="wf-title">Акт №3</span><span class="o-badge neutral" style="font-size:10px">Черновик</span></div>
+    <div class="wf-desc">05.03 — 10.03.2026</div>
+    <div style="font-size:12px;color:var(--g700);margin-top:4px">Гидроизоляция фундамента</div>
+    <div class="wf-progress"><div class="bar" style="width:35%;background:var(--g500)"></div></div>
+  </div>
+</div>
+${bnav('acts')}`,
+    notes: `<h4>Акты АОСР</h4>
+<p>Список актов с карточками статуса, progress-bar и действиями.</p>
+<p><strong>Ключевые паттерны:</strong></p>
+<ul style="font-size:13px;padding-left:20px;margin:8px 0;line-height:1.8">
+  <li><strong>Primary CTA</strong> — «Сформировать из графика» full-width</li>
+  <li><strong>Summary row</strong> — количество по статусам</li>
+  <li><strong>Card + Badge</strong> — статус акта в правом углу</li>
+  <li><strong>Warning block</strong> — предупреждение о недостающих документах</li>
+  <li><strong>Progress bar</strong> — заполненность акта</li>
+  <li><strong>Infinite scroll</strong> — подгрузка по 10 при достижении конца</li>
+</ul>
+<p><strong>Drill-down:</strong> «Подробнее» → <code>/acts/:id</code> (full-page)</p>`
+  },
+
+  worklog: {
+    html: `
+<div class="pf-header">
+  <div class="pf-back">←</div>
+  <div><div class="pf-title">Общий журнал работ</div><div class="pf-sub">ЖК Сосны, Корпус 2</div></div>
+  <div style="margin-left:auto;font-size:14px;cursor:pointer">🔄</div>
+</div>
+<div class="pf-body">
+  <div class="pill-tabs" style="margin-bottom:12px">
+    <button class="pill-tab" style="font-size:11px;padding:5px 12px">Разд. 1</button>
+    <button class="pill-tab" style="font-size:11px;padding:5px 12px">Разд. 2</button>
+    <button class="pill-tab active" style="font-size:11px;padding:5px 12px">Разд. 3</button>
+    <button class="pill-tab" style="font-size:11px;padding:5px 12px">Разд. 4</button>
+    <button class="pill-tab" style="font-size:11px;padding:5px 12px">Разд. 5</button>
+  </div>
+  <div class="wf-card" style="background:var(--p50);border-color:var(--p300);padding:8px 12px">
+    <div style="font-size:11px;font-weight:600;color:var(--p700)">ⓘ Раздел 3: Сведения о выполнении работ</div>
+    <div style="font-size:10px;color:var(--g500);margin-top:2px">Последняя запись: Март 2026</div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 8px">
+    <span style="font-size:12px;font-weight:600;color:var(--g700)">ОБЩИЙ ПРОГРЕСС</span>
+    <span style="font-size:12px;font-weight:700;color:var(--p700)">78%</span>
+  </div>
+  <div style="height:4px;background:var(--g200);border-radius:2px;margin-bottom:14px;overflow:hidden"><div style="width:78%;height:100%;background:var(--p500);border-radius:2px"></div></div>
+
+  <div class="wf-wl-item">
+    <div class="wf-wl-date"><div class="day">03</div><div class="dow">Пн</div><div style="font-size:9px;color:var(--g500)">Мар</div></div>
+    <div class="wf-wl-content"><div class="wl-head"><span class="o-badge success" style="font-size:9px">Принято</span><span style="margin-left:auto;font-size:14px;cursor:pointer;color:var(--g500)">⋮</span></div>Бетонирование фундамента блок А, 45 м³, М350</div>
+  </div>
+  <div class="wf-wl-item">
+    <div class="wf-wl-date"><div class="day">04</div><div class="dow">Вт</div><div style="font-size:9px;color:var(--g500)">Мар</div></div>
+    <div class="wf-wl-content"><div class="wl-head"><span class="o-badge warning" style="font-size:9px">В работе</span><span style="margin-left:auto;font-size:14px;cursor:pointer;color:var(--g500)">⋮</span></div>Армирование плиты, 12 т, арматура А500С d16</div>
+  </div>
+  <div class="wf-wl-item" style="border:none">
+    <div class="wf-wl-date"><div class="day">05</div><div class="dow">Ср</div><div style="font-size:9px;color:var(--g500)">Мар</div></div>
+    <div class="wf-wl-content"><div class="wl-head"><span class="o-badge success" style="font-size:9px">Принято</span><span style="margin-left:auto;font-size:14px;cursor:pointer;color:var(--g500)">⋮</span></div>Гидроизоляция фундамента, 230 м²</div>
+  </div>
+  <div style="border:1px dashed var(--g300);border-radius:var(--radius-lg);padding:12px;text-align:center;margin-top:10px;cursor:pointer">
+    <div style="font-size:13px;color:var(--p500);font-weight:500">+ Добавить новую запись</div>
+    <div style="font-size:11px;color:var(--g500);margin-top:2px">Нажмите для добавления</div>
+  </div>
+</div>
+<div style="position:absolute;bottom:68px;right:16px;width:48px;height:48px;border-radius:50%;background:var(--p500);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:var(--shadow-lg);cursor:pointer">+</div>
+${bnav('worklog')}`,
+    notes: `<h4>Журнал работ (WorkLog)</h4>
+<p>Общий журнал работ по РД-11-05-2007. Pill-табы для разделов.</p>
+<p><strong>Ключевые паттерны:</strong></p>
+<ul style="font-size:13px;padding-left:20px;margin:8px 0;line-height:1.8">
+  <li><strong>Pill tabs</strong> — горизонтальный скролл (Разд. 1–5, Титул)</li>
+  <li><strong>Info badge</strong> — название раздела + дата</li>
+  <li><strong>Progress bar</strong> — общий прогресс обработки</li>
+  <li><strong>List items</strong> — дата (число/день) + badge + kebab</li>
+  <li><strong>FAB</strong> — только на Разд. 3</li>
+  <li><strong>Разд. 1/2/4/5</strong> — таблицы с СУЩЕСТВУЮЩИМИ шапками</li>
+</ul>
+<p class="note" style="margin-top:12px">⚠ Шапки таблиц Журнала работ остаются <strong>без изменений</strong> (требование #6)</p>`
+  },
+
+  source: {
+    html: `
+<div class="pf-header">
+  <div class="pf-back">←</div>
+  <div><div class="pf-title">Исходные данные</div><div class="pf-sub">ЖК Сосны, Корпус 2</div></div>
+  <div style="margin-left:auto;font-size:16px">⚙</div>
+</div>
+<div class="pf-body">
+  <div class="wf-card" style="background:var(--p50);border-color:var(--p300)">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:16px">🏗</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--g900)">ЖК Сосны, Корпус 2 <span style="color:var(--g500);font-size:11px">▾</span></div>
+        <div style="font-size:11px;color:var(--g500)">Московская обл., г. Одинцово</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-overline">Стороны / участники</div>
+  <div class="wf-chip-row">
+    <div class="wf-chip"><div class="wf-chip-role">Заказчик</div><div class="wf-chip-name">ООО «РосСтрой»</div><div style="font-size:9px;color:var(--success);margin-top:2px">✓ ИНН</div></div>
+    <div class="wf-chip"><div class="wf-chip-role">Подрядчик</div><div class="wf-chip-name">ООО «СтройМонтаж»</div><div style="font-size:9px;color:var(--success);margin-top:2px">✓ ИНН</div></div>
+    <div class="wf-chip"><div class="wf-chip-role">Проектировщик</div><div class="wf-chip-name">АО «ПроектИнвест»</div><div style="font-size:9px;color:var(--g500);margin-top:2px">○ ИНН</div></div>
+  </div>
+
+  <div class="wf-overline">Разделы</div>
+  <div class="wf-stat-card">
+    <div style="display:flex;align-items:center;gap:8px;flex:1"><span class="sc-icon">📦</span><div><div class="sc-label">Материалы</div><div style="font-size:10px;color:var(--g500);margin-top:1px">76% документов привязано</div></div></div>
+    <span class="sc-count">128</span><span class="sc-arrow">›</span>
+  </div>
+  <div class="wf-stat-card">
+    <div style="display:flex;align-items:center;gap:8px;flex:1"><span class="sc-icon">📄</span><div><div class="sc-label">Документы качества</div><div style="font-size:10px;color:var(--g500);margin-top:1px">Сертификаты, паспорта</div></div></div>
+    <span class="sc-count">54</span><span class="sc-arrow">›</span>
+  </div>
+  <div class="wf-stat-card">
+    <div style="display:flex;align-items:center;gap:8px;flex:1"><span class="sc-icon">📐</span><div class="sc-label">Исполнительные схемы</div></div>
+    <span class="sc-count">12</span><span class="sc-arrow">›</span>
+  </div>
+  <div class="wf-stat-card">
+    <div style="display:flex;align-items:center;gap:8px;flex:1"><span class="sc-icon">🧪</span><div class="sc-label">Протоколы / испытания</div></div>
+    <span class="sc-count">18</span><span class="sc-arrow">›</span>
+  </div>
+</div>
+${bnav('source')}`,
+    notes: `<h4>Исходные данные (SourceData)</h4>
+<p>Дашборд с контекстом объекта, участниками и разделами данных.</p>
+<p><strong>Ключевые паттерны:</strong></p>
+<ul style="font-size:13px;padding-left:20px;margin:8px 0;line-height:1.8">
+  <li><strong>Object selector</strong> — sticky, голубой фон (--primary-50)</li>
+  <li><strong>Chip carousel</strong> — горизонтальный скролл участников</li>
+  <li><strong>Индикатор заполненности</strong> — ✓ ИНН (зелёный) / ○ (серый)</li>
+  <li><strong>Stat cards</strong> — иконка + название + счётчик + стрелка drill-down</li>
+  <li><strong>Drill-down</strong> — нажатие → subpage (/source-data/materials и т.д.)</li>
+</ul>
+<p><strong>Архитектура:</strong> Объект → Участники → Документы → Материалы</p>`
+  }
+};
+
+function showWF(id, btn) {
+  if (btn) {
+    btn.parentElement.querySelectorAll('.pill-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  const wf = wireframes[id];
+  document.getElementById('wf-phone').innerHTML = wf.html;
+  document.getElementById('wf-notes').innerHTML = wf.notes;
+}
+
+// Init
+showWF('home');
+</script>
+</body>
+</html>
