@@ -23,6 +23,8 @@
       "estimateNo": "02-01-02",
       "title": "Ремонт системы отопления",
       "expectedImportedPositionCount": 43,
+      "expectedAuxiliaryPositionCount": 32,
+      "expectedTotalEstimatePositionCount": 75,
       "expectedTotalMarkerCount": 43,
       "expectedLineNos": [
         1,
@@ -208,6 +210,8 @@
       "estimateNo": "02-01-04",
       "title": "Ремонт системы водоснабжения",
       "expectedImportedPositionCount": 48,
+      "expectedAuxiliaryPositionCount": 77,
+      "expectedTotalEstimatePositionCount": 125,
       "expectedTotalMarkerCount": 48,
       "expectedLineNos": [
         1,
@@ -409,6 +413,8 @@
       "estimateNo": "02-01-05",
       "title": "Водомерый узел",
       "expectedImportedPositionCount": 37,
+      "expectedAuxiliaryPositionCount": 30,
+      "expectedTotalEstimatePositionCount": 67,
       "expectedTotalMarkerCount": 37,
       "expectedLineNos": [
         1,

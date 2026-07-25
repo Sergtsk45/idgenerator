@@ -1,6 +1,6 @@
 {
   "name": "rik-service-number-is-not-line-no",
-  "purpose": "Regression vector for the ambiguity that the three real RTF fixtures cannot expose, because their top-level values in columns 'номер' and '№ п/п' are equal.",
+  "purpose": "Regression vector for the ambiguity that the three real RTF fixtures cannot expose, because their top-level values in columns 'номер' and '№ п/п' are equal. Main lineNo must come from '№ п/п'; decimal auxiliary rows may be imported as material subrows.",
   "sourceColumns": [
     "номер",
     "№ п/п",
@@ -64,7 +64,8 @@
     ]
   ],
   "expected": {
-    "importedPositionCount": 1,
+    "importedMainPositionCount": 1,
+    "importedAuxiliaryPositionCount": 1,
     "positions": [
       {
         "lineNo": 7,
@@ -76,8 +77,7 @@
       }
     ],
     "mustNotAppearAsLineNo": [
-      9001,
-      "7.1"
+      9001
     ]
   }
 }

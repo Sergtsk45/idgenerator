@@ -4,7 +4,7 @@
 
 ### Добавлено
 - `client/src/lib/rikRtfTableExtractor.ts` — безопасное клиентское извлечение табличных строк из RTF (`ansicpg1251`, `\'hh`, `\uN`, `\binN`, пропуск служебных destinations и лимиты размера/строк/ячеек).
-- `client/src/lib/rikRtfEstimateParser.ts` — парсер RTF-выгрузки ПК РИК в существующий `ParsedEstimateImportPayload`; ресурсы первой версии не импортируются.
+- `client/src/lib/rikRtfEstimateParser.ts` — парсер RTF-выгрузки ПК РИК в существующий `ParsedEstimateImportPayload`; ресурсы первой версии не импортируются в `position_resources`.
 - `client/src/workers/rik-rtf.worker.ts` и `client/src/lib/rikRtfWorkerClient.ts` — запуск RTF-парсинга в Web Worker, чтобы не блокировать `/works`.
 - `tests/rik-rtf-parser.test.ts` — контрактные тесты на три эталонных RTF, synthetic vector служебной колонки `номер`, негативные проверки и регрессия preview-счётчика.
 
@@ -14,6 +14,7 @@
 - Preview для RTF показывает источник `ПК РИК / RTF` и предупреждение, что ресурсы ОТ/ЭМ/М в первой версии не импортируются.
 - RTF-декодер ограничивает глубину вложенных групп; worker-парсер получил timeout, abort/terminate на unmount и игнор late result.
 - Проверка подписи РИК стала строже: требуется `ПК РИК` или `Наименование программного продукта`, а не произвольная подстрока `рик`.
+- Материальные строки RTF с дробным `№ п/п` (`3.1`, `6.1`, `17.2`) импортируются как вспомогательные `estimate_positions`, чтобы отображаться подстроками в графике работ.
 
 ### Ограничения
 - Поддерживается только RTF-выгрузка ПК РИК по зафиксированному контракту `docs/smeta-rtf/*`; произвольные RTF, `.doc/.docx`, OCR и импорт ресурсов не входят в первую версию.

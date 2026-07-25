@@ -85,6 +85,10 @@ function isIntegerLineNo(value: unknown): boolean {
   return /^[1-9]\d*$/.test(text(value));
 }
 
+function isDecimalLineNo(value: unknown): boolean {
+  return /^[1-9]\d*\.\d+$/.test(text(value));
+}
+
 function isNumericHeaderRow(row: string[], cols: HeaderMap): boolean {
   return text(row[cols.serviceNo]) === "1" && text(row[cols.lineNo]) === "2" && text(row[cols.code]) === "3";
 }
@@ -242,6 +246,22 @@ function isPositionRow(row: string[], cols: HeaderMap): boolean {
   );
 }
 
+function isAuxiliaryMaterialPositionRow(row: string[], cols: HeaderMap): boolean {
+  const code = text(row[cols.code]);
+  const line = norm(rowText(row));
+  return (
+    text(row[cols.serviceNo]) === "" &&
+    isDecimalLineNo(row[cols.lineNo]) &&
+    code !== "" &&
+    text(row[cols.name]) !== "" &&
+    text(row[cols.unit]) !== "" &&
+    sourceNumeric(row[cols.quantity]) !== null &&
+    !/^421\/пр/i.test(code) &&
+    !line.includes("применение сметных норм") &&
+    !isSkippedServiceRow(row, cols)
+  );
+}
+
 function looksLikeHeading(row: string[], cols: HeaderMap): string | null {
   if (isSkippedServiceRow(row, cols)) return null;
   const candidates = row.map(text).filter(Boolean);
@@ -353,6 +373,27 @@ export function parseRikRtfEstimateRows(
       };
       positions.push(position);
       pending = { lineNo, positionIndex: positions.length - 1 };
+      continue;
+    }
+
+    if (isAuxiliaryMaterialPositionRow(row, cols)) {
+      if (!sectionState.currentSectionNumber) {
+        addSection(sectionState, sections, "Без раздела", sectionOrder++);
+      }
+      positions.push({
+        sectionNumber: sectionState.currentSectionNumber,
+        lineNo: text(row[cols.lineNo]),
+        code: text(row[cols.code]) || null,
+        name: text(row[cols.name]),
+        unit: text(row[cols.unit]) || null,
+        quantity: normalizeNumeric(row[cols.quantity]),
+        baseCostPerUnit: cols.baseCostPerUnit !== null ? normalizeNumeric(row[cols.baseCostPerUnit]) : null,
+        indexValue: cols.indexValue !== null ? normalizeNumeric(row[cols.indexValue]) : null,
+        currentCostPerUnit: cols.currentCostPerUnit !== null ? normalizeNumeric(row[cols.currentCostPerUnit]) : null,
+        totalCurrentCost: cols.totalCurrentCost !== null ? normalizeNumeric(row[cols.totalCurrentCost]) : null,
+        notes: null,
+        orderIndex: positionOrder++,
+      });
       continue;
     }
 

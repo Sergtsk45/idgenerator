@@ -20,6 +20,8 @@ type GoldenContract = {
     estimateNo: string;
     title: string;
     expectedImportedPositionCount: number;
+    expectedAuxiliaryPositionCount?: number;
+    expectedTotalEstimatePositionCount?: number;
     expectedTotalMarkerCount: number;
     expectedLineNos: [number, number];
     sections: Array<{
@@ -103,16 +105,16 @@ test("RIK parser honors service-number regression vector", async () => {
   const result = parseRikRtfEstimateRows(rows, { fileName: "synthetic.rtf", requireRikSignature: false });
   const lineNos = result.payload.positions.map((p) => p.lineNo);
 
-  assert.equal(result.payload.positions.length, vector.expected.importedPositionCount);
-  assert.equal(result.payload.positions[0].lineNo, String(vector.expected.positions[0].lineNo));
-  assert.equal(result.payload.positions[0].code, vector.expected.positions[0].code);
-  assert.equal(result.payload.positions[0].name, vector.expected.positions[0].name);
-  assert.equal(result.payload.positions[0].unit, vector.expected.positions[0].unit);
-  assert.equal(result.payload.positions[0].quantity, normalizeNumber(vector.expected.positions[0].quantity));
-  assert.equal(result.payload.positions[0].totalCurrentCost, normalizeNumber(vector.expected.positions[0].total));
-  for (const forbidden of vector.expected.mustNotAppearAsLineNo) {
-    assert.equal(lineNos.includes(String(forbidden)), false);
-  }
+  const mainPositions = result.payload.positions.filter((position) => /^\d+$/.test(position.lineNo));
+  assert.equal(mainPositions.length, vector.expected.importedMainPositionCount);
+  assert.equal(mainPositions[0].lineNo, String(vector.expected.positions[0].lineNo));
+  assert.equal(mainPositions[0].code, vector.expected.positions[0].code);
+  assert.equal(mainPositions[0].name, vector.expected.positions[0].name);
+  assert.equal(mainPositions[0].unit, vector.expected.positions[0].unit);
+  assert.equal(mainPositions[0].quantity, normalizeNumber(vector.expected.positions[0].quantity));
+  assert.equal(mainPositions[0].totalCurrentCost, normalizeNumber(vector.expected.positions[0].total));
+  assert.equal(lineNos.includes("9001"), false);
+  assert.equal(lineNos.includes("7.1"), true);
 });
 
 test("RIK parser matches golden RTF contract", async () => {
@@ -127,7 +129,18 @@ test("RIK parser matches golden RTF contract", async () => {
 
     assert.equal(payload.estimate.code, fixture.estimateNo, fixture.file);
     assert.equal(payload.estimate.name, fixture.title, fixture.file);
-    assert.equal(payload.positions.length, fixture.expectedImportedPositionCount, fixture.file);
+    const mainPositions = payload.positions.filter((position) => /^\d+$/.test(position.lineNo));
+    assert.equal(mainPositions.length, fixture.expectedImportedPositionCount, fixture.file);
+    if (fixture.expectedAuxiliaryPositionCount !== undefined) {
+      assert.equal(
+        payload.positions.filter((position) => /^\d+\.\d+$/.test(position.lineNo)).length,
+        fixture.expectedAuxiliaryPositionCount,
+        fixture.file
+      );
+    }
+    if (fixture.expectedTotalEstimatePositionCount !== undefined) {
+      assert.equal(payload.positions.length, fixture.expectedTotalEstimatePositionCount, fixture.file);
+    }
     assert.equal(result.stats.totalMarkers, fixture.expectedTotalMarkerCount, fixture.file);
     assert.deepEqual(payload.resources, [], fixture.file);
 
@@ -135,7 +148,7 @@ test("RIK parser matches golden RTF contract", async () => {
       { length: fixture.expectedLineNos[1] - fixture.expectedLineNos[0] + 1 },
       (_v, idx) => String(fixture.expectedLineNos[0] + idx)
     );
-    assert.deepEqual(payload.positions.map((p) => p.lineNo), expectedLineNos, fixture.file);
+    assert.deepEqual(mainPositions.map((p) => p.lineNo), expectedLineNos, fixture.file);
 
     assert.deepEqual(
       payload.sections.map((section) => section.title),
@@ -178,6 +191,48 @@ test("RIK parser matches golden RTF contract", async () => {
     ]) {
       assert.equal(importedText.includes(forbidden), false, `${fixture.file}: forbidden ${forbidden}`);
     }
+  }
+});
+
+test("RIK parser imports material subrows as auxiliary estimate positions", async () => {
+  const fixtures = [
+    {
+      file: "docs/smeta-rtf/02-01-02 Ремонт системы отопления.rtf",
+      rows: [
+        ["3.1", "23.5.02.02-0055", "Трубы стальные электросварные прямошовные", "м", "100"],
+        ["3.2", "23.8.04.06-0072", "Отвод 90°", "шт", "20"],
+        ["3.3", "08.4.02.04-0001", "Каркасы металлические", "т", "1.5683"],
+      ],
+    },
+    {
+      file: "docs/smeta-rtf/02-01-04 Ремонт системы водоснабжения.rtf",
+      rows: [
+        ["6.1", "23.3.06.02-0006", "Трубы стальные сварные оцинкованные", "м", "100"],
+        ["17.1", "24.3.02.05-0004", "Трубы полипропиленовые ПП-Р", "м", "102.5"],
+        ["17.2", "23.1.02.06-0034", "Хомуты металлические оцинкованные", "10 шт", "5"],
+      ],
+    },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    const result = parseRikRtfEstimate(await readFile(fixture.file), { fileName: fixture.file.split("/").pop() });
+    const auxiliaryPositions = result.payload.positions.filter((position) => /^\d+\.\d+$/.test(position.lineNo));
+    assert.ok(auxiliaryPositions.length > 0, fixture.file);
+
+    for (const [lineNo, code, namePart, unit, quantity] of fixture.rows) {
+      const row = result.payload.positions.find((position) => position.lineNo === lineNo);
+      assert.ok(row, `${fixture.file}: missing auxiliary ${lineNo}`);
+      assert.equal(row.code, code);
+      assert.match(row.name, new RegExp(namePart));
+      assert.equal(row.unit, unit);
+      assert.equal(row.quantity, quantity);
+    }
+
+    assert.equal(
+      auxiliaryPositions.some((position) => String(position.code ?? "").startsWith("421/пр")),
+      false,
+      `${fixture.file}: coefficient rows must not be auxiliary positions`
+    );
   }
 });
 

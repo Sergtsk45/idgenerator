@@ -392,8 +392,8 @@ export default function Works() {
         parsed = result.payload;
         warnings = [
           language === "ru"
-            ? "Ресурсы ОТ/ЭМ/М в этой версии не импортируются."
-            : "Labor/machine/material resources are not imported in this version.",
+            ? "Ресурсы ОТ/ЭМ/М в таблицу ресурсов не импортируются; материальные подстроки импортируются как позиции сметы."
+            : "Labor/machine/material resources are not imported into resources; material subrows are imported as estimate positions.",
           ...result.warnings,
         ];
         stats = result.stats;
