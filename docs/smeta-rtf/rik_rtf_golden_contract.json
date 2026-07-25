@@ -1,0 +1,613 @@
+{
+  "schemaVersion": 1,
+  "format": "RIK RTF",
+  "contract": {
+    "lineNoSourceColumn": "№ п/п",
+    "ignoredSourceColumns": [
+      "номер"
+    ],
+    "positionStartRule": "A top-level data row is a position when both source columns 'номер' and '№ п/п' contain integers, the row has item fields (code, name, unit, quantity), and it is not the repeated numeric column header.",
+    "positionEndMarker": "Всего по позиции",
+    "codePrefixPolicy": "Do not filter positions by code prefix: ГЭСН/ГЭСНм/ГЭСНр, direct resource codes and ТЦ_ custom-price codes may all be top-level positions.",
+    "textNormalization": [
+      "replace non-breaking spaces with ordinary spaces",
+      "collapse repeated whitespace",
+      "normalize superscript unit digits to plain digits, for example м² -> м2",
+      "preserve source spelling; do not autocorrect titles"
+    ]
+  },
+  "fixtures": [
+    {
+      "file": "docs/smeta-rtf/02-01-02 Ремонт системы отопления.rtf",
+      "sha256": "f75cb720cd1d7ad7149bb7b5bbf2810d380489b4b51fdf9cd13fc78f85ad8b9f",
+      "estimateNo": "02-01-02",
+      "title": "Ремонт системы отопления",
+      "expectedImportedPositionCount": 43,
+      "expectedTotalMarkerCount": 43,
+      "expectedLineNos": [
+        1,
+        43
+      ],
+      "sections": [
+        {
+          "name": "Раздел 1. Система отопления ниже отм. 0,000 (подвал)",
+          "positionRange": [
+            1,
+            33
+          ],
+          "positionCount": 33,
+          "directPositionRange": [
+            1,
+            29
+          ],
+          "directPositionCount": 29,
+          "subsections": [
+            {
+              "name": "Строительные работы",
+              "positionRange": [
+                30,
+                33
+              ],
+              "positionCount": 4
+            }
+          ]
+        },
+        {
+          "name": "Раздел 2. Система отопления выше отм. 0,000 (МОП)",
+          "positionRange": [
+            34,
+            43
+          ],
+          "positionCount": 10,
+          "directPositionRange": [
+            34,
+            40
+          ],
+          "directPositionCount": 7,
+          "subsections": [
+            {
+              "name": "Строительные работы",
+              "positionRange": [
+                41,
+                43
+              ],
+              "positionCount": 3
+            }
+          ]
+        }
+      ],
+      "controlPositions": {
+        "start": [
+          {
+            "sourceRowIndex": 2,
+            "sourceServiceNumber": 1,
+            "lineNo": 1,
+            "code": "ГЭСН 16-02-010-03",
+            "name": "Изготовление элементов и сборка узлов стальных трубопроводов диаметром: 100 мм",
+            "unit": "10 м",
+            "sourceQuantity": "2",
+            "section": "Раздел 1. Система отопления ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "2 205,20",
+            "sourceTotal": "4 410,39"
+          },
+          {
+            "sourceRowIndex": 21,
+            "sourceServiceNumber": 2,
+            "lineNo": 2,
+            "code": "ГЭСН 16-02-010-12",
+            "name": "Добавлять на каждый последующий стык свыше одного, диаметр трубопровода: 100 мм",
+            "unit": "стык",
+            "sourceQuantity": "9",
+            "section": "Раздел 1. Система отопления ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "1 793,67",
+            "sourceTotal": "16 143,00"
+          },
+          {
+            "sourceRowIndex": 40,
+            "sourceServiceNumber": 3,
+            "lineNo": 3,
+            "code": "ГЭСН 16-02-005-05",
+            "name": "Прокладка трубопроводов отопления и водоснабжения из стальных электросварных труб диаметром: 100 мм",
+            "unit": "100 м",
+            "sourceQuantity": "0,2",
+            "section": "Раздел 1. Система отопления ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "535 405,90",
+            "sourceTotal": "107 081,18"
+          }
+        ],
+        "middle": [
+          {
+            "sourceRowIndex": 474,
+            "sourceServiceNumber": 21,
+            "lineNo": 21,
+            "code": "ГЭСН 16-02-013-07",
+            "name": "Изготовление элементов и сборка узлов стальных трубопроводов из неоцинкованных водогазопроводных труб на сварке диаметром: до 25 мм",
+            "unit": "10 м",
+            "sourceQuantity": "1,8",
+            "section": "Раздел 1. Система отопления ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "1 039,11",
+            "sourceTotal": "1 870,40"
+          },
+          {
+            "sourceRowIndex": 497,
+            "sourceServiceNumber": 22,
+            "lineNo": 22,
+            "code": "ГЭСН 16-02-013-11",
+            "name": "При гнутье труб ручным гидравлическим трубогибом добавлять на один гиб трубы к норме: 16-02-013-07",
+            "unit": "10 гибов",
+            "sourceQuantity": "0,6",
+            "section": "Раздел 1. Система отопления ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "235,65",
+            "sourceTotal": "141,39"
+          },
+          {
+            "sourceRowIndex": 508,
+            "sourceServiceNumber": 23,
+            "lineNo": 23,
+            "code": "ГЭСН 16-02-013-09",
+            "name": "Добавлять или исключать на каждый последующий сварной стык свыше пяти к норме: 16-02-013-07",
+            "unit": "100 стыков",
+            "sourceQuantity": "0,03",
+            "section": "Раздел 1. Система отопления ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "16 574,00",
+            "sourceTotal": "497,22"
+          }
+        ],
+        "end": [
+          {
+            "sourceRowIndex": 978,
+            "sourceServiceNumber": 41,
+            "lineNo": 41,
+            "code": "ГЭСН 13-03-002-04",
+            "name": "Огрунтовка металлических поверхностей за один раз: грунтовкой ГФ-021",
+            "unit": "100 м2",
+            "sourceQuantity": "0,0452",
+            "section": "Раздел 2. Система отопления выше отм. 0,000 (МОП)",
+            "subsection": "Строительные работы",
+            "sourceUnitPrice": "13 116,81",
+            "sourceTotal": "592,88"
+          },
+          {
+            "sourceRowIndex": 1003,
+            "sourceServiceNumber": 42,
+            "lineNo": 42,
+            "code": "ГЭСН 13-03-004-26",
+            "name": "Окраска металлических огрунтованных поверхностей: эмалью ПФ-115",
+            "unit": "100 м2",
+            "sourceQuantity": "0,0452",
+            "section": "Раздел 2. Система отопления выше отм. 0,000 (МОП)",
+            "subsection": "Строительные работы",
+            "sourceUnitPrice": "11 136,73",
+            "sourceTotal": "503,38"
+          },
+          {
+            "sourceRowIndex": 1030,
+            "sourceServiceNumber": 43,
+            "lineNo": 43,
+            "code": "ГЭСНр 62-01-016-05",
+            "name": "Окрашивание водоэмульсионными составами поверхностей стен, ранее окрашенных: водоэмульсионной краской с расчисткой старой краски свыше 10 до 35%",
+            "unit": "100 м2",
+            "sourceQuantity": "0,045",
+            "section": "Раздел 2. Система отопления выше отм. 0,000 (МОП)",
+            "subsection": "Строительные работы",
+            "sourceUnitPrice": "57 103,11",
+            "sourceTotal": "2 569,64"
+          }
+        ]
+      }
+    },
+    {
+      "file": "docs/smeta-rtf/02-01-04 Ремонт системы водоснабжения.rtf",
+      "sha256": "e403d289d6c828f8a8fff848c6ce0b7baed33bfb2621f00c635976af780b6acd",
+      "estimateNo": "02-01-04",
+      "title": "Ремонт системы водоснабжения",
+      "expectedImportedPositionCount": 48,
+      "expectedTotalMarkerCount": 48,
+      "expectedLineNos": [
+        1,
+        48
+      ],
+      "sections": [
+        {
+          "name": "Раздел 1. Хоз-питьевое водоснабжение (В1) ниже отм. 0,000 (подвал)",
+          "positionRange": [
+            1,
+            23
+          ],
+          "positionCount": 23,
+          "directPositionRange": [
+            1,
+            18
+          ],
+          "directPositionCount": 18,
+          "subsections": [
+            {
+              "name": "Гильзы для трубопроводов",
+              "positionRange": [
+                19,
+                19
+              ],
+              "positionCount": 1
+            },
+            {
+              "name": "Строительные работы",
+              "positionRange": [
+                20,
+                23
+              ],
+              "positionCount": 4
+            }
+          ]
+        },
+        {
+          "name": "Раздел 2. Горячее водоснабжение (Т3) ниже отм. 0,000 (подвал)",
+          "positionRange": [
+            24,
+            48
+          ],
+          "positionCount": 25,
+          "directPositionRange": [
+            24,
+            43
+          ],
+          "directPositionCount": 20,
+          "subsections": [
+            {
+              "name": "Гильзы для трубопроводов",
+              "positionRange": [
+                44,
+                44
+              ],
+              "positionCount": 1
+            },
+            {
+              "name": "Строительные работы",
+              "positionRange": [
+                45,
+                48
+              ],
+              "positionCount": 4
+            }
+          ]
+        }
+      ],
+      "controlPositions": {
+        "start": [
+          {
+            "sourceRowIndex": 2,
+            "sourceServiceNumber": 1,
+            "lineNo": 1,
+            "code": "ГЭСН 16-02-013-03",
+            "name": "Изготовление элементов и сборка узлов стальных трубопроводов из оцинкованных и неоцинкованных водогазопроводных труб на резьбе диаметром: 40 мм (прим. 65 мм)",
+            "unit": "10 м",
+            "sourceQuantity": "1",
+            "section": "Раздел 1. Хоз-питьевое водоснабжение (В1) ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "494,52",
+            "sourceTotal": "494,52"
+          },
+          {
+            "sourceRowIndex": 22,
+            "sourceServiceNumber": 2,
+            "lineNo": 2,
+            "code": "ГЭСН 16-02-013-06",
+            "name": "Добавлять или исключать на каждый последующий резьбовой стык свыше пяти к норме: 16-02-013-03",
+            "unit": "100 стыков",
+            "sourceQuantity": "0,04",
+            "section": "Раздел 1. Хоз-питьевое водоснабжение (В1) ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "1 435,50",
+            "sourceTotal": "57,42"
+          },
+          {
+            "sourceRowIndex": 37,
+            "sourceServiceNumber": 3,
+            "lineNo": 3,
+            "code": "ГЭСН 16-02-002-07",
+            "name": "Прокладка трубопроводов водоснабжения из стальных водогазопроводных оцинкованных труб диаметром: 65 мм",
+            "unit": "100 м",
+            "sourceQuantity": "0,1",
+            "section": "Раздел 1. Хоз-питьевое водоснабжение (В1) ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "298 479,40",
+            "sourceTotal": "29 847,94"
+          }
+        ],
+        "middle": [
+          {
+            "sourceRowIndex": 554,
+            "sourceServiceNumber": 23,
+            "lineNo": 23,
+            "code": "ГЭСН 46-03-017-01",
+            "name": "Заделка отверстий, гнезд и борозд: в перекрытиях железобетонных площадью до 0,1 м2",
+            "unit": "м3",
+            "sourceQuantity": "0,00965",
+            "section": "Раздел 1. Хоз-питьевое водоснабжение (В1) ниже отм. 0,000 (подвал)",
+            "subsection": "Строительные работы",
+            "sourceUnitPrice": "93 462,18",
+            "sourceTotal": "901,91"
+          },
+          {
+            "sourceRowIndex": 591,
+            "sourceServiceNumber": 24,
+            "lineNo": 24,
+            "code": "ГЭСН 16-02-013-03",
+            "name": "Изготовление элементов и сборка узлов стальных трубопроводов из оцинкованных и неоцинкованных водогазопроводных труб на резьбе диаметром: 40 мм (прим. 50 мм)",
+            "unit": "10 м",
+            "sourceQuantity": "0,5",
+            "section": "Раздел 2. Горячее водоснабжение (Т3) ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "494,56",
+            "sourceTotal": "247,28"
+          },
+          {
+            "sourceRowIndex": 611,
+            "sourceServiceNumber": 25,
+            "lineNo": 25,
+            "code": "ГЭСН 16-02-013-06",
+            "name": "Добавлять или исключать на каждый последующий резьбовой стык свыше пяти к норме: 16-02-013-03",
+            "unit": "100 стыков",
+            "sourceQuantity": "0,02",
+            "section": "Раздел 2. Горячее водоснабжение (Т3) ниже отм. 0,000 (подвал)",
+            "subsection": null,
+            "sourceUnitPrice": "1 435,50",
+            "sourceTotal": "28,71"
+          }
+        ],
+        "end": [
+          {
+            "sourceRowIndex": 1142,
+            "sourceServiceNumber": 46,
+            "lineNo": 46,
+            "code": "ГЭСН 13-03-002-04",
+            "name": "Огрунтовка металлических поверхностей за один раз: грунтовкой ГФ-021",
+            "unit": "100 м2",
+            "sourceQuantity": "0,0225",
+            "section": "Раздел 2. Горячее водоснабжение (Т3) ниже отм. 0,000 (подвал)",
+            "subsection": "Строительные работы",
+            "sourceUnitPrice": "13 117,78",
+            "sourceTotal": "295,15"
+          },
+          {
+            "sourceRowIndex": 1167,
+            "sourceServiceNumber": 47,
+            "lineNo": 47,
+            "code": "ГЭСН 13-03-004-26",
+            "name": "Окраска металлических огрунтованных поверхностей: эмалью ПФ-115",
+            "unit": "100 м2",
+            "sourceQuantity": "0,0225",
+            "section": "Раздел 2. Горячее водоснабжение (Т3) ниже отм. 0,000 (подвал)",
+            "subsection": "Строительные работы",
+            "sourceUnitPrice": "11 136,00",
+            "sourceTotal": "250,56"
+          },
+          {
+            "sourceRowIndex": 1194,
+            "sourceServiceNumber": 48,
+            "lineNo": 48,
+            "code": "ГЭСН 46-03-017-01",
+            "name": "Заделка отверстий, гнезд и борозд: в перекрытиях железобетонных площадью до 0,1 м2",
+            "unit": "м3",
+            "sourceQuantity": "0,00965",
+            "section": "Раздел 2. Горячее водоснабжение (Т3) ниже отм. 0,000 (подвал)",
+            "subsection": "Строительные работы",
+            "sourceUnitPrice": "93 462,18",
+            "sourceTotal": "901,91"
+          }
+        ]
+      }
+    },
+    {
+      "file": "docs/smeta-rtf/02-01-05 Водомерный узел.rtf",
+      "sha256": "ea15f507b5a612c63deecd6e687f7d5a4e619e98e62273a960b84856a7c8914e",
+      "estimateNo": "02-01-05",
+      "title": "Водомерый узел",
+      "expectedImportedPositionCount": 37,
+      "expectedTotalMarkerCount": 37,
+      "expectedLineNos": [
+        1,
+        37
+      ],
+      "sections": [
+        {
+          "name": "Водомерный узел ХВС ниже отм. 0,000",
+          "positionRange": [
+            1,
+            28
+          ],
+          "positionCount": 28,
+          "directPositionRange": [
+            1,
+            16
+          ],
+          "directPositionCount": 16,
+          "subsections": [
+            {
+              "name": "Строительные работы",
+              "positionRange": [
+                17,
+                18
+              ],
+              "positionCount": 2
+            },
+            {
+              "name": "Автоматизация узла учета водоснабжения",
+              "positionRange": [
+                19,
+                28
+              ],
+              "positionCount": 10
+            }
+          ]
+        },
+        {
+          "name": "Раздел 1. Устройство технической площадки приямка",
+          "positionRange": [
+            29,
+            37
+          ],
+          "positionCount": 9,
+          "directPositionRange": null,
+          "directPositionCount": 0,
+          "subsections": [
+            {
+              "name": "Устройство бетонного основания",
+              "positionRange": [
+                29,
+                32
+              ],
+              "positionCount": 4
+            },
+            {
+              "name": "Устройство приямка",
+              "positionRange": [
+                33,
+                34
+              ],
+              "positionCount": 2
+            },
+            {
+              "name": "Устройство сетчатого ограждения",
+              "positionRange": [
+                35,
+                37
+              ],
+              "positionCount": 3
+            }
+          ]
+        }
+      ],
+      "controlPositions": {
+        "start": [
+          {
+            "sourceRowIndex": 2,
+            "sourceServiceNumber": 1,
+            "lineNo": 1,
+            "code": "ГЭСН 16-06-005-01",
+            "name": "Установка счетчиков (водомеров) диаметром: до 40 мм",
+            "unit": "шт",
+            "sourceQuantity": "1",
+            "section": "Водомерный узел ХВС ниже отм. 0,000",
+            "subsection": null,
+            "sourceUnitPrice": "724,41",
+            "sourceTotal": "724,41"
+          },
+          {
+            "sourceRowIndex": 24,
+            "sourceServiceNumber": 2,
+            "lineNo": 2,
+            "code": "65.1.01.01-1119",
+            "name": "Счетчик холодной и горячей воды с импульсным выходом, универсальный, крыльчатый многоструйный, присоединение резьбовое, диаметр условного прохода 40 мм",
+            "unit": "шт",
+            "sourceQuantity": "1",
+            "section": "Водомерный узел ХВС ниже отм. 0,000",
+            "subsection": null,
+            "sourceUnitPrice": "11 559,94",
+            "sourceTotal": "11 559,94"
+          },
+          {
+            "sourceRowIndex": 26,
+            "sourceServiceNumber": 3,
+            "lineNo": 3,
+            "code": "ГЭСН 16-05-001-03",
+            "name": "Установка вентилей, задвижек, затворов, клапанов обратных, кранов проходных на трубопроводах из стальных труб диаметром: до 100 мм",
+            "unit": "шт",
+            "sourceQuantity": "4",
+            "section": "Водомерный узел ХВС ниже отм. 0,000",
+            "subsection": null,
+            "sourceUnitPrice": "11 063,85",
+            "sourceTotal": "44 255,39"
+          }
+        ],
+        "middle": [
+          {
+            "sourceRowIndex": 322,
+            "sourceServiceNumber": 18,
+            "lineNo": 18,
+            "code": "ГЭСН 13-03-004-26",
+            "name": "Окраска металлических огрунтованных поверхностей: эмалью ПФ-115",
+            "unit": "100 м2",
+            "sourceQuantity": "0,0127",
+            "section": "Водомерный узел ХВС ниже отм. 0,000",
+            "subsection": "Строительные работы",
+            "sourceUnitPrice": "8 840,94",
+            "sourceTotal": "112,28"
+          },
+          {
+            "sourceRowIndex": 350,
+            "sourceServiceNumber": 19,
+            "lineNo": 19,
+            "code": "ГЭСНм 11-03-001-01",
+            "name": "Приборы, устанавливаемые на металлоконструкциях, щитах и пультах, масса: до 5 кг",
+            "unit": "шт",
+            "sourceQuantity": "1",
+            "section": "Водомерный узел ХВС ниже отм. 0,000",
+            "subsection": "Автоматизация узла учета водоснабжения",
+            "sourceUnitPrice": "984,85",
+            "sourceTotal": "984,85"
+          },
+          {
+            "sourceRowIndex": 366,
+            "sourceServiceNumber": 20,
+            "lineNo": 20,
+            "code": "ТЦ_65.1.01.03_27_2724168690_13.06.2025_02_19.1 (Цена согласно конъюнктурного анализа 10 000,00 руб (с НДС) п.20.18)",
+            "name": "Счетчик импульсов-регистратор (6-канальный с индикатором)",
+            "unit": "шт",
+            "sourceQuantity": "1",
+            "section": "Водомерный узел ХВС ниже отм. 0,000",
+            "subsection": "Автоматизация узла учета водоснабжения",
+            "sourceUnitPrice": "8 686,33",
+            "sourceTotal": "8 686,33"
+          }
+        ],
+        "end": [
+          {
+            "sourceRowIndex": 710,
+            "sourceServiceNumber": 35,
+            "lineNo": 35,
+            "code": "ГЭСН 09-03-040-01",
+            "name": "Монтаж защитных ограждений оборудования",
+            "unit": "т",
+            "sourceQuantity": "0,128",
+            "section": "Раздел 1. Устройство технической площадки приямка",
+            "subsection": "Устройство сетчатого ограждения",
+            "sourceUnitPrice": "284 889,84",
+            "sourceTotal": "36 465,90"
+          },
+          {
+            "sourceRowIndex": 748,
+            "sourceServiceNumber": 36,
+            "lineNo": 36,
+            "code": "ГЭСН 13-03-002-04",
+            "name": "Огрунтовка металлических поверхностей за один раз: грунтовкой ГФ-021",
+            "unit": "100 м2",
+            "sourceQuantity": "0,1272",
+            "section": "Раздел 1. Устройство технической площадки приямка",
+            "subsection": "Устройство сетчатого ограждения",
+            "sourceUnitPrice": "9 831,84",
+            "sourceTotal": "1 250,61"
+          },
+          {
+            "sourceRowIndex": 773,
+            "sourceServiceNumber": 37,
+            "lineNo": 37,
+            "code": "ГЭСН 13-03-004-26",
+            "name": "Окраска металлических огрунтованных поверхностей: эмалью ПФ-115",
+            "unit": "100 м2",
+            "sourceQuantity": "0,1272",
+            "section": "Раздел 1. Устройство технической площадки приямка",
+            "subsection": "Устройство сетчатого ограждения",
+            "sourceUnitPrice": "8 842,37",
+            "sourceTotal": "1 124,75"
+          }
+        ]
+      }
+    }
+  ]
+}

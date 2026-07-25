@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-07-25] - Импорт смет из RTF ПК РИК
+
+### Добавлено
+- `client/src/lib/rikRtfTableExtractor.ts` — безопасное клиентское извлечение табличных строк из RTF (`ansicpg1251`, `\'hh`, `\uN`, `\binN`, пропуск служебных destinations и лимиты размера/строк/ячеек).
+- `client/src/lib/rikRtfEstimateParser.ts` — парсер RTF-выгрузки ПК РИК в существующий `ParsedEstimateImportPayload`; ресурсы первой версии не импортируются.
+- `client/src/workers/rik-rtf.worker.ts` и `client/src/lib/rikRtfWorkerClient.ts` — запуск RTF-парсинга в Web Worker, чтобы не блокировать `/works`.
+- `tests/rik-rtf-parser.test.ts` — контрактные тесты на три эталонных RTF, synthetic vector служебной колонки `номер`, негативные проверки и регрессия preview-счётчика.
+
+### Изменено
+- `/works`: импорт смет теперь принимает `.xlsx,.xls,.rtf`; Excel идёт через прежний `parseEstimateWorkbook`, RTF ПК РИК — через новый worker-парсер.
+- Preview импорта сметы считает `sectionCount`/`positionCount` по плоским `parsed.sections.length` и `parsed.positions.length`; исправлен старый Excel-preview счётчик, который искал `sections[].positions`.
+- Preview для RTF показывает источник `ПК РИК / RTF` и предупреждение, что ресурсы ОТ/ЭМ/М в первой версии не импортируются.
+
+### Ограничения
+- Поддерживается только RTF-выгрузка ПК РИК по зафиксированному контракту `docs/smeta-rtf/*`; произвольные RTF, `.doc/.docx`, OCR и импорт ресурсов не входят в первую версию.
+
 ## [2026-07-24] - Документы качества: scoping по объекту
 
 ### Добавлено

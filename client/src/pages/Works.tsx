@@ -35,7 +35,9 @@ import { OdooTable, OdooTHead, OdooTh, OdooTBody, OdooTr, OdooTd } from "@/compo
 import { WorkItemCard } from "@/components/WorkItemCard";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
-import { parseEstimateWorkbook } from "@/lib/estimateParser";
+import { parseEstimateWorkbook, type ParsedEstimateImportPayload } from "@/lib/estimateParser";
+import { parseRikRtfEstimateInWorker } from "@/lib/rikRtfWorkerClient";
+import type { RikRtfEstimateParseStats } from "@/lib/rikRtfEstimateParser";
 
 // Task 3.4: Import preview types
 type WorksImportPreview = {
@@ -45,9 +47,12 @@ type WorksImportPreview = {
 };
 type EstimateImportPreview = {
   fileName: string;
+  source: "excel" | "rik-rtf";
   sectionCount: number;
   positionCount: number;
-  parsed: any;
+  parsed: ParsedEstimateImportPayload;
+  warnings?: string[];
+  stats?: RikRtfEstimateParseStats;
 };
 
 export default function Works() {
@@ -147,6 +152,38 @@ export default function Works() {
       reader.onload = () => resolve(reader.result as ArrayBuffer);
       reader.readAsArrayBuffer(file);
     });
+  };
+
+  const getFileExtension = (fileName: string): string => {
+    const idx = fileName.lastIndexOf(".");
+    return idx === -1 ? "" : fileName.slice(idx).toLowerCase();
+  };
+
+  const formatRikRtfError = (message: string): string => {
+    const messages: Record<string, string> = {
+      RTF_IMPORT_EMPTY_FILE: language === "ru" ? "Файл RTF пустой." : "The RTF file is empty.",
+      RTF_IMPORT_FILE_LIMIT_EXCEEDED:
+        language === "ru" ? "Файл RTF превышает допустимый размер 15 МБ." : "The RTF file exceeds the 15 MB limit.",
+      RTF_IMPORT_INVALID_SIGNATURE:
+        language === "ru" ? "Файл не похож на RTF-документ." : "The file does not look like an RTF document.",
+      RTF_IMPORT_UNSUPPORTED_RIK_EXPORT:
+        language === "ru" ? "RTF не похож на поддерживаемую выгрузку ПК РИК." : "The RTF is not a supported PK RIK export.",
+      RTF_IMPORT_HEADER_NOT_FOUND:
+        language === "ru" ? "В RTF не найдена таблица сметы с нужными колонками." : "No estimate table with required columns was found in the RTF.",
+      RTF_IMPORT_NO_POSITIONS:
+        language === "ru" ? "В RTF не распознано ни одной позиции сметы." : "No estimate positions were recognized in the RTF.",
+      RTF_IMPORT_ROW_LIMIT_EXCEEDED:
+        language === "ru" ? "RTF содержит слишком много строк для импорта." : "The RTF contains too many rows to import.",
+      RTF_IMPORT_CELL_COUNT_LIMIT_EXCEEDED:
+        language === "ru" ? "RTF содержит таблицу со слишком большим числом ячеек." : "The RTF contains a table with too many cells.",
+      RTF_IMPORT_CELL_LIMIT_EXCEEDED:
+        language === "ru" ? "RTF содержит слишком длинную ячейку таблицы." : "The RTF contains an overlong table cell.",
+      RTF_IMPORT_CORRUPTED_HEX_ESCAPE:
+        language === "ru" ? "RTF повреждён: некорректная escape-последовательность." : "The RTF is corrupted: invalid escape sequence.",
+      RTF_IMPORT_WORKER_FAILED:
+        language === "ru" ? "Не удалось запустить разбор RTF в браузере." : "Failed to parse the RTF in the browser.",
+    };
+    return messages[message] ?? message;
   };
 
   const isValidWorkCode = (code: string): boolean => {
@@ -301,37 +338,70 @@ export default function Works() {
 
   // Task 3.4: handleEstimateFileUpload — parse then show preview, don't import yet
   const handleEstimateFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
     const file = event.target.files?.[0];
     if (!file) return;
 
     setIsImportingEstimate(true);
     try {
-      const buffer = await readFileAsArrayBuffer(file);
-      const data = new Uint8Array(buffer);
-
-      let workbook: XLSX.WorkBook;
-      try {
-        workbook = XLSX.read(data, { type: "array" });
-      } catch {
+      const ext = getFileExtension(file.name);
+      if (![".xlsx", ".xls", ".rtf"].includes(ext)) {
         throw new Error(
           language === "ru"
-            ? "Не удалось прочитать Excel файл сметы. Проверьте формат (.xlsx/.xls) и целостность."
-            : "Failed to read estimate Excel file. Check format (.xlsx/.xls) and file integrity."
+            ? "Неподдерживаемый формат сметы. Используйте .xlsx, .xls или .rtf (ПК РИК)."
+            : "Unsupported estimate format. Use .xlsx, .xls, or .rtf (PK RIK)."
         );
       }
 
-      const parsed = parseEstimateWorkbook(workbook, { fileName: file.name });
+      const buffer = await readFileAsArrayBuffer(file);
+      let parsed: ParsedEstimateImportPayload;
+      let source: EstimateImportPreview["source"] = "excel";
+      let warnings: string[] | undefined;
+      let stats: RikRtfEstimateParseStats | undefined;
+
+      if (ext === ".rtf") {
+        if (file.size > 15 * 1024 * 1024) {
+          throw new Error(formatRikRtfError("RTF_IMPORT_FILE_LIMIT_EXCEEDED"));
+        }
+        const signature = new TextDecoder("ascii").decode(new Uint8Array(buffer.slice(0, 5)));
+        if (signature !== "{\\rtf") {
+          throw new Error(formatRikRtfError("RTF_IMPORT_INVALID_SIGNATURE"));
+        }
+        const result = await parseRikRtfEstimateInWorker(buffer, file.name);
+        parsed = result.payload;
+        warnings = [
+          language === "ru"
+            ? "Ресурсы ОТ/ЭМ/М в этой версии не импортируются."
+            : "Labor/machine/material resources are not imported in this version.",
+          ...result.warnings,
+        ];
+        stats = result.stats;
+        source = "rik-rtf";
+      } else {
+        const data = new Uint8Array(buffer);
+        let workbook: XLSX.WorkBook;
+        try {
+          workbook = XLSX.read(data, { type: "array" });
+        } catch {
+          throw new Error(
+            language === "ru"
+              ? "Не удалось прочитать Excel файл сметы. Проверьте формат (.xlsx/.xls) и целостность."
+              : "Failed to read estimate Excel file. Check format (.xlsx/.xls) and file integrity."
+          );
+        }
+        parsed = parseEstimateWorkbook(workbook, { fileName: file.name });
+      }
+
       const sectionCount = Array.isArray(parsed?.sections) ? parsed.sections.length : 0;
-      const positionCount = Array.isArray(parsed?.sections)
-        ? parsed.sections.reduce((acc: number, s: any) => acc + (Array.isArray(s?.positions) ? s.positions.length : 0), 0)
-        : 0;
+      const positionCount = Array.isArray(parsed?.positions) ? parsed.positions.length : 0;
 
       // Task 3.4: Show preview instead of importing immediately
-      setEstimateImportPreview({ fileName: file.name, sectionCount, positionCount, parsed });
+      setEstimateImportPreview({ fileName: file.name, source, sectionCount, positionCount, parsed, warnings, stats });
       setIsImportingEstimate(false);
       return;
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const rawMsg = error instanceof Error ? error.message : String(error);
+      const msg = formatRikRtfError(rawMsg);
       toast({
         title: language === "ru" ? "Ошибка импорта сметы" : "Estimate import error",
         description: msg,
@@ -339,6 +409,7 @@ export default function Works() {
       });
     } finally {
       setIsImportingEstimate(false);
+      input.value = "";
     }
   };
 
@@ -619,7 +690,7 @@ export default function Works() {
               : te?.import ?? (language === "ru" ? "Импорт сметы" : "Import estimate")}
             <input
               type="file"
-              accept=".xlsx, .xls"
+              accept=".xlsx,.xls,.rtf"
               className="hidden"
               onChange={handleEstimateFileUpload}
               data-testid="input-estimate-file-upload"
@@ -715,8 +786,16 @@ export default function Works() {
             <AlertDialogTitle>{language === "ru" ? "Подтверждение импорта сметы" : "Confirm Estimate Import"}</AlertDialogTitle>
             <AlertDialogDescription>
               {language === "ru"
-                ? `Файл: ${estimateImportPreview?.fileName}. Разделов: ${estimateImportPreview?.sectionCount}, позиций: ${estimateImportPreview?.positionCount}. Начать импорт?`
-                : `File: ${estimateImportPreview?.fileName}. Sections: ${estimateImportPreview?.sectionCount}, positions: ${estimateImportPreview?.positionCount}. Start import?`}
+                ? `Файл: ${estimateImportPreview?.fileName}. Источник: ${
+                    estimateImportPreview?.source === "rik-rtf" ? "ПК РИК / RTF" : "Excel"
+                  }. Разделов: ${estimateImportPreview?.sectionCount}, позиций: ${estimateImportPreview?.positionCount}.${
+                    estimateImportPreview?.warnings?.length ? ` ${estimateImportPreview.warnings.join(" ")}` : ""
+                  } Начать импорт?`
+                : `File: ${estimateImportPreview?.fileName}. Source: ${
+                    estimateImportPreview?.source === "rik-rtf" ? "PK RIK / RTF" : "Excel"
+                  }. Sections: ${estimateImportPreview?.sectionCount}, positions: ${estimateImportPreview?.positionCount}.${
+                    estimateImportPreview?.warnings?.length ? ` ${estimateImportPreview.warnings.join(" ")}` : ""
+                  } Start import?`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

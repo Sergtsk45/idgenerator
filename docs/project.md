@@ -237,10 +237,10 @@ flowchart LR
 - `act_material_usages`: список материалов для п.3 АОСР "При выполнении работ применены…" (с порядком, опциональной привязкой к работе/партии/документу качества).
 - `act_document_attachments`: формальные приложения к АОСР (уникально по (actId, documentId)), отдельно от `attachments`.
 - `works`: позиции ВОР/ВОИР (код, описание, единицы, плановый объём, синонимы).
-- `estimates`: шапка сметы/ЛСР (код, название, регион/квартал, итоги) — импортируется из Excel-выгрузки ГРАНД‑Сметы.
-- `estimate_sections`: разделы сметы (номер/название) — опционально (если файл содержит "Раздел N...").
+- `estimates`: шапка сметы/ЛСР (код, название, регион/квартал, итоги) — импортируется из Excel-выгрузки ГРАНД‑Сметы или клиентского RTF-экспорта ПК РИК.
+- `estimate_sections`: разделы сметы (номер/название) — опционально (если файл содержит "Раздел N..."). Для RTF ПК РИК разделы/подразделы сплющиваются в плоские номера (`0`, `1`, `1.1`, ...), чтобы использовать существующую схему.
 - `estimate_positions`: позиции сметы (№ п/п, обоснование/шифр, наименование, ед. изм., количество, суммы/примечания).
-- `position_resources`: ресурсы внутри позиции сметы (код/тип, наименование, ед. изм., количество, суммы).
+- `position_resources`: ресурсы внутри позиции сметы (код/тип, наименование, ед. изм., количество, суммы). Для первой версии RTF ПК РИК ресурсы не импортируются (`resources: []`).
 - `messages`: исходный текст, нормализованные поля (json), флаги обработки.
 - `acts`: акты АОСР (глобальный номер `actNumber`, **тип акта** `actTemplateId`, период `dateStart/dateEnd`, статус, агрегированные работы `worksData` (json) + агрегированные поля документации из задач (`projectDrawingsAgg`, `normativeRefsAgg`, `executiveSchemesAgg`)).
 - `attachments`: вложения к актам (url/name/type).
@@ -381,7 +381,7 @@ objects
 - **Act material usages**: `GET /api/acts/:id/material-usages`, `PUT /api/acts/:id/material-usages`
 - **Act document attachments**: `GET /api/acts/:id/document-attachments`, `PUT /api/acts/:id/document-attachments`
 - **Works**: `GET /api/works`, `POST /api/works`
-- **Estimates (Смета/ЛСР)**: `GET /api/estimates`, `GET /api/estimates/:id`, `POST /api/estimates/import`, `DELETE /api/estimates/:id` (опц. `?resetSchedule=1` — сбросить график/акты, если смета используется как источник графика)
+- **Estimates (Смета/ЛСР)**: `GET /api/estimates`, `GET /api/estimates/:id`, `POST /api/estimates/import`, `DELETE /api/estimates/:id` (опц. `?resetSchedule=1` — сбросить график/акты, если смета используется как источник графика). `/works` поддерживает импорт `.xlsx/.xls` через текущий Excel-парсер и `.rtf` ПК РИК через клиентский Web Worker; исходный RTF не отправляется на сервер, API получает только существующий JSON payload.
 - **Messages**: `GET /api/messages`, `POST /api/messages`, `PATCH /api/messages/:id`, `POST /api/messages/:id/process`
 - **Voice**: `POST /api/voice/transcribe` — загрузка аудио (FormData, поле `audio`, до 10 MB), транскрипция через OpenAI Whisper, возврат `{ text }`. Rate limit: 10 req/min.
 - **Acts**: `GET /api/acts`, `GET /api/acts/:id`, `POST /api/acts/:id/export`
