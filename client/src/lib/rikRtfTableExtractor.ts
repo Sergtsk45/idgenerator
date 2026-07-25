@@ -7,6 +7,7 @@
 
 export type RikRtfTableExtractorLimits = {
   maxFileBytes: number;
+  maxGroupDepth: number;
   maxRows: number;
   maxCellsPerRow: number;
   maxCellChars: number;
@@ -25,6 +26,7 @@ export type RikRtfTableExtractionResult = {
 
 export const DEFAULT_RIK_RTF_LIMITS: RikRtfTableExtractorLimits = {
   maxFileBytes: 15 * 1024 * 1024,
+  maxGroupDepth: 512,
   maxRows: 20_000,
   maxCellsPerRow: 80,
   maxCellChars: 20_000,
@@ -156,6 +158,9 @@ export function extractRikRtfTableRows(
     const state = current();
 
     if (byte === 123) {
+      if (stack.length >= limits.maxGroupDepth) {
+        throw new Error("RTF_IMPORT_GROUP_DEPTH_LIMIT_EXCEEDED");
+      }
       stack.push({ ...state });
       continue;
     }

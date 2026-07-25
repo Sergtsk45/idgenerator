@@ -162,7 +162,7 @@ function hasRikSignature(rows: string[][]): boolean {
   const first = norm(rows.slice(0, 80).map(rowText).join("\n"));
   return (
     first.includes("локальный сметный расчет") &&
-    (first.includes("пк рик") || first.includes("наименование программного продукта") || first.includes("рик"))
+    (first.includes("пк рик") || first.includes("наименование программного продукта"))
   );
 }
 
@@ -224,7 +224,7 @@ function isSkippedServiceRow(row: string[], cols: HeaderMap): boolean {
     line.includes("итоги по смете") ||
     line.includes("всего по смете") ||
     line === "справочно" ||
-    line.includes("фот") ||
+    /(^|\s)фот($|\s)/.test(line) ||
     /^пр\/(812|774)/i.test(text(row[cols.code])) ||
     /^(от|эм|м|нр|сп|\d+\s+(от|эм|м))$/i.test(text(row[cols.name]))
   );
@@ -254,6 +254,7 @@ function looksLikeHeading(row: string[], cols: HeaderMap): string | null {
   if (!value || n.includes("локальный сметный расчет") || n.includes("обоснование") || n.includes("составлен")) return null;
   if (/^(согласовано|утверждаю|номер|№ п\/п|в том числе)$/i.test(value)) return null;
   if (/^формула ценообразования/i.test(value)) return null;
+  if (/(^|,\s*)(зт|зтм|эм|м)\s*:/i.test(value)) return null;
   if (/^(от|эм|м|фот|нр|сп)$/i.test(value)) return null;
   return value;
 }
@@ -328,6 +329,10 @@ export function parseRikRtfEstimateRows(
     }
 
     if (isPositionRow(row, cols)) {
+      if (pending) {
+        warnings.push(`Позиция ${pending.lineNo} не содержит строки "Всего по позиции"; сумма оставлена из основной строки или пустой`);
+        pending = null;
+      }
       if (!sectionState.currentSectionNumber) {
         addSection(sectionState, sections, "Без раздела", sectionOrder++);
       }
@@ -351,10 +356,13 @@ export function parseRikRtfEstimateRows(
       continue;
     }
 
-    const heading = pending ? null : looksLikeHeading(row, cols);
+    const heading = looksLikeHeading(row, cols);
     if (heading) {
+      if (pending) {
+        warnings.push(`Позиция ${pending.lineNo} не содержит строки "Всего по позиции" перед новым разделом`);
+        pending = null;
+      }
       addSection(sectionState, sections, heading, sectionOrder++);
-      pending = null;
       continue;
     }
 

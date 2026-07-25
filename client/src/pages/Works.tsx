@@ -7,7 +7,7 @@
  * @updated: 2026-03-13
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveShell } from "@/components/ResponsiveShell";
 import { useWorks, useImportWorks, useClearWorks } from "@/hooks/use-works";
 import { useDeleteWorkCollection, useWorkCollection, useWorkCollections } from "@/hooks/use-work-collections";
@@ -36,7 +36,7 @@ import { WorkItemCard } from "@/components/WorkItemCard";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { parseEstimateWorkbook, type ParsedEstimateImportPayload } from "@/lib/estimateParser";
-import { parseRikRtfEstimateInWorker } from "@/lib/rikRtfWorkerClient";
+import { parseRikRtfEstimateInWorker, type RikRtfWorkerParseHandle } from "@/lib/rikRtfWorkerClient";
 import type { RikRtfEstimateParseStats } from "@/lib/rikRtfEstimateParser";
 
 // Task 3.4: Import preview types
@@ -90,6 +90,16 @@ export default function Works() {
   // Task 3.4: Import preview state
   const [worksImportPreview, setWorksImportPreview] = useState<WorksImportPreview | null>(null);
   const [estimateImportPreview, setEstimateImportPreview] = useState<EstimateImportPreview | null>(null);
+  const isMountedRef = useRef(true);
+  const currentRikRtfParseRef = useRef<RikRtfWorkerParseHandle | null>(null);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      currentRikRtfParseRef.current?.abort();
+      currentRikRtfParseRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const list = estimatesQuery.data ?? [];
@@ -178,10 +188,14 @@ export default function Works() {
         language === "ru" ? "RTF содержит таблицу со слишком большим числом ячеек." : "The RTF contains a table with too many cells.",
       RTF_IMPORT_CELL_LIMIT_EXCEEDED:
         language === "ru" ? "RTF содержит слишком длинную ячейку таблицы." : "The RTF contains an overlong table cell.",
+      RTF_IMPORT_GROUP_DEPTH_LIMIT_EXCEEDED:
+        language === "ru" ? "RTF содержит слишком глубокую вложенность групп." : "The RTF contains too many nested groups.",
       RTF_IMPORT_CORRUPTED_HEX_ESCAPE:
         language === "ru" ? "RTF повреждён: некорректная escape-последовательность." : "The RTF is corrupted: invalid escape sequence.",
       RTF_IMPORT_WORKER_FAILED:
         language === "ru" ? "Не удалось запустить разбор RTF в браузере." : "Failed to parse the RTF in the browser.",
+      RTF_IMPORT_WORKER_TIMEOUT:
+        language === "ru" ? "Разбор RTF занял слишком много времени и был остановлен." : "RTF parsing took too long and was stopped.",
     };
     return messages[message] ?? message;
   };
@@ -343,6 +357,7 @@ export default function Works() {
     if (!file) return;
 
     setIsImportingEstimate(true);
+    let parseHandleForThisRun: RikRtfWorkerParseHandle | null = null;
     try {
       const ext = getFileExtension(file.name);
       if (![".xlsx", ".xls", ".rtf"].includes(ext)) {
@@ -367,7 +382,13 @@ export default function Works() {
         if (signature !== "{\\rtf") {
           throw new Error(formatRikRtfError("RTF_IMPORT_INVALID_SIGNATURE"));
         }
-        const result = await parseRikRtfEstimateInWorker(buffer, file.name);
+        currentRikRtfParseRef.current?.abort();
+        const parseHandle = parseRikRtfEstimateInWorker(buffer, file.name);
+        parseHandleForThisRun = parseHandle;
+        currentRikRtfParseRef.current = parseHandle;
+        const result = await parseHandle.promise;
+        if (!isMountedRef.current || currentRikRtfParseRef.current !== parseHandle) return;
+        currentRikRtfParseRef.current = null;
         parsed = result.payload;
         warnings = [
           language === "ru"
@@ -396,11 +417,18 @@ export default function Works() {
       const positionCount = Array.isArray(parsed?.positions) ? parsed.positions.length : 0;
 
       // Task 3.4: Show preview instead of importing immediately
-      setEstimateImportPreview({ fileName: file.name, source, sectionCount, positionCount, parsed, warnings, stats });
-      setIsImportingEstimate(false);
+      if (isMountedRef.current) {
+        setEstimateImportPreview({ fileName: file.name, source, sectionCount, positionCount, parsed, warnings, stats });
+        setIsImportingEstimate(false);
+      }
       return;
     } catch (error) {
+      if (parseHandleForThisRun && currentRikRtfParseRef.current === parseHandleForThisRun) {
+        currentRikRtfParseRef.current = null;
+      }
+      if (!isMountedRef.current) return;
       const rawMsg = error instanceof Error ? error.message : String(error);
+      if (rawMsg === "RTF_IMPORT_WORKER_ABORTED") return;
       const msg = formatRikRtfError(rawMsg);
       toast({
         title: language === "ru" ? "Ошибка импорта сметы" : "Estimate import error",
@@ -408,7 +436,7 @@ export default function Works() {
         variant: "destructive",
       });
     } finally {
-      setIsImportingEstimate(false);
+      if (isMountedRef.current) setIsImportingEstimate(false);
       input.value = "";
     }
   };

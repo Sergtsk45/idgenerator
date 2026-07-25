@@ -90,6 +90,10 @@ test("RTF extractor rejects invalid signature, empty input and configured limits
     () => extractRikRtfTableRows(bytes("{\\rtf1\\ansi\\trowd a\\cell\\row}"), { limits: { maxRows: 0 } }),
     /RTF_IMPORT_ROW_LIMIT_EXCEEDED/
   );
+  assert.throws(
+    () => extractRikRtfTableRows(bytes("{\\rtf1\\ansi{{{deep}}}}"), { limits: { maxGroupDepth: 2 } }),
+    /RTF_IMPORT_GROUP_DEPTH_LIMIT_EXCEEDED/
+  );
 });
 
 test("RIK parser honors service-number regression vector", async () => {
@@ -194,6 +198,17 @@ test("RIK parser rejects unsupported and structurally invalid RTF", () => {
     () =>
       parseRikRtfEstimateRows(
         [
+          ["ЛОКАЛЬНЫЙ СМЕТНЫЙ РАСЧЕТ (СМЕТА) № 1", "слово рикошет не является подписью продукта"],
+          ["номер", "№ п/п", "Обоснование", "Наименование работ и затрат", "Единица измерения", "Количество"],
+        ],
+        { fileName: "not-rik.rtf" }
+      ),
+    /RTF_IMPORT_UNSUPPORTED_RIK_EXPORT/
+  );
+  assert.throws(
+    () =>
+      parseRikRtfEstimateRows(
+        [
           ["Наименование программного продукта", "ПК РИК"],
           ["ЛОКАЛЬНЫЙ СМЕТНЫЙ РАСЧЕТ (СМЕТА) № 1"],
           ["номер", "№ п/п", "Обоснование", "Наименование работ и затрат", "Единица измерения", "Количество"],
@@ -202,6 +217,40 @@ test("RIK parser rejects unsupported and structurally invalid RTF", () => {
       ),
     /RTF_IMPORT_NO_POSITIONS/
   );
+});
+
+test("RIK parser moves to a new section even if previous position has no total marker", () => {
+  const result = parseRikRtfEstimateRows(
+    [
+      ["Наименование программного продукта", "ПК РИК"],
+      ["ЛОКАЛЬНЫЙ СМЕТНЫЙ РАСЧЕТ (СМЕТА) № 1"],
+      ["Тестовая смета"],
+      ["номер", "№ п/п", "Обоснование", "Наименование работ и затрат", "Единица измерения", "Количество"],
+      ["", "", "", "", "", "на единицу измерения", "коэффициенты", "всего с учётом коэффициентов", "", "", "", "", "всего в текущем уровне цен"],
+      ["1", "1", "ГЭСН 01-01-001-01", "Позиция без итога", "шт", "1", "", "1", "", "", "", "", ""],
+      ["Раздел 1. Новый раздел"],
+      ["2", "2", "ГЭСН 01-01-001-02", "Позиция нового раздела", "шт", "2", "", "2", "", "", "", "", ""],
+      ["", "", "", "Всего по позиции", "", "", "", "", "", "", "", "", "20,00"],
+    ],
+    { fileName: "broken-section.rtf" }
+  );
+
+  assert.match(result.warnings.join("\n"), /не содержит строки "Всего по позиции"/);
+  assert.equal(result.payload.sections.at(-1)?.title, "Раздел 1. Новый раздел");
+  assert.equal(result.payload.positions[1].sectionNumber, "1");
+  assert.equal(result.payload.positions[1].totalCurrentCost, "20.00");
+});
+
+test("RIK worker client has timeout and abort lifecycle controls", async () => {
+  const source = await readFile("client/src/lib/rikRtfWorkerClient.ts", "utf8");
+  const worksSource = await readFile("client/src/pages/Works.tsx", "utf8");
+
+  assert.match(source, /timeoutMs.*60_000/);
+  assert.match(source, /RTF_IMPORT_WORKER_TIMEOUT/);
+  assert.match(source, /abort:/);
+  assert.match(source, /worker\.terminate\(\)/);
+  assert.match(worksSource, /currentRikRtfParseRef\.current\?\.abort\(\)/);
+  assert.match(worksSource, /isMountedRef/);
 });
 
 test("Works estimate preview counts flat positions payload", async () => {
