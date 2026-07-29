@@ -760,6 +760,65 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(invoiceImports).where(eq(invoiceImports.objectId, objectId));
       await tx.delete(invoiceParseCorrections).where(eq(invoiceParseCorrections.objectId, objectId));
 
+      // Estimates cascade from objects, but sections/positions/resources do NOT cascade from estimates.
+      const objectEstimates = await tx
+        .select({ id: estimates.id })
+        .from(estimates)
+        .where(eq(estimates.objectId, objectId));
+      const estimateIds = objectEstimates.map((e) => e.id);
+      if (estimateIds.length > 0) {
+        const positions = await tx
+          .select({ id: estimatePositions.id })
+          .from(estimatePositions)
+          .where(inArray(estimatePositions.estimateId, estimateIds));
+        const positionIds = positions.map((p) => p.id);
+        if (positionIds.length > 0) {
+          await tx.delete(positionResources).where(inArray(positionResources.positionId, positionIds));
+          await tx.delete(estimatePositionMaterialLinks).where(
+            inArray(estimatePositionMaterialLinks.estimatePositionId, positionIds as any)
+          );
+          await tx
+            .update(scheduleTasks)
+            .set({ estimatePositionId: null } as any)
+            .where(inArray(scheduleTasks.estimatePositionId, positionIds as any));
+          await tx.delete(estimatePositions).where(inArray(estimatePositions.id, positionIds));
+        }
+        await tx.delete(estimateSections).where(inArray(estimateSections.estimateId, estimateIds));
+        await tx
+          .update(schedules)
+          .set({ estimateId: null } as any)
+          .where(inArray(schedules.estimateId, estimateIds));
+        await tx.delete(estimates).where(inArray(estimates.id, estimateIds));
+      }
+
+      // Work collections: clear works/resources/sections before collection/object cascade.
+      const objectCollections = await tx
+        .select({ id: workCollections.id })
+        .from(workCollections)
+        .where(eq(workCollections.objectId, objectId));
+      const collectionIds = objectCollections.map((c) => c.id);
+      if (collectionIds.length > 0) {
+        const collectionWorks = await tx
+          .select({ id: works.id })
+          .from(works)
+          .where(inArray(works.workCollectionId, collectionIds));
+        const workIds = collectionWorks.map((w) => w.id);
+        if (workIds.length > 0) {
+          await tx.delete(workResources).where(inArray(workResources.workId, workIds));
+          await tx
+            .update(scheduleTasks)
+            .set({ workId: null } as any)
+            .where(inArray(scheduleTasks.workId, workIds));
+          await tx.delete(works).where(inArray(works.id, workIds));
+        }
+        await tx.delete(workSections).where(inArray(workSections.workCollectionId, collectionIds));
+        await tx
+          .update(schedules)
+          .set({ workCollectionId: null } as any)
+          .where(inArray(schedules.workCollectionId, collectionIds));
+        await tx.delete(workCollections).where(inArray(workCollections.id, collectionIds));
+      }
+
       // Bindings/usages may also target materials of this object without objectId set
       const mats = await tx
         .select({ id: projectMaterials.id })
