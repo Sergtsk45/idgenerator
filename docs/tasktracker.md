@@ -2,6 +2,38 @@
 
 ---
 
+## Задача: SCHED-WORKS-SUBROWS — Паритет подстрок ВОР со сметой в графике
+- **Статус**: Завершена
+- **Дата начала**: 2026-07-29
+- **Дата завершения**: 2026-07-29
+- **Описание**: При `sourceType=works` вспомогательные строки ВОР (дробные коды / ФССЦ / Цена) не должны создавать отдельные `schedule_tasks`; отображаются как раскрываемые подстроки под основной задачей — как auxiliary positions сметы. Модель данных: вариант A (классификация по `code`/`lineNo`, без `parentTaskId`).
+- **Шаги выполнения**:
+  - [x] Shared-хелпер `isMainWorkPosition` + `groupAuxiliaryWorksByMainId`
+  - [x] Bootstrap works: только main; удаление legacy aux-tasks
+  - [x] UI `/schedule`: expand/collapse + сдвиг таймлайна для works
+  - [x] Unit-тесты классификации и группировки
+  - [x] Обновить `docs/project.md`, `docs/changelog.md`, `docs/tasktracker.md`
+- **Зависимости**: эталон сметы (`isMainEstimatePosition`, `auxiliaryPositionsByMainId`)
+
+---
+
+## Задача: CI-MIG-DIAG — Диагностика падений Test Migrations (Fresh DB)
+- **Статус**: Завершена
+- **Дата начала**: 2026-07-28
+- **Дата завершения**: 2026-07-28
+- **Описание**: Установить первопричину повторяющихся сбоев workflow `Test Migrations (Fresh DB)` на `main` и `fix/review-findings-from-tjr` (последний известный fail — `80d28f5`). Код и миграции в рамках диагностики не менять.
+- **Шаги выполнения**:
+  - [x] Разобрать workflow и шаг `Run migrations on clean DB`
+  - [x] Сопоставить fail-runs (`80d28f5`…`fc3eb9b`) — один и тот же упавший step
+  - [x] Проследить clean-chain `0001` → `0018` → `0019`
+  - [x] Локально воспроизвести на ephemeral Postgres 16: `Cannot make user_id NOT NULL: found 1 rows with NULL user_id`
+  - [x] Подтвердить, что вариант A уже в `85f9ff8` / текущем `HEAD`; CI зелёный с run #43
+  - [x] Зафиксировать в `docs/db-migrations.md`, `docs/changelog.md`, `docs/tasktracker.md`
+- **Вывод**: первопричина — guard в `0019` при seed-объекте без владельца; исправление (legacy-owner backfill) уже применено, повторный патч не нужен.
+- **Зависимости**: `.github/workflows/test-migrations.yml`, `migrations/0019_drop_legacy_telegram_columns.sql`, `docs/db-migrations.md`
+
+---
+
 ## Задача: RIK-RTF — Импорт смет из RTF-выгрузки ПК РИК на клиенте
 - **Статус**: Реализована локально; ожидает ручной smoke Chromium/Telegram WebView
 - **Дата начала**: 2026-07-25

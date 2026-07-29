@@ -27,6 +27,10 @@ import { useWorks } from "@/hooks/use-works";
 import { useEstimate, useEstimates } from "@/hooks/use-estimates";
 import { useEstimateSubrowStatuses } from "@/hooks/use-estimate-position-links";
 import { useUpsertEstimatePositionLink, useDeleteEstimatePositionLink } from "@/hooks/use-estimate-position-links";
+import {
+  compareWorksOrder,
+  groupAuxiliaryWorksByMainId,
+} from "@shared/workPositionKind";
 import { 
   useBootstrapScheduleFromWorks, 
   useBootstrapScheduleFromEstimate,
@@ -108,6 +112,7 @@ export default function Schedule() {
 
   const { data: works = [] } = useWorks();
   const worksById = useMemo(() => new Map<number, Work>(works.map((w) => [w.id, w])), [works]);
+  const sortedWorks = useMemo(() => [...works].sort(compareWorksOrder), [works]);
 
   const { data: defaultSchedule, isLoading: isLoadingDefault, error: defaultError } = useDefaultSchedule();
   const scheduleId = defaultSchedule?.id;
@@ -408,6 +413,12 @@ export default function Schedule() {
     return map;
   }, [allEstimatePositions, sourceType]);
 
+  // Group auxiliary BoQ rows under main works (parity with estimate subrows)
+  const auxiliaryWorksByMainId = useMemo(() => {
+    if (sourceType !== "works") return new Map<number, Work[]>();
+    return groupAuxiliaryWorksByMainId(sortedWorks);
+  }, [sortedWorks, sourceType]);
+
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<number>>(new Set());
 
   const toggleTaskExpanded = (taskId: number) => {
@@ -449,18 +460,19 @@ export default function Schedule() {
   const rowHeight = 88;
   const auxRowHeight = 32;
 
-  // When auxiliary rows are expanded (estimate source), the left table grows,
+  // When auxiliary rows are expanded, the left table grows,
   // so the timeline must also grow and shift bars down accordingly.
   const scheduleRowLayout = useMemo(() => {
     const expandedAuxCountByTaskId = new Map<number, number>();
-    if (sourceType === "estimate") {
-      for (const task of tasks) {
-        const auxiliaries = task.estimatePositionId
-          ? (auxiliaryPositionsByMainId.get(task.estimatePositionId) ?? [])
-          : [];
-        const isExpanded = expandedTaskIds.has(task.id);
-        expandedAuxCountByTaskId.set(task.id, isExpanded ? auxiliaries.length : 0);
+    for (const task of tasks) {
+      let auxiliaries: unknown[] = [];
+      if (sourceType === "estimate" && task.estimatePositionId) {
+        auxiliaries = auxiliaryPositionsByMainId.get(task.estimatePositionId) ?? [];
+      } else if (sourceType === "works" && task.workId) {
+        auxiliaries = auxiliaryWorksByMainId.get(task.workId) ?? [];
       }
+      const isExpanded = expandedTaskIds.has(task.id);
+      expandedAuxCountByTaskId.set(task.id, isExpanded ? auxiliaries.length : 0);
     }
 
     const taskTopPixelByTaskId = new Map<number, number>();
@@ -476,7 +488,7 @@ export default function Schedule() {
       taskTopPixelByTaskId,
       totalHeight: pixelOffset,
     };
-  }, [tasks, sourceType, expandedTaskIds, auxiliaryPositionsByMainId]);
+  }, [tasks, sourceType, expandedTaskIds, auxiliaryPositionsByMainId, auxiliaryWorksByMainId]);
 
   // Warning: total quantity of all tasks for the same source exceeds the source reference value.
   const quantityExceedWarning = useMemo(() => {
@@ -1288,7 +1300,14 @@ export default function Schedule() {
                           ? (p?.name ?? `${language === "ru" ? "Позиция" : "Position"} #${task.estimatePositionId ?? task.id}`)
                           : (w?.description ?? `${t.task} #${task.id}`));
                       
-                      const auxiliaries = task.estimatePositionId ? (auxiliaryPositionsByMainId.get(task.estimatePositionId) ?? []) : [];
+                      const estimateAuxiliaries = task.estimatePositionId
+                        ? (auxiliaryPositionsByMainId.get(task.estimatePositionId) ?? [])
+                        : [];
+                      const workAuxiliaries = task.workId
+                        ? (auxiliaryWorksByMainId.get(task.workId) ?? [])
+                        : [];
+                      const auxiliaries =
+                        sourceType === "estimate" ? estimateAuxiliaries : workAuxiliaries;
                       const hasAuxiliaries = auxiliaries.length > 0;
                       const isExpanded = expandedTaskIds.has(task.id);
 
@@ -1347,7 +1366,7 @@ export default function Schedule() {
                                     {actTzBrgLine}
                                   </span>
                                   <div className="flex items-center gap-0.5">
-                                    {sourceType === "estimate" && hasAuxiliaries && (
+                                    {hasAuxiliaries && (
                                       <Button
                                         variant="ghost"
                                         size="icon"
@@ -1439,17 +1458,24 @@ export default function Schedule() {
                           </div>
 
                           {/* Auxiliary positions (collapsed by default) */}
-                          {isExpanded && auxiliaries.map((aux: any, idx: number) => (
+                          {isExpanded && auxiliaries.map((aux: any, idx: number) => {
+                            const auxCode = aux.lineNo || aux.code;
+                            const auxName = sourceType === "estimate"
+                              ? aux.name
+                              : aux.description;
+
+                            return (
                             <div
                               key={`aux-${task.id}-${idx}`}
                               className="pl-12 pr-3 bg-muted/20 border-b border-border/40 text-xs text-muted-foreground flex items-center"
                               style={{ height: auxRowHeight }}
                             >
-                              <div className="flex items-start gap-2">
-                                <span className="font-mono shrink-0">{aux.lineNo || aux.code}</span>
-                                <span className="truncate">{aux.name}</span>
+                              <div className="flex items-start gap-2 min-w-0">
+                                <span className="font-mono shrink-0">{auxCode}</span>
+                                <span className="truncate">{auxName}</span>
                               </div>
-                              {/* Quality documents status */}
+                              {/* Quality documents status (estimate only) */}
+                              {sourceType === "estimate" && (
                               <div className="ml-auto pl-2 shrink-0">
                                 {(() => {
                                   const s = (subrowStatuses as any)?.byEstimatePositionId?.[String(aux?.id)];
@@ -1501,8 +1527,10 @@ export default function Schedule() {
                                   );
                                 })()}
                               </div>
+                              )}
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       );
                     })}

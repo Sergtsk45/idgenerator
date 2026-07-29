@@ -89,6 +89,7 @@ import {
 } from "@shared/schema";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql, count } from "drizzle-orm";
+import { isMainWorkPosition } from "@shared/workPositionKind";
 import { getQuota, getEffectiveTariff } from "@shared/tariff-features";
 
 type ObjectPartyRole = "customer" | "builder" | "designer";
@@ -2584,28 +2585,64 @@ export class DatabaseStorage implements IStorage {
               .select()
               .from(works)
               .where(inArray(works.id, workIds))
-              .orderBy(works.code)
-          : await tx.select().from(works).orderBy(works.code);
+              .orderBy(asc(works.orderIndex), asc(works.code))
+          : await tx.select().from(works).orderBy(asc(works.orderIndex), asc(works.code));
+
+      // Only main BoQ rows become Gantt tasks (parity with estimate bootstrap).
+      const mainWorks = worksList.filter((w) => isMainWorkPosition(w));
 
       const existingTasks = await tx
         .select({ id: scheduleTasks.id, workId: scheduleTasks.workId, orderIndex: scheduleTasks.orderIndex, quantity: scheduleTasks.quantity })
         .from(scheduleTasks)
         .where(eq(scheduleTasks.scheduleId, scheduleId));
 
-      const existingWorkIds = new Set(existingTasks.map((t) => t.workId));
+      // Repair legacy graphs: drop tasks that point at auxiliary works.
+      const workIdsOnTasks = Array.from(
+        new Set(
+          existingTasks
+            .map((t) => t.workId)
+            .filter((id): id is number => typeof id === "number" && Number.isFinite(id))
+        )
+      );
+      const worksOnTasks =
+        workIdsOnTasks.length === 0
+          ? []
+          : await tx.select().from(works).where(inArray(works.id, workIdsOnTasks));
+      const workById = new Map(worksOnTasks.map((w) => [w.id, w]));
+      const auxiliaryTaskIds = existingTasks
+        .filter((t) => {
+          if (t.workId == null) return false;
+          const w = workById.get(t.workId);
+          return w != null && !isMainWorkPosition(w);
+        })
+        .map((t) => t.id);
+
+      if (auxiliaryTaskIds.length > 0) {
+        await tx.delete(scheduleTasks).where(inArray(scheduleTasks.id, auxiliaryTaskIds));
+      }
+
+      const remainingTasks = existingTasks.filter((t) => !auxiliaryTaskIds.includes(t.id));
+
+      const existingWorkIds = new Set(
+        remainingTasks.map((t) => t.workId).filter((id): id is number => id != null)
+      );
       const maxOrderIndex =
-        existingTasks.length === 0
+        remainingTasks.length === 0
           ? -1
-          : Math.max(...existingTasks.map((t) => Number(t.orderIndex ?? 0)));
+          : Math.max(...remainingTasks.map((t) => Number(t.orderIndex ?? 0)));
 
       // Build lookup: workId → task id (for backfill of existing tasks with quantity=NULL)
-      const existingTaskByWorkId = new Map(existingTasks.map((t) => [t.workId, t]));
+      const existingTaskByWorkId = new Map(
+        remainingTasks
+          .filter((t) => t.workId != null)
+          .map((t) => [t.workId!, t])
+      );
 
       let nextOrderIndex = maxOrderIndex + 1;
       let created = 0;
       let skipped = 0;
 
-      for (const w of worksList) {
+      for (const w of mainWorks) {
         const rawQty = (w as any).quantityTotal;
         const qty = rawQty == null ? null : Number(rawQty);
         const qtyStr = qty != null && Number.isFinite(qty) ? String(qty) : null;

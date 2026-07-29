@@ -1,5 +1,32 @@
 # Changelog
 
+## [2026-07-29] - График из ВОР: подстроки как у сметы (вариант A)
+
+### Добавлено
+- `shared/workPositionKind.ts` — классификация основных/вспомогательных позиций ВОР (`isMainWorkPosition`) и группировка подстрок (`groupAuxiliaryWorksByMainId`).
+- `tests/work-position-kind.test.ts` — unit-тесты классификации, группировки `10 → 10.1/10.2` и фильтра bootstrap.
+
+### Изменено
+- `bootstrapScheduleTasksFromWorks`: создаёт `schedule_tasks` только для основных строк ВОР; при bootstrap удаляет уже существующие tasks по вспомогательным works (починка legacy-графиков).
+- `/schedule` при `sourceType=works`: вспомогательные позиции раскрываются/сворачиваются под основной задачей; таймлайн смещается вместе с подстроками (как для estimate).
+- `docs/project.md` — зафиксирован вариант A (без `parentTaskId` в `schedule_tasks`).
+
+### Исправлено
+- Коды вида `9.1`, `10.2` больше не становятся отдельными полосами Ганта при источнике ВОР.
+
+---
+
+## [2026-07-28] - Диагностика CI Test Migrations (Fresh DB)
+
+### Изменено
+- `docs/db-migrations.md` — зафиксированы первопричина и цепочка сбоя clean-chain на `0019` (`Cannot make user_id NOT NULL`), ссылки на fail/success runs и подтверждение, что вариант A (legacy-owner backfill) уже в `85f9ff8`.
+- `docs/tasktracker.md` — задача диагностики закрыта; код миграций не менялся (исправление уже на `main`).
+
+### Исправлено
+- Документально подтверждено: повторные падения `Test Migrations (Fresh DB)` на `main` / `fix/review-findings-from-tjr` (в т.ч. `80d28f5`) вызваны guard в `0019` при seed-объекте без `user_id`; после `85f9ff8` workflow зелёный.
+
+---
+
 ## [2026-07-25] - Импорт смет из RTF ПК РИК
 
 ### Добавлено

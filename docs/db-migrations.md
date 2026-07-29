@@ -79,13 +79,26 @@ npm run db:push  # → ОШИБКА
 
 ### Clean-chain fix: `0019_drop_legacy_telegram_columns.sql`
 
-`0019` теперь идемпотентно назначает объектам без владельца явного legacy-пользователя перед `objects.user_id SET NOT NULL`.
+`0019` идемпотентно назначает объектам без владельца явного legacy-пользователя перед `objects.user_id SET NOT NULL`.
 
 Политика:
 - пользователь создаётся как `Legacy System Owner`;
 - email: `legacy-system-owner@local.invalid`;
 - `role = 'admin'`, `is_blocked = true`;
 - реальные пользователи не выбираются случайно.
+
+#### Инцидент CI `Test Migrations (Fresh DB)` (диагностика 2026-07-28)
+
+- **Симптом:** workflow падал на шаге `Run migrations on clean DB` (`npm run db:migrate`); verify-шаги не запускались.
+- **Ошибка:** `Cannot make user_id NOT NULL: found 1 rows with NULL user_id` (`P0001` из guard в `0019`).
+- **Цепочка на чистой БД:**
+  1. `0001` создаёт seed `objects(id=1)` без владельца;
+  2. `0018` заполняет `objects.user_id` только для строк с `telegram_user_id IS NOT NULL`;
+  3. seed остаётся с `user_id IS NULL` → `0019` делает `RAISE EXCEPTION`.
+- **Первопричина:** `0019` (с `5f82848`) рассчитан на «живую» БД с уже привязанными объектами, а не на clean-chain с MVP-seed.
+- **Исправление (вариант A):** backfill legacy-owner в `0019` перед `SET NOT NULL` — коммит `85f9ff8` (2026-07-24). С run #43 workflow на `main` зелёный.
+- **Почему долго не чинили:** инкрементальные миграции на уже заполненных БД проходили; красный был именно bootstrap на чистом Postgres. CI ловил сбой с ранних запусков, но root-cause закрыли вместе с DOC-SCOPE hardening.
+- **Референсы:** fail run `80d28f5` → [actions/runs/30078972227](https://github.com/Sergtsk45/idgenerator/actions/runs/30078972227); первый success после фикса → [actions/runs/30091457406](https://github.com/Sergtsk45/idgenerator/actions/runs/30091457406) (`85f9ff8`).
 
 ### BL-001: preflight перед staging/prod
 
