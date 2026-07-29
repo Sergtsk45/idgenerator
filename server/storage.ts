@@ -725,14 +725,14 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Cascade cleanup for tables with ON DELETE RESTRICT (project_materials, batches,
-    // act attachments/usages referencing materials/documents, estimate links).
+    // Cascade cleanup for tables with ON DELETE RESTRICT / NO ACTION.
     await db.transaction(async (tx) => {
       const objectActs = await tx.select({ id: acts.id }).from(acts).where(eq(acts.objectId, objectId));
       const actIds = objectActs.map((a) => a.id);
       if (actIds.length > 0) {
         await tx.delete(actMaterialUsages).where(inArray(actMaterialUsages.actId, actIds));
         await tx.delete(actDocumentAttachments).where(inArray(actDocumentAttachments.actId, actIds));
+        await tx.delete(actTemplateSelections).where(inArray(actTemplateSelections.actId, actIds));
         await tx.delete(attachments).where(inArray(attachments.actId as any, actIds as any));
         await tx.delete(acts).where(inArray(acts.id, actIds));
       }
@@ -757,7 +757,10 @@ export class DatabaseStorage implements IStorage {
 
       await tx.delete(estimatePositionMaterialLinks).where(eq(estimatePositionMaterialLinks.objectId, objectId));
       await tx.delete(documentBindings).where(eq(documentBindings.objectId, objectId));
-      // Bindings may also target materials of this object without objectId set
+      await tx.delete(invoiceImports).where(eq(invoiceImports.objectId, objectId));
+      await tx.delete(invoiceParseCorrections).where(eq(invoiceParseCorrections.objectId, objectId));
+
+      // Bindings/usages may also target materials of this object without objectId set
       const mats = await tx
         .select({ id: projectMaterials.id })
         .from(projectMaterials)

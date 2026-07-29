@@ -171,7 +171,8 @@ export function registerObjectRoutes(app: Express): void {
         }
       }
       console.error("Object delete failed:", err);
-      return res.status(500).json({ message: "Internal Server Error" });
+      const detail = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ message: "Internal Server Error", detail });
     }
   });
 
