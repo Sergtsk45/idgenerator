@@ -31,6 +31,7 @@ import {
   compareWorksOrder,
   groupAuxiliaryWorksByMainId,
 } from "@shared/workPositionKind";
+import { buildScheduleRowLayout } from "@/lib/schedule-row-layout";
 import { 
   useBootstrapScheduleFromWorks, 
   useBootstrapScheduleFromEstimate,
@@ -463,32 +464,20 @@ export default function Schedule() {
   // When auxiliary rows are expanded, the left table grows,
   // so the timeline must also grow and shift bars down accordingly.
   const scheduleRowLayout = useMemo(() => {
-    const expandedAuxCountByTaskId = new Map<number, number>();
-    for (const task of tasks) {
+    const rows = filteredTasks.map((task) => {
       let auxiliaries: unknown[] = [];
       if (sourceType === "estimate" && task.estimatePositionId) {
         auxiliaries = auxiliaryPositionsByMainId.get(task.estimatePositionId) ?? [];
       } else if (sourceType === "works" && task.workId) {
         auxiliaries = auxiliaryWorksByMainId.get(task.workId) ?? [];
       }
-      const isExpanded = expandedTaskIds.has(task.id);
-      expandedAuxCountByTaskId.set(task.id, isExpanded ? auxiliaries.length : 0);
-    }
-
-    const taskTopPixelByTaskId = new Map<number, number>();
-    let pixelOffset = 0;
-    for (const task of tasks) {
-      taskTopPixelByTaskId.set(task.id, pixelOffset);
-      const auxCount = expandedAuxCountByTaskId.get(task.id) ?? 0;
-      pixelOffset += rowHeight + auxCount * auxRowHeight;
-    }
-
-    return {
-      expandedAuxCountByTaskId,
-      taskTopPixelByTaskId,
-      totalHeight: pixelOffset,
-    };
-  }, [tasks, sourceType, expandedTaskIds, auxiliaryPositionsByMainId, auxiliaryWorksByMainId]);
+      return {
+        id: task.id,
+        auxiliaryCount: expandedTaskIds.has(task.id) ? auxiliaries.length : 0,
+      };
+    });
+    return buildScheduleRowLayout(rows, rowHeight, auxRowHeight);
+  }, [filteredTasks, sourceType, expandedTaskIds, auxiliaryPositionsByMainId, auxiliaryWorksByMainId]);
 
   // Warning: total quantity of all tasks for the same source exceeds the source reference value.
   const quantityExceedWarning = useMemo(() => {
@@ -645,11 +634,19 @@ export default function Schedule() {
       const result = sourceType === 'estimate' 
         ? await bootstrapFromEstimate.mutateAsync({})
         : await bootstrapFromWorks.mutateAsync({});
+      const removed =
+        "removed" in result && typeof result.removed === "number" ? result.removed : 0;
+      const description = t.bootstrapDoneDesc
+        .replace("{created}", String(result.created))
+        .replace("{skipped}", String(result.skipped));
       toast({
         title: t.bootstrapDoneTitle,
-        description: t.bootstrapDoneDesc
-          .replace("{created}", String(result.created))
-          .replace("{skipped}", String(result.skipped)),
+        description:
+          removed > 0
+            ? `${description}; ${
+                language === "ru" ? "удалено устаревших" : "legacy removed"
+              }: ${removed}`
+            : description,
       });
     } catch (err: any) {
       toast({
@@ -1336,9 +1333,9 @@ export default function Schedule() {
                       const actTzBrgLine = `${actLabel} · ${tzLabel} · ${brgLabel}`;
 
                       return (
-                        <div key={task.id} className="border-b border-border/40 last:border-b-0">
+                        <div key={task.id}>
                           {/* Main task row */}
-                          <div className="px-3 py-2" style={{ height: rowHeight, overflow: 'hidden' }}>
+                          <div className="px-3 py-2 border-b border-border/40" style={{ height: rowHeight, overflow: 'hidden' }}>
                             <div className="flex items-start gap-2">
                               {/* Дата */}
                               <div className="w-10 shrink-0 text-center hidden md:block">
@@ -1541,9 +1538,7 @@ export default function Schedule() {
                     style={{
                       width: timelineWidth,
                       height: scheduleRowLayout.totalHeight,
-                      backgroundImage:
-                        `repeating-linear-gradient(to right, rgba(0,0,0,0.06) 0, rgba(0,0,0,0.06) 1px, transparent 1px, transparent ${dayWidth}px),` +
-                        `repeating-linear-gradient(to bottom, rgba(0,0,0,0.04) 0, rgba(0,0,0,0.04) 1px, transparent 1px, transparent ${rowHeight}px)`,
+                      backgroundImage: `repeating-linear-gradient(to right, rgba(0,0,0,0.06) 0, rgba(0,0,0,0.06) 1px, transparent 1px, transparent ${dayWidth}px)`,
                     }}
                   >
                     {/* Weekend shading */}
@@ -2284,4 +2279,3 @@ export default function Schedule() {
     </ResponsiveShell>
   );
 }
-

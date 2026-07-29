@@ -1129,7 +1129,7 @@ export const api = {
       method: 'POST' as const,
       path: '/api/schedules/:id/bootstrap-from-works',
       input: z.object({
-        workIds: z.array(z.number().int().positive()).optional(),
+        workIds: z.array(z.number().int().positive()).min(1).optional(),
         defaultStartDate: z.string().optional(), // YYYY-MM-DD
         defaultDurationDays: z.number().int().min(1).optional(),
       }),
@@ -1138,6 +1138,7 @@ export const api = {
           scheduleId: z.number(),
           created: z.number(),
           skipped: z.number(),
+          removed: z.number(),
         }),
         400: z.object({ message: z.string() }),
         404: z.object({ message: z.string() }),

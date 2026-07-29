@@ -94,6 +94,12 @@ export function registerScheduleRoutes(app: Express): void {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
+      if ((err as Error).message === "SCHEDULE_NOT_FOUND") {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+      if ((err as Error).message === "SCHEDULE_SOURCE_MISMATCH") {
+        return res.status(400).json({ message: "Schedule source type does not match" });
+      }
       console.error("Schedule bootstrap failed:", err);
       return res.status(500).json({ message: "Internal Server Error" });
     }

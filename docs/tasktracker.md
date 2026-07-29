@@ -2,6 +2,32 @@
 
 ---
 
+## Задача: SCHED-GANTT-ALIGN-ORDER — Выравнивание строк и collection-aware порядок ВОР
+- **Статус**: Завершена локально; production repair ожидает preflight
+- **Дата начала**: 2026-07-29
+- **Дата завершения разработки**: 2026-07-30
+- **Описание**: Устранить накопительный вертикальный сдвиг подписей и полос Ганта, неверную группировку auxiliary-позиций при пересекающихся `orderIndex` двух коллекций и попадание legacy auxiliary/out-of-scope works в `schedule_tasks`.
+- **Шаги выполнения**:
+  - [x] Подтвердить root cause: layout по `tasks` при рендере `filteredTasks`, фиксированная горизонтальная сетка и граница вне фиксированной высоты строки.
+  - [x] Вынести чистый расчёт layout и строить его по `filteredTasks` с учётом раскрытых auxiliary-строк.
+  - [x] Убрать ложную горизонтальную сетку и накопительный `1px` сдвиг.
+  - [x] Считать `works.orderIndex` локальным коллекции; сортировать по `(workCollectionId, orderIndex, code natural, id)`.
+  - [x] Привязывать `N.x` к ближайшей предшествующей `N` только внутри той же коллекции; сохранить collection-local fallback для ФССЦ/ФСБЦ/Цена.
+  - [x] Ограничить works-bootstrap коллекциями `schedule.objectId` и отклонять чужие `workIds`, пустой выбор и несовместимый `sourceType`.
+  - [x] Полный bootstrap: удалить legacy auxiliary/out-of-scope tasks, один раз нормализовать main-порядок и вернуть `removed`; частичный bootstrap не выполняет cleanup.
+  - [x] Добавить regression-тесты layout/call-site, grouping/order collisions и bootstrap contract/scope.
+  - [x] Обновить `docs/changelog.md`, `docs/project.md`, `docs/tasktracker.md`.
+  - [ ] Production schedule `7`: проверить legacy-задачи на `actNumber`, split-группы, task materials и документацию; после backup/подтверждения выполнить полный bootstrap и ручной UI smoke.
+- **Проверка**:
+  - [x] `npm test`
+  - [x] `npm run check`
+  - [x] `npm run build`
+  - [x] `git diff --check`
+- **Ограничение**: автоматическое слияние пользовательских данных удаляемой auxiliary-задачи с parent-задачей не выполняется, поскольку однозначного правила для актов, split-объёмов, материалов и документации нет.
+- **Зависимости**: `SCHED-WORKS-SUBROWS`, `shared/workPositionKind.ts`, `client/src/pages/Schedule.tsx`, `server/storage.ts`.
+
+---
+
 ## Задача: SCHED-WORKS-SUBROWS — Паритет подстрок ВОР со сметой в графике
 - **Статус**: Завершена
 - **Дата начала**: 2026-07-29

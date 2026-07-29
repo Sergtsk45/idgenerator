@@ -80,7 +80,7 @@ test("bootstrap filter: only main rows become schedule tasks", () => {
   assert.deepEqual(mainIds, [1, 3, 5]);
 });
 
-test("compareWorksOrder: orderIndex then numeric code", () => {
+test("compareWorksOrder: collection, orderIndex, numeric code, then id", () => {
   const rows = [
     { orderIndex: 2, code: "10" },
     { orderIndex: 1, code: "2" },
@@ -91,4 +91,55 @@ test("compareWorksOrder: orderIndex then numeric code", () => {
     sorted.map((r) => r.code),
     ["2", "10", "10"]
   );
+});
+
+test("collection-local order keeps auxiliary rows under their numeric parent", () => {
+  const rows = [
+    { id: 1, workCollectionId: 1, orderIndex: 10, code: "10" },
+    { id: 2, workCollectionId: 1, orderIndex: 11, code: "10.1" },
+    { id: 3, workCollectionId: 2, orderIndex: 9, code: "40" },
+    { id: 4, workCollectionId: 2, orderIndex: 10, code: "40.2" },
+  ].sort(compareWorksOrder);
+
+  assert.deepEqual(rows.map((r) => r.code), ["10", "10.1", "40", "40.2"]);
+
+  const map = groupAuxiliaryWorksByMainId(rows);
+  assert.deepEqual((map.get(1) ?? []).map((w) => w.code), ["10.1"]);
+  assert.deepEqual((map.get(3) ?? []).map((w) => w.code), ["40.2"]);
+});
+
+test("numeric auxiliary without a parent in its collection stays ungrouped", () => {
+  const rows = [
+    { id: 1, workCollectionId: 1, orderIndex: 1, code: "10" },
+    { id: 2, workCollectionId: 2, orderIndex: 1, code: "40.2" },
+  ].sort(compareWorksOrder);
+
+  const map = groupAuxiliaryWorksByMainId(rows);
+  assert.deepEqual(map.get(1) ?? [], []);
+});
+
+test("repeated numeric parent uses the nearest preceding main row", () => {
+  const rows = [
+    { id: 1, workCollectionId: 1, code: "10" },
+    { id: 2, workCollectionId: 1, code: "10.1" },
+    { id: 3, workCollectionId: 1, code: "10" },
+    { id: 4, workCollectionId: 1, code: "10.2" },
+  ];
+
+  const map = groupAuxiliaryWorksByMainId(rows);
+  assert.deepEqual((map.get(1) ?? []).map((w) => w.code), ["10.1"]);
+  assert.deepEqual((map.get(3) ?? []).map((w) => w.code), ["10.2"]);
+});
+
+test("nonnumeric auxiliary fallback never crosses collection boundaries", () => {
+  const rows = [
+    { id: 1, workCollectionId: 1, code: "1" },
+    { id: 2, workCollectionId: 2, code: "2" },
+    { id: 3, workCollectionId: 1, code: "ФССЦ-1" },
+    { id: 4, workCollectionId: 2, code: "Цена 2" },
+  ];
+
+  const map = groupAuxiliaryWorksByMainId(rows);
+  assert.deepEqual((map.get(1) ?? []).map((w) => w.code), ["ФССЦ-1"]);
+  assert.deepEqual((map.get(2) ?? []).map((w) => w.code), ["Цена 2"]);
 });

@@ -45,35 +45,69 @@ export function isMainWorkPosition(work: {
   return true;
 }
 
-/** Группирует вспомогательные позиции ВОР под id последней основной (порядок списка = порядок обхода). */
+/** Группирует auxiliary под numeric parent или предыдущую main-позицию в той же коллекции. */
 export function groupAuxiliaryWorksByMainId<
-  T extends { id: number; code?: string | null; lineNo?: string | null },
+  T extends {
+    id: number;
+    workCollectionId?: number | null;
+    code?: string | null;
+    lineNo?: string | null;
+  },
 >(worksList: T[]): Map<number, T[]> {
   const map = new Map<number, T[]>();
-  let currentMainId: number | null = null;
+  const currentMainIdByCollection = new Map<number | null, number>();
+  const mainIdByCollectionAndCode = new Map<string, number>();
+
+  const hierarchyCode = (work: T): string | null => {
+    const lineNo = String(work.lineNo ?? "").trim();
+    if (/^\d+(?:\.\d+)*$/.test(lineNo)) return lineNo;
+    const code = String(work.code ?? "").trim();
+    return /^\d+(?:\.\d+)*$/.test(code) ? code : null;
+  };
+  const hierarchyKey = (collectionId: number | null, code: string) =>
+    `${collectionId ?? "none"}:${code}`;
 
   for (const work of worksList) {
+    const collectionId = work.workCollectionId ?? null;
     if (isMainWorkPosition(work)) {
-      currentMainId = work.id;
-      if (!map.has(currentMainId)) {
-        map.set(currentMainId, []);
+      currentMainIdByCollection.set(collectionId, work.id);
+      const code = hierarchyCode(work);
+      if (code) {
+        mainIdByCollectionAndCode.set(hierarchyKey(collectionId, code), work.id);
       }
-    } else if (currentMainId !== null) {
-      const list = map.get(currentMainId) ?? [];
+      if (!map.has(work.id)) map.set(work.id, []);
+      continue;
+    }
+
+    const code = hierarchyCode(work);
+    const parentCode = code?.includes(".") ? code.slice(0, code.indexOf(".")) : null;
+    const parentId = parentCode
+      ? mainIdByCollectionAndCode.get(hierarchyKey(collectionId, parentCode))
+      : currentMainIdByCollection.get(collectionId);
+
+    if (parentId !== undefined) {
+      const list = map.get(parentId) ?? [];
       list.push(work);
-      map.set(currentMainId, list);
+      map.set(parentId, list);
     }
   }
 
   return map;
 }
 
-/** Стабильный порядок ВОР: orderIndex, затем code (numeric). */
+/** Стабильный порядок ВОР: коллекция, локальный orderIndex, code (numeric), id. */
 export function compareWorksOrder(
-  a: { orderIndex?: number | null; code?: string | null },
-  b: { orderIndex?: number | null; code?: string | null }
+  a: { id?: number | null; workCollectionId?: number | null; orderIndex?: number | null; code?: string | null },
+  b: { id?: number | null; workCollectionId?: number | null; orderIndex?: number | null; code?: string | null }
 ): number {
+  const collection =
+    Number(a.workCollectionId ?? 0) - Number(b.workCollectionId ?? 0);
+  if (collection !== 0) return collection;
   const oi = Number(a.orderIndex ?? 0) - Number(b.orderIndex ?? 0);
   if (oi !== 0) return oi;
-  return String(a.code ?? "").localeCompare(String(b.code ?? ""), undefined, { numeric: true });
+  const code = String(a.code ?? "").localeCompare(String(b.code ?? ""), undefined, {
+    numeric: true,
+  });
+  if (code !== 0) return code;
+  return Number(a.id ?? 0) - Number(b.id ?? 0);
 }

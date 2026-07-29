@@ -89,7 +89,7 @@ import {
 } from "@shared/schema";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql, count } from "drizzle-orm";
-import { isMainWorkPosition } from "@shared/workPositionKind";
+import { compareWorksOrder, isMainWorkPosition } from "@shared/workPositionKind";
 import { getQuota, getEffectiveTariff } from "@shared/tariff-features";
 
 type ObjectPartyRole = "customer" | "builder" | "designer";
@@ -339,7 +339,7 @@ export interface IStorage {
     workIds?: number[];
     defaultStartDate: string;
     defaultDurationDays: number;
-  }): Promise<{ scheduleId: number; created: number; skipped: number }>;
+  }): Promise<{ scheduleId: number; created: number; skipped: number; removed: number }>;
   patchScheduleTask(
     id: number,
     patch: Partial<
@@ -725,7 +725,59 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    await db.delete(objects).where(eq(objects.id, objectId));
+    // Cascade cleanup for tables with ON DELETE RESTRICT (project_materials, batches,
+    // act attachments/usages referencing materials/documents, estimate links).
+    await db.transaction(async (tx) => {
+      const objectActs = await tx.select({ id: acts.id }).from(acts).where(eq(acts.objectId, objectId));
+      const actIds = objectActs.map((a) => a.id);
+      if (actIds.length > 0) {
+        await tx.delete(actMaterialUsages).where(inArray(actMaterialUsages.actId, actIds));
+        await tx.delete(actDocumentAttachments).where(inArray(actDocumentAttachments.actId, actIds));
+        await tx.delete(attachments).where(inArray(attachments.actId as any, actIds as any));
+        await tx.delete(acts).where(inArray(acts.id, actIds));
+      }
+
+      const objectSchedules = await tx
+        .select({ id: schedules.id })
+        .from(schedules)
+        .where(eq(schedules.objectId, objectId));
+      const scheduleIds = objectSchedules.map((s) => s.id);
+      if (scheduleIds.length > 0) {
+        const tasks = await tx
+          .select({ id: scheduleTasks.id })
+          .from(scheduleTasks)
+          .where(inArray(scheduleTasks.scheduleId, scheduleIds));
+        const taskIds = tasks.map((t) => t.id);
+        if (taskIds.length > 0) {
+          await tx.delete(taskMaterials).where(inArray(taskMaterials.taskId, taskIds));
+          await tx.delete(scheduleTasks).where(inArray(scheduleTasks.id, taskIds));
+        }
+        await tx.delete(schedules).where(inArray(schedules.id, scheduleIds));
+      }
+
+      await tx.delete(estimatePositionMaterialLinks).where(eq(estimatePositionMaterialLinks.objectId, objectId));
+      await tx.delete(documentBindings).where(eq(documentBindings.objectId, objectId));
+      // Bindings may also target materials of this object without objectId set
+      const mats = await tx
+        .select({ id: projectMaterials.id })
+        .from(projectMaterials)
+        .where(eq(projectMaterials.objectId, objectId));
+      const matIds = mats.map((m) => m.id);
+      if (matIds.length > 0) {
+        await tx.delete(documentBindings).where(inArray(documentBindings.projectMaterialId, matIds as any));
+        await tx.delete(taskMaterials).where(inArray(taskMaterials.projectMaterialId, matIds as any));
+        await tx.delete(actMaterialUsages).where(inArray(actMaterialUsages.projectMaterialId, matIds as any));
+        await tx.delete(materialBatches).where(inArray(materialBatches.projectMaterialId, matIds as any));
+        await tx.delete(projectMaterials).where(inArray(projectMaterials.id, matIds as any));
+      }
+      await tx.delete(materialBatches).where(eq(materialBatches.objectId, objectId));
+      await tx.delete(documents).where(eq(documents.objectId, objectId));
+
+      await tx.delete(objectParties).where(eq(objectParties.objectId, objectId));
+      await tx.delete(objectResponsiblePersons).where(eq(objectResponsiblePersons.objectId, objectId));
+
+      await tx.delete(objects).where(eq(objects.id, objectId));
+    });
   }
 
   async selectCurrentObject(userId: number, objectId: number): Promise<void> {
@@ -2569,7 +2621,7 @@ export class DatabaseStorage implements IStorage {
     workIds?: number[];
     defaultStartDate: string;
     defaultDurationDays: number;
-  }): Promise<{ scheduleId: number; created: number; skipped: number }> {
+  }): Promise<{ scheduleId: number; created: number; skipped: number; removed: number }> {
     const { scheduleId, workIds, defaultStartDate, defaultDurationDays } = params;
 
     return await db.transaction(async (tx) => {
@@ -2578,15 +2630,38 @@ export class DatabaseStorage implements IStorage {
         // Let the route translate this to 404.
         throw new Error("SCHEDULE_NOT_FOUND");
       }
+      if (schedule.sourceType !== "works" || schedule.objectId == null) {
+        throw new Error("SCHEDULE_SOURCE_MISMATCH");
+      }
 
-      const worksList =
-        workIds && workIds.length > 0
-          ? await tx
+      const objectCollections = await tx
+        .select({ id: workCollections.id })
+        .from(workCollections)
+        .where(eq(workCollections.objectId, schedule.objectId));
+      const collectionIds = objectCollections.map((collection) => collection.id);
+      const collectionIdSet = new Set(collectionIds);
+      const requestedWorkIds = workIds?.length ? workIds : null;
+      const worksList = (
+        collectionIds.length === 0
+          ? []
+          : await tx
               .select()
               .from(works)
-              .where(inArray(works.id, workIds))
-              .orderBy(asc(works.orderIndex), asc(works.code))
-          : await tx.select().from(works).orderBy(asc(works.orderIndex), asc(works.code));
+              .where(
+                requestedWorkIds
+                  ? and(
+                      inArray(works.workCollectionId, collectionIds),
+                      inArray(works.id, requestedWorkIds)
+                    )
+                  : inArray(works.workCollectionId, collectionIds)
+              )
+              .orderBy(
+                asc(works.workCollectionId),
+                asc(works.orderIndex),
+                asc(works.code),
+                asc(works.id)
+              )
+      ).sort(compareWorksOrder);
 
       // Only main BoQ rows become Gantt tasks (parity with estimate bootstrap).
       const mainWorks = worksList.filter((w) => isMainWorkPosition(w));
@@ -2596,7 +2671,7 @@ export class DatabaseStorage implements IStorage {
         .from(scheduleTasks)
         .where(eq(scheduleTasks.scheduleId, scheduleId));
 
-      // Repair legacy graphs: drop tasks that point at auxiliary works.
+      // Repair complete legacy graphs; partial bootstrap must not delete unrelated tasks.
       const workIdsOnTasks = Array.from(
         new Set(
           existingTasks
@@ -2609,19 +2684,26 @@ export class DatabaseStorage implements IStorage {
           ? []
           : await tx.select().from(works).where(inArray(works.id, workIdsOnTasks));
       const workById = new Map(worksOnTasks.map((w) => [w.id, w]));
-      const auxiliaryTaskIds = existingTasks
-        .filter((t) => {
-          if (t.workId == null) return false;
-          const w = workById.get(t.workId);
-          return w != null && !isMainWorkPosition(w);
-        })
-        .map((t) => t.id);
+      const legacyTaskIds = requestedWorkIds
+        ? []
+        : existingTasks
+            .filter((t) => {
+              if (t.workId == null) return false;
+              const w = workById.get(t.workId);
+              return (
+                w == null ||
+                !collectionIdSet.has(w.workCollectionId ?? -1) ||
+                !isMainWorkPosition(w)
+              );
+            })
+            .map((t) => t.id);
 
-      if (auxiliaryTaskIds.length > 0) {
-        await tx.delete(scheduleTasks).where(inArray(scheduleTasks.id, auxiliaryTaskIds));
+      if (legacyTaskIds.length > 0) {
+        await tx.delete(scheduleTasks).where(inArray(scheduleTasks.id, legacyTaskIds));
       }
 
-      const remainingTasks = existingTasks.filter((t) => !auxiliaryTaskIds.includes(t.id));
+      const legacyTaskIdSet = new Set(legacyTaskIds);
+      const remainingTasks = existingTasks.filter((t) => !legacyTaskIdSet.has(t.id));
 
       const existingWorkIds = new Set(
         remainingTasks.map((t) => t.workId).filter((id): id is number => id != null)
@@ -2674,7 +2756,38 @@ export class DatabaseStorage implements IStorage {
         existingWorkIds.add(w.id);
       }
 
-      return { scheduleId, created, skipped };
+      if (!requestedWorkIds && legacyTaskIds.length > 0) {
+        const workOrderById = new Map(mainWorks.map((work, index) => [work.id, index]));
+        const tasksToOrder = await tx
+          .select({
+            id: scheduleTasks.id,
+            workId: scheduleTasks.workId,
+            orderIndex: scheduleTasks.orderIndex,
+          })
+          .from(scheduleTasks)
+          .where(eq(scheduleTasks.scheduleId, scheduleId));
+
+        const orderedTasks = tasksToOrder
+          .filter((task) => task.workId != null && workOrderById.has(task.workId))
+          .sort((a, b) => {
+            const workOrder =
+              workOrderById.get(a.workId!)! - workOrderById.get(b.workId!)!;
+            if (workOrder !== 0) return workOrder;
+            const taskOrder = Number(a.orderIndex) - Number(b.orderIndex);
+            return taskOrder !== 0 ? taskOrder : a.id - b.id;
+          });
+
+        for (let orderIndex = 0; orderIndex < orderedTasks.length; orderIndex++) {
+          const task = orderedTasks[orderIndex];
+          if (Number(task.orderIndex) === orderIndex) continue;
+          await tx
+            .update(scheduleTasks)
+            .set({ orderIndex })
+            .where(eq(scheduleTasks.id, task.id));
+        }
+      }
+
+      return { scheduleId, created, skipped, removed: legacyTaskIds.length };
     });
   }
 
