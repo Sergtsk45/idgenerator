@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-07-31] - Автовыбор документов качества для актов
+
+### Добавлено
+- `resolveQualityDocumentId` — выбор quality-документа по приоритету: primary+useInActs → useInActs → первый quality-роль.
+- `storage.resolveQualityDocumentForMaterial` — резолв качества по привязкам материала.
+- Fallback при генерации актов из графика: если у task material нет `qualityDocumentId`, подставляется документ из привязок материала.
+- На карточке акта показываются реальные usages материалов (партия, quality-документ) и `act_document_attachments`.
+
+### Изменено
+- UI выбора материалов задачи и актов использует общий `resolveQualityDocumentId`.
+- `updateDocument` больше не блокирует обновление `fileUrl` для `/api/documents/files/...` (нужно для PDF upload).
+
+### Исправлено
+- Восстановлен `getProjectDocument` (нужен upload/download/delete PDF).
+
+---
+
 ## [2026-07-30] - Загрузка PDF к project-документам
 
 ### Добавлено

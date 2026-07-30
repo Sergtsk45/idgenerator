@@ -322,6 +322,16 @@ export function registerScheduleRoutes(app: Express): void {
 
         const taskMaterialsLists = await Promise.all(tasks.map((t: any) => storage.getTaskMaterials(Number(t.id))));
         const flatTaskMaterials = taskMaterialsLists.flat();
+        const materialIds = Array.from(new Set(flatTaskMaterials.map((row: any) => Number(row.projectMaterialId))));
+        // ponytail: one lookup per unique material; replace with a batch resolver if acts routinely reach hundreds of materials.
+        const fallbackQualityDocuments = new Map(
+          await Promise.all(
+            materialIds.map(async (projectMaterialId) => [
+              projectMaterialId,
+              await storage.resolveQualityDocumentForMaterial(projectMaterialId),
+            ] as const),
+          ),
+        );
 
         const actUsageItems: any[] = [];
         const attachmentDocIds: number[] = [];
@@ -329,7 +339,13 @@ export function registerScheduleRoutes(app: Express): void {
         let missingQualityDocs = 0;
 
         for (const row of flatTaskMaterials) {
-          const qdId = (row as any).qualityDocumentId == null ? null : Number((row as any).qualityDocumentId);
+          const fallbackDocument = fallbackQualityDocuments.get(Number((row as any).projectMaterialId));
+          const qdId =
+            (row as any).qualityDocumentId == null
+              ? fallbackDocument == null
+                ? null
+                : Number(fallbackDocument.id)
+              : Number((row as any).qualityDocumentId);
           if (qdId == null) missingQualityDocs++;
           if (qdId != null && !attachmentDocSeen.has(qdId)) {
             attachmentDocSeen.add(qdId);

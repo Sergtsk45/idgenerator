@@ -91,7 +91,7 @@ import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql, count } from "drizzle-orm";
 import { compareWorksOrder, isMainWorkPosition } from "@shared/workPositionKind";
 import { getQuota, getEffectiveTariff } from "@shared/tariff-features";
-import { QUALITY_BINDING_ROLES } from "@shared/documentBinding";
+import { QUALITY_BINDING_ROLES, resolveQualityDocumentId } from "@shared/documentBinding";
 
 const qualityBindingRoleSql = inArray(documentBindings.bindingRole, [...QUALITY_BINDING_ROLES]);
 
@@ -170,6 +170,7 @@ export interface IStorage {
       }
     | undefined
   >;
+  resolveQualityDocumentForMaterial(projectMaterialId: number): Promise<Document | null>;
   createProjectMaterial(
     objectId: number,
     data: Omit<InsertProjectMaterial, "objectId">
@@ -224,6 +225,7 @@ export interface IStorage {
       ActMaterialUsage & {
         projectMaterial?: ProjectMaterial;
         catalogMaterial?: MaterialCatalog | null;
+        batch?: MaterialBatch | null;
         qualityDocument?: Document | null;
       }
     >
@@ -1136,6 +1138,16 @@ export class DatabaseStorage implements IStorage {
     return { material, catalog, batches, bindings, documents: docs };
   }
 
+  async resolveQualityDocumentForMaterial(projectMaterialId: number): Promise<Document | null> {
+    const details = await this.getProjectMaterial(projectMaterialId);
+    if (!details) return null;
+    const documentIds = new Set(details.documents.map((document) => Number(document.id)));
+    const documentId = resolveQualityDocumentId(
+      details.bindings.filter((binding) => documentIds.has(Number(binding.documentId))),
+    );
+    return details.documents.find((document) => Number(document.id) === documentId) ?? null;
+  }
+
   async createProjectMaterial(objectId: number, data: Omit<InsertProjectMaterial, "objectId">): Promise<ProjectMaterial> {
     const [created] = await db
       .insert(projectMaterials)
@@ -1448,7 +1460,6 @@ export class DatabaseStorage implements IStorage {
       if (!existing) return undefined;
       if (existing.scope === "project" && existing.objectId !== objectId) return undefined;
       if (existing.scope === "global") return existing;
-      if (existing.fileUrl?.startsWith("/api/documents/files/")) return undefined;
 
       const [updated] = await tx
         .update(documents)
@@ -1580,7 +1591,7 @@ export class DatabaseStorage implements IStorage {
 
   async getActMaterialUsages(
     actId: number
-  ): Promise<Array<ActMaterialUsage & { projectMaterial?: ProjectMaterial; catalogMaterial?: MaterialCatalog | null; qualityDocument?: Document | null }>> {
+  ): Promise<Array<ActMaterialUsage & { projectMaterial?: ProjectMaterial; catalogMaterial?: MaterialCatalog | null; batch?: MaterialBatch | null; qualityDocument?: Document | null }>> {
     const usages = await db
       .select()
       .from(actMaterialUsages)
@@ -1588,6 +1599,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(actMaterialUsages.orderIndex));
 
     const materialIds = Array.from(new Set(usages.map((u) => u.projectMaterialId)));
+    const batchIds = Array.from(new Set(usages.map((u) => u.batchId).filter((v): v is any => v != null)));
     const qualityDocIds = Array.from(new Set(usages.map((u) => u.qualityDocumentId).filter((v): v is any => v != null)));
 
     const materials =
@@ -1606,6 +1618,8 @@ export class DatabaseStorage implements IStorage {
       qualityDocIds.length === 0
         ? []
         : await db.select().from(documents).where(and(inArray(documents.id, qualityDocIds as any), isNull(documents.deletedAt)));
+    const batches =
+      batchIds.length === 0 ? [] : await db.select().from(materialBatches).where(inArray(materialBatches.id, batchIds as any));
 
     const materialById = new Map<number, { material: ProjectMaterial; catalog: MaterialCatalog | null }>();
     for (const row of materials) {
@@ -1616,14 +1630,18 @@ export class DatabaseStorage implements IStorage {
 
     const docById = new Map<number, Document>();
     for (const d of docs) docById.set(Number(d.id), d);
+    const batchById = new Map<number, MaterialBatch>();
+    for (const batch of batches) batchById.set(Number(batch.id), batch);
 
     return usages.map((u) => {
       const mat = materialById.get(Number(u.projectMaterialId));
       const qd = u.qualityDocumentId == null ? null : (docById.get(Number(u.qualityDocumentId)) ?? null);
+      const batch = u.batchId == null ? null : (batchById.get(Number(u.batchId)) ?? null);
       return {
         ...(u as any),
         projectMaterial: mat?.material,
         catalogMaterial: mat?.catalog ?? null,
+        batch,
         qualityDocument: qd,
       };
     });

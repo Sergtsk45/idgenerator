@@ -31,7 +31,7 @@ import { api, buildUrl } from "@shared/routes";
 import { useCurrentObject } from "@/hooks/use-source-data";
 import { useProjectMaterials } from "@/hooks/use-materials";
 import { openPdfDownload } from "@/lib/pdf-download";
-import { isQualityBindingRole } from "@shared/documentBinding";
+import { isQualityBindingRole, resolveQualityDocumentId } from "@shared/documentBinding";
 
 interface ActTemplate {
   id: number;
@@ -56,6 +56,37 @@ interface TemplatesResponse {
 }
 
 const PAGE_SIZE = 10;
+
+async function loadQualityDocumentOptions(materialId: number) {
+  const url = buildUrl(api.projectMaterials.get.path, { id: materialId });
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to load material details");
+  const data: any = await res.json();
+  const documents = new Map<number, any>(
+    (Array.isArray(data?.documents) ? data.documents : []).map((document: any) => [Number(document.id), document]),
+  );
+  const bindings = (Array.isArray(data?.bindings) ? data.bindings : [])
+    .filter((binding: any) => isQualityBindingRole(binding.bindingRole) && documents.has(Number(binding.documentId)));
+  const defaultDocumentId = resolveQualityDocumentId(bindings);
+  const seen = new Set<number>();
+  const options = [...bindings]
+    .sort((a: any, b: any) => Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)))
+    .flatMap((binding: any) => {
+      const id = Number(binding.documentId);
+      if (seen.has(id)) return [];
+      seen.add(id);
+      const document = documents.get(id);
+      return [{
+        id,
+        label: [
+          String(document.docType ?? "document"),
+          document.docNumber ? `№${String(document.docNumber)}` : "",
+          String(document.title ?? "").trim(),
+        ].filter(Boolean).join(" · "),
+      }];
+    });
+  return { options, defaultDocumentId };
+}
 
 export default function Acts() {
   const { language } = useLanguageStore();
@@ -171,27 +202,7 @@ export default function Acts() {
     const run = async () => {
       setDocPickerLoading(true);
       try {
-        const url = buildUrl(api.projectMaterials.get.path, { id: materialId });
-        const res = await fetch(url, { credentials: "include" });
-        if (!res.ok) throw new Error("Failed to load material details");
-        const data: any = await res.json();
-
-        const bindings: any[] = Array.isArray(data?.bindings) ? data.bindings : [];
-        const docs: any[] = Array.isArray(data?.documents) ? data.documents : [];
-
-        const qualityDocIds = new Set<number>(
-          bindings.filter((b) => isQualityBindingRole(b?.bindingRole)).map((b) => Number(b?.documentId)).filter((x) => Number.isFinite(x) && x > 0),
-        );
-
-        const options = docs
-          .filter((d) => qualityDocIds.has(Number(d?.id)))
-          .map((d) => {
-            const type = String(d?.docType ?? "document");
-            const num = d?.docNumber ? ` №${String(d.docNumber)}` : "";
-            const dt = d?.docDate ? ` от ${String(d.docDate)}` : "";
-            return { id: Number(d.id), label: `${type}${num}${dt}`.trim() };
-          });
-
+        const { options } = await loadQualityDocumentOptions(materialId);
         if (!cancelled) setDocPickerOptions(options);
       } catch {
         if (!cancelled) setDocPickerOptions([]);
@@ -1141,12 +1152,22 @@ export default function Acts() {
                         <label key={id} className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer">
                           <Checkbox
                             checked={checked}
-                            onCheckedChange={(v) => {
+                            onCheckedChange={async (v) => {
                               const next = Boolean(v);
+                              const quality =
+                                next
+                                  ? await loadQualityDocumentOptions(id).catch(() => ({ options: [], defaultDocumentId: null }))
+                                  : null;
+                              const defaultOption = quality?.options.find((option) => option.id === quality.defaultDocumentId);
                               setP3Materials((prev) => {
                                 if (next) {
                                   if (prev.some((x) => x.projectMaterialId === id)) return prev;
-                                  return [...prev, { projectMaterialId: id, title, qualityDocumentId: null }];
+                                  return [...prev, {
+                                    projectMaterialId: id,
+                                    title,
+                                    qualityDocumentId: quality?.defaultDocumentId ?? null,
+                                    qualityLabel: defaultOption?.label,
+                                  }];
                                 }
                                 return prev.filter((x) => x.projectMaterialId !== id);
                               });

@@ -599,6 +599,19 @@ export async function buildP3MaterialsText(actId: number): Promise<string> {
   const usages = await storage.getActMaterialUsages(actId);
   if (!usages || usages.length === 0) return "";
 
+  const missingMaterialIds = Array.from(
+    new Set(usages.filter((usage) => !usage.qualityDocument).map((usage) => Number(usage.projectMaterialId))),
+  );
+  // ponytail: legacy fallback does one lookup per unique material; batch it if old acts routinely contain hundreds.
+  const fallbackQualityDocuments = new Map(
+    await Promise.all(
+      missingMaterialIds.map(async (projectMaterialId) => [
+        projectMaterialId,
+        await storage.resolveQualityDocumentForMaterial(projectMaterialId),
+      ] as const),
+    ),
+  );
+
   const lines = usages.map((u) => {
     const name =
       String(u.catalogMaterial?.name ?? "").trim() ||
@@ -608,7 +621,7 @@ export async function buildP3MaterialsText(actId: number): Promise<string> {
     const standardRef = String((u.catalogMaterial as any)?.standardRef ?? "").trim();
     const namePart = standardRef ? `${name} (${standardRef})` : name;
 
-    const qd = u.qualityDocument;
+    const qd = u.qualityDocument ?? fallbackQualityDocuments.get(Number(u.projectMaterialId));
     const docPart = qd
       ? `${translateDocTypeRu((qd as any).docType)}${(qd as any).docNumber ? ` №${String((qd as any).docNumber)}` : ""}${
           (qd as any).docDate ? ` от ${formatDate(String((qd as any).docDate))}` : ""

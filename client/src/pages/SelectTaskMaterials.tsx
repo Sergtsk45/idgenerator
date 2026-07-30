@@ -11,6 +11,7 @@ import { Header } from "@/components/Header";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useTaskMaterials, useReplaceTaskMaterials } from "@/hooks/use-task-materials";
 import { useProjectMaterials } from "@/hooks/use-materials";
@@ -18,6 +19,9 @@ import { useCurrentObject } from "@/hooks/use-source-data";
 import { useLanguageStore, translations } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Loader2, Plus, Trash2, ChevronUp, ChevronDown, Check } from "lucide-react";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { api, buildUrl } from "@shared/routes";
+import { isQualityBindingRole, resolveQualityDocumentId } from "@shared/documentBinding";
 
 type MaterialItem = {
   projectMaterialId: number;
@@ -33,11 +37,43 @@ type ProjectMaterial = {
   catalogMaterial?: { name?: string } | null;
 };
 
+async function loadProjectMaterialDetails(materialId: number) {
+  const url = buildUrl(api.projectMaterials.get.path, { id: materialId });
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to fetch project material");
+  return api.projectMaterials.get.responses[200].parse(await res.json());
+}
+
+function getQualityDocumentOptions(details: any) {
+  const documents = new Map<number, any>(
+    (details?.documents ?? []).map((document: any) => [Number(document.id), document]),
+  );
+  const seen = new Set<number>();
+  return [...(details?.bindings ?? [])]
+    .filter((binding: any) => isQualityBindingRole(binding.bindingRole) && documents.has(Number(binding.documentId)))
+    .sort((a: any, b: any) => Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)))
+    .flatMap((binding: any) => {
+      const documentId = Number(binding.documentId);
+      if (seen.has(documentId)) return [];
+      seen.add(documentId);
+      const document = documents.get(documentId);
+      return [{
+        id: documentId,
+        label: [
+          String(document.docType ?? "document"),
+          document.docNumber ? `№${String(document.docNumber)}` : "",
+          String(document.title ?? "").trim(),
+        ].filter(Boolean).join(" · "),
+      }];
+    });
+}
+
 export default function SelectTaskMaterials() {
   const [, navigate] = useLocation();
   const { language } = useLanguageStore();
   const t = translations[language].selectTaskMaterials;
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Get taskId from history.state
   const taskId = window.history.state?.taskId as number | undefined;
@@ -53,6 +89,22 @@ export default function SelectTaskMaterials() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const materialDetailsQueries = useQueries({
+    queries: materials.map((item) => ({
+      queryKey: [api.projectMaterials.get.path, item.projectMaterialId],
+      queryFn: () => loadProjectMaterialDetails(item.projectMaterialId),
+    })),
+  });
+  const materialDetailsById = useMemo(
+    () =>
+      new Map(
+        materials.flatMap((item, index) => {
+          const details = materialDetailsQueries[index]?.data;
+          return details ? [[item.projectMaterialId, details] as const] : [];
+        }),
+      ),
+    [materials, materialDetailsQueries],
+  );
 
   // Initialize materials from loaded data
   useEffect(() => {
@@ -148,20 +200,28 @@ export default function SelectTaskMaterials() {
     return availableMaterials.filter((m) => m.label.toLowerCase().includes(query));
   }, [availableMaterials, searchQuery]);
 
-  const handleAddMaterial = useCallback((materialId: number) => {
+  const handleAddMaterial = useCallback(async (materialId: number) => {
+    const details = await queryClient.fetchQuery({
+      queryKey: [api.projectMaterials.get.path, materialId],
+      queryFn: () => loadProjectMaterialDetails(materialId),
+    }).catch(() => null);
+    const availableDocumentIds = new Set((details?.documents ?? []).map((document) => Number(document.id)));
+    const qualityDocumentId = resolveQualityDocumentId(
+      (details?.bindings ?? []).filter((binding) => availableDocumentIds.has(Number(binding.documentId))),
+    );
     setMaterials((prev) => [
       ...prev,
       {
         projectMaterialId: materialId,
         batchId: null,
-        qualityDocumentId: null,
+        qualityDocumentId,
         note: null,
       },
     ]);
     setHasUnsavedChanges(true);
     setAddDialogOpen(false);
     setSearchQuery("");
-  }, []);
+  }, [queryClient]);
 
   const handleRemoveMaterial = useCallback((index: number) => {
     setMaterials((prev) => prev.filter((_, i) => i !== index));
@@ -322,26 +382,31 @@ export default function SelectTaskMaterials() {
                         />
                       </div>
 
-                      {/* Quality Document ID */}
+                      {/* Quality document */}
                       <div className="grid gap-1.5">
                         <label className="text-xs font-medium text-muted-foreground">
                           {t.qualityDoc}
                         </label>
-                        <Input
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={item.qualityDocumentId ?? ""}
-                          onChange={(e) =>
-                            handleUpdateMaterial(
-                              index,
-                              "qualityDocumentId",
-                              validateAndParseNumber(e.target.value)
-                            )
+                        <Select
+                          value={item.qualityDocumentId == null ? "none" : String(item.qualityDocumentId)}
+                          onValueChange={(value) =>
+                            handleUpdateMaterial(index, "qualityDocumentId", value === "none" ? null : Number(value))
                           }
-                          placeholder={language === "ru" ? "ID документа" : "Document ID"}
-                          className="h-9 text-sm"
-                        />
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder={language === "ru" ? "Выберите документ" : "Select document"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              {language === "ru" ? "Не указан" : "Not specified"}
+                            </SelectItem>
+                            {getQualityDocumentOptions(materialDetailsById.get(item.projectMaterialId)).map((option) => (
+                              <SelectItem key={option.id} value={String(option.id)}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       {/* Note */}

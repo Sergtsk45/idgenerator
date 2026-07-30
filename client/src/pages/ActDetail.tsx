@@ -46,6 +46,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { openPdfDownload } from "@/lib/pdf-download";
+import { useActDocumentAttachments, useActMaterialUsages } from "@/hooks/use-act-materials";
 
 interface ActDetailProps {
   params: { id: string };
@@ -78,6 +79,8 @@ export default function ActDetail({ params }: ActDetailProps) {
   const { toast } = useToast();
   const actId = Number(params.id);
   const { data: act, isLoading } = useAct(actId);
+  const { data: materialUsages = [], isLoading: materialsLoading } = useActMaterialUsages(actId);
+  const { data: documentAttachments = [], isLoading: documentsLoading } = useActDocumentAttachments(actId);
   const { data: templatesData, isLoading: templatesLoading } = useQuery<TemplatesResponse>({
     queryKey: ["/api/act-templates"],
   });
@@ -194,7 +197,6 @@ export default function ActDetail({ params }: ActDetailProps) {
   }
 
   const works = (act.worksData ?? []) as any[];
-  const attachments = (act as any).attachments ?? [];
   const hasDrawings = !!act.projectDrawingsAgg;
   const hasNormatives = !!act.normativeRefsAgg;
   const hasDates = !!act.dateStart && !!act.dateEnd;
@@ -352,12 +354,62 @@ export default function ActDetail({ params }: ActDetailProps) {
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4 text-[--p500]" />
                 <span className="o-overline">{t("Материалы", "Materials")}</span>
+                {materialUsages.length > 0 && (
+                  <span className="ml-1 text-[11px] bg-[--g200] text-[--g700] rounded-full px-1.5 py-0">{materialUsages.length}</span>
+                )}
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4 pt-1">
-              <p className="text-[13px] text-[--g400] text-center py-4">
-                {t("Привязка материалов — в разделе «Исходные данные»", "Material bindings are in Source Data section")}
-              </p>
+              {materialsLoading ? (
+                <div className="flex items-center justify-center py-4 text-[--g500]">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  {t("Загрузка...", "Loading...")}
+                </div>
+              ) : materialUsages.length === 0 ? (
+                <p className="text-[13px] text-[--g400] text-center py-4">
+                  {t("Нет материалов в акте", "No materials in this act")}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {materialUsages.map((usage: any) => {
+                    const document = usage.qualityDocument;
+                    const materialName =
+                      String(usage.projectMaterial?.nameOverride ?? "").trim() ||
+                      String(usage.catalogMaterial?.name ?? "").trim() ||
+                      `Материал #${usage.projectMaterialId}`;
+                    const documentLabel = document
+                      ? [
+                          String(document.docType ?? t("Документ", "Document")),
+                          document.docNumber ? `№${String(document.docNumber)}` : "",
+                          String(document.title ?? "").trim(),
+                        ].filter(Boolean).join(" · ")
+                      : t("не указан", "not specified");
+                    return (
+                      <div key={usage.id} className="py-2 border-b border-[--g100] last:border-0 space-y-1">
+                        <p className="text-[13px] font-medium text-[--g900]">{materialName}</p>
+                        <p className="text-[11px] text-[--g500]">
+                          {t("Партия", "Batch")}: {usage.batch?.batchNumber ?? usage.batchId ?? "—"}
+                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] text-[--g500]">
+                            {t("Документ качества", "Quality document")}: {documentLabel}
+                          </p>
+                          {document?.fileUrl && (
+                            <a
+                              href={document.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-[--p500] hover:underline shrink-0"
+                            >
+                              {t("открыть", "open")}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
 
@@ -367,34 +419,46 @@ export default function ActDetail({ params }: ActDetailProps) {
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-[--p500]" />
                 <span className="o-overline">{t("Документы", "Documents")}</span>
-                {attachments.length > 0 && (
-                  <span className="ml-1 text-[11px] bg-[--g200] text-[--g700] rounded-full px-1.5 py-0">{attachments.length}</span>
+                {documentAttachments.length > 0 && (
+                  <span className="ml-1 text-[11px] bg-[--g200] text-[--g700] rounded-full px-1.5 py-0">{documentAttachments.length}</span>
                 )}
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4 pt-1">
-              {attachments.length === 0 ? (
+              {documentsLoading ? (
+                <div className="flex items-center justify-center py-4 text-[--g500]">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  {t("Загрузка...", "Loading...")}
+                </div>
+              ) : documentAttachments.length === 0 ? (
                 <p className="text-[13px] text-[--g400] text-center py-4">
                   {t("Нет прикреплённых документов", "No attached documents")}
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {attachments.map((a: any) => (
+                  {documentAttachments.map((a: any) => {
+                    const document = a.document;
+                    return (
                     <div key={a.id} className="flex items-center gap-2 py-1.5 border-b border-[--g100] last:border-0">
                       <FileText className="h-4 w-4 text-[--g400] shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] text-[--g900] truncate">{a.name}</p>
-                        {a.type && <p className="text-[11px] text-[--g500]">{a.type}</p>}
+                        <p className="text-[13px] text-[--g900] truncate">
+                          {document?.title || document?.docNumber || t("Документ качества", "Quality document")}
+                        </p>
+                        <p className="text-[11px] text-[--g500]">
+                          {[document?.docType, document?.docNumber ? `№${document.docNumber}` : ""].filter(Boolean).join(" · ")}
+                        </p>
                       </div>
-                      {a.url && (
-                        <a href={a.url} target="_blank" rel="noreferrer">
+                      {document?.fileUrl && (
+                        <a href={document.fileUrl} target="_blank" rel="noreferrer">
                           <Button variant="odoo-icon" size="odoo-icon-sm">
                             <Download className="h-4 w-4" />
                           </Button>
                         </a>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </AccordionContent>
