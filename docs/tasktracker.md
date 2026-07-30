@@ -2,6 +2,20 @@
 
 ---
 
+## Задача: DOC-FILE-UPLOAD — Загрузка PDF к project-документам
+- **Статус**: В процессе (код готов; деплой с persistent volume)
+- **Дата начала**: 2026-07-30
+- **Описание**: Загрузка/раздача/удаление PDF для project-документов с auth, проверкой MIME/%PDF, лимитом 50 MB и хранением на диске через `DOCUMENTS_UPLOAD_DIR`.
+- **Шаги выполнения**:
+  - [x] API `POST/GET/DELETE` для файлов документов
+  - [x] UI в `/source/documents` и `MaterialFullCard`
+  - [x] Тесты `tests/document-files.test.ts`
+  - [ ] Persistent volume + `DOCUMENTS_UPLOAD_DIR` на staging/prod
+  - [ ] Smoke на объекте «Забурхановская»
+- **Зависимости**: object-scoped documents (`DOC-SCOPE`)
+
+---
+
 ## Задача: SCHED-GANTT-ALIGN-ORDER — Выравнивание строк и collection-aware порядок ВОР
 - **Статус**: Завершена локально; production repair ожидает preflight
 - **Дата начала**: 2026-07-29
