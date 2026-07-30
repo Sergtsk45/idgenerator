@@ -91,6 +91,9 @@ import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql, count } from "drizzle-orm";
 import { compareWorksOrder, isMainWorkPosition } from "@shared/workPositionKind";
 import { getQuota, getEffectiveTariff } from "@shared/tariff-features";
+import { QUALITY_BINDING_ROLES } from "@shared/documentBinding";
+
+const qualityBindingRoleSql = inArray(documentBindings.bindingRole, [...QUALITY_BINDING_ROLES]);
 
 type ObjectPartyRole = "customer" | "builder" | "designer";
 type ObjectPersonRole =
@@ -1068,8 +1071,8 @@ export class DatabaseStorage implements IStorage {
         // Cast to int so API returns numbers (matches shared/routes.ts zod schema).
         batchesCount: sql<number>`COALESCE(COUNT(DISTINCT ${materialBatches.id})::int, 0)`,
         docsCount: sql<number>`COALESCE(COUNT(DISTINCT ${documentBindings.id})::int, 0)`,
-        qualityDocsCount: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${documentBindings.bindingRole}='quality' THEN ${documentBindings.id} END)::int, 0)`,
-        hasUseInActsQualityDoc: sql<boolean>`COALESCE(BOOL_OR(${documentBindings.bindingRole}='quality' AND ${documentBindings.useInActs}=TRUE), FALSE)`,
+        qualityDocsCount: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${qualityBindingRoleSql} THEN ${documentBindings.id} END)::int, 0)`,
+        hasUseInActsQualityDoc: sql<boolean>`COALESCE(BOOL_OR(${qualityBindingRoleSql} AND ${documentBindings.useInActs}=TRUE), FALSE)`,
       })
       .from(projectMaterials)
       .leftJoin(materialBatches, eq(materialBatches.projectMaterialId, projectMaterials.id))
@@ -3186,10 +3189,10 @@ export class DatabaseStorage implements IStorage {
         batchId: estimatePositionMaterialLinks.batchId,
         // IMPORTANT: COUNT() is bigint in Postgres and may be returned as string by driver.
         // Cast to int to keep numbers stable for API/logic.
-        qualityDocsTotal: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${documentBindings.bindingRole}='quality' THEN ${documentBindings.id} END)::int, 0)`,
-        qualityDocsUseInActs: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${documentBindings.bindingRole}='quality' AND ${documentBindings.useInActs}=TRUE THEN ${documentBindings.id} END)::int, 0)`,
-        qualityDocsValid: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${documentBindings.bindingRole}='quality' AND (${documents.validTo} IS NULL OR ${documents.validTo} >= CURRENT_DATE) THEN ${documentBindings.id} END)::int, 0)`,
-        qualityDocsValidUseInActs: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${documentBindings.bindingRole}='quality' AND ${documentBindings.useInActs}=TRUE AND (${documents.validTo} IS NULL OR ${documents.validTo} >= CURRENT_DATE) THEN ${documentBindings.id} END)::int, 0)`,
+        qualityDocsTotal: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${qualityBindingRoleSql} THEN ${documentBindings.id} END)::int, 0)`,
+        qualityDocsUseInActs: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${qualityBindingRoleSql} AND ${documentBindings.useInActs}=TRUE THEN ${documentBindings.id} END)::int, 0)`,
+        qualityDocsValid: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${qualityBindingRoleSql} AND (${documents.validTo} IS NULL OR ${documents.validTo} >= CURRENT_DATE) THEN ${documentBindings.id} END)::int, 0)`,
+        qualityDocsValidUseInActs: sql<number>`COALESCE(COUNT(DISTINCT CASE WHEN ${qualityBindingRoleSql} AND ${documentBindings.useInActs}=TRUE AND (${documents.validTo} IS NULL OR ${documents.validTo} >= CURRENT_DATE) THEN ${documentBindings.id} END)::int, 0)`,
       })
       .from(estimatePositionMaterialLinks)
       .leftJoin(documentBindings, eq(documentBindings.projectMaterialId, estimatePositionMaterialLinks.projectMaterialId))

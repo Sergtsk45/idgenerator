@@ -31,6 +31,7 @@ import { api, buildUrl } from "@shared/routes";
 import { useCurrentObject } from "@/hooks/use-source-data";
 import { useProjectMaterials } from "@/hooks/use-materials";
 import { openPdfDownload } from "@/lib/pdf-download";
+import { isQualityBindingRole } from "@shared/documentBinding";
 
 interface ActTemplate {
   id: number;
@@ -179,7 +180,7 @@ export default function Acts() {
         const docs: any[] = Array.isArray(data?.documents) ? data.documents : [];
 
         const qualityDocIds = new Set<number>(
-          bindings.filter((b) => b?.bindingRole === "quality").map((b) => Number(b?.documentId)).filter((x) => Number.isFinite(x) && x > 0),
+          bindings.filter((b) => isQualityBindingRole(b?.bindingRole)).map((b) => Number(b?.documentId)).filter((x) => Number.isFinite(x) && x > 0),
         );
 
         const options = docs

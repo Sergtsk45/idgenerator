@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { DocumentCard, type DocumentCardModel } from "@/components/documents/DocumentCard";
 import { AlertTriangle, CheckCircle2, Star, Trash2, Unlink } from "lucide-react";
 import { formatIsoToDmy } from "@/lib/dateFormat";
+import { isQualityBindingRole } from "@shared/documentBinding";
 
 type BatchModel = {
   id: number;
@@ -62,7 +63,7 @@ export function MaterialDetailView(props: {
     return [head, date, supplier].filter(Boolean).join(" • ");
   };
 
-  const hasUseInActsQualityDoc = props.bindings.some((b) => b.bindingRole === "quality" && b.useInActs);
+  const hasUseInActsQualityDoc = props.bindings.some((b) => isQualityBindingRole(b.bindingRole) && b.useInActs);
 
   return (
     <div className="grid gap-4">
@@ -168,7 +169,7 @@ export function MaterialDetailView(props: {
                   const d = docById.get(binding.documentId);
                   if (!d) return null;
                   const scopeLabel = binding.batchId == null ? "На все партии" : formatBatchLabel(Number(binding.batchId));
-                  const showUseInActs = binding.bindingRole === "quality";
+                  const showUseInActs = isQualityBindingRole(binding.bindingRole);
                   return (
                     <DocumentCard
                       key={binding.id}
@@ -267,4 +268,3 @@ export function MaterialDetailView(props: {
     </div>
   );
 }
-

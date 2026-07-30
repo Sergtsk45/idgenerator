@@ -28,6 +28,7 @@ import { BatchForm, type BatchDraft } from "@/components/materials/BatchForm";
 import { format } from "date-fns";
 import { CalendarIcon, Loader2, Plus, Star } from "lucide-react";
 import { formatIsoToDmy, normalizeDmyInput, parseDmyToIso } from "@/lib/dateFormat";
+import { isQualityBindingRole } from "@shared/documentBinding";
 
 type DocDraft = {
   docType: "certificate" | "declaration" | "passport" | "protocol" | "scheme" | "other";
@@ -410,7 +411,7 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                                 objectId: null,
                                 batchId: batchIdForBinding,
                                 bindingRole: role,
-                                useInActs: role === "quality" ? true : false,
+                                useInActs: isQualityBindingRole(role),
                                 isPrimary: false,
                               } as any);
                               toast({ title: "Готово", description: "Документ привязан" });
@@ -442,7 +443,10 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                           type="button"
                           variant={newDoc.docType === t ? "default" : "outline"}
                           className="rounded-xl justify-center"
-                          onClick={() => setNewDoc((p) => ({ ...p, docType: t, useInActs: t === "certificate" || t === "declaration" }))}
+                          onClick={() => {
+                            const role = deriveBindingRole(t);
+                            setNewDoc((p) => ({ ...p, docType: t, useInActs: isQualityBindingRole(role) }));
+                          }}
                         >
                           {t}
                         </Button>
@@ -502,7 +506,7 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                     <Input value={newDoc.fileUrl ?? ""} onChange={(e) => setNewDoc((p) => ({ ...p, fileUrl: e.target.value }))} />
                   </div>
 
-                  {(newDoc.docType === "certificate" || newDoc.docType === "declaration") ? (
+                  {isQualityBindingRole(deriveBindingRole(newDoc.docType)) ? (
                     <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
                       <div className="text-sm">Использовать в актах</div>
                       <Switch checked={newDoc.useInActs} onCheckedChange={(v) => setNewDoc((p) => ({ ...p, useInActs: v }))} />
@@ -538,7 +542,7 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                           objectId: null,
                           batchId: batchIdForBinding,
                           bindingRole: role,
-                          useInActs: role === "quality" ? Boolean(newDoc.useInActs) : false,
+                          useInActs: isQualityBindingRole(role) ? Boolean(newDoc.useInActs) : false,
                           isPrimary: false,
                         } as any);
                         toast({ title: "Готово", description: "Документ создан и привязан" });

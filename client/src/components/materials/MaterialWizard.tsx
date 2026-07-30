@@ -21,6 +21,7 @@ import { useCreateDocument, useCreateDocumentBinding, useDocuments } from "@/hoo
 import { BatchForm, type BatchDraft } from "@/components/materials/BatchForm";
 import { Loader2, Plus } from "lucide-react";
 import { api, buildUrl } from "@shared/routes";
+import { isQualityBindingRole } from "@shared/documentBinding";
 
 type Step = 1 | 2 | 3 | 4;
 type DocScopeFilter = "all" | "project" | "global";
@@ -164,14 +165,17 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
           fileUrl: doc.fileUrl || null,
         } as any);
 
+        const documentType = String((documentForBinding as any).docType ?? doc.docType);
         const bindingRole =
-          String((documentForBinding as any).docType ?? doc.docType) === "passport"
+          documentType === "passport"
             ? "passport"
-            : String((documentForBinding as any).docType ?? doc.docType) === "protocol"
+            : documentType === "protocol"
               ? "protocol"
-              : String((documentForBinding as any).docType ?? doc.docType) === "scheme"
+              : documentType === "scheme"
                 ? "scheme"
-                : "quality";
+                : documentType === "other"
+                  ? "other"
+                  : "quality";
 
         const batchIdForBinding =
           addBatch && docBindTarget === "batch" ? createdBatchId : null;
@@ -182,7 +186,7 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
           objectId: null,
           batchId: batchIdForBinding,
           bindingRole,
-          useInActs: bindingRole === "quality" ? doc.useInActs : false,
+          useInActs: isQualityBindingRole(bindingRole) ? doc.useInActs : false,
           isPrimary: false,
         } as any);
       }
@@ -388,7 +392,10 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
                               type="button"
                               variant={selectedDocumentId === id ? "default" : "outline"}
                               className="w-full justify-start rounded-xl"
-                              onClick={() => setSelectedDocumentId(id)}
+                              onClick={() => {
+                                setSelectedDocumentId(id);
+                                setDoc((current) => ({ ...current, useInActs: true }));
+                              }}
                             >
                               <span className="min-w-0 flex-1 truncate text-left">{label}</span>
                               <Badge variant={d.scope === "global" ? "info" : "neutral"} className="ml-2 shrink-0">
@@ -404,7 +411,16 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
                   <>
                     <div className="grid gap-2">
                       <Label>Тип</Label>
-                      <Select value={doc.docType} onValueChange={(v) => setDoc((p) => ({ ...p, docType: v as any, useInActs: v !== "passport" }))}>
+                      <Select
+                        value={doc.docType}
+                        onValueChange={(v) =>
+                          setDoc((p) => ({
+                            ...p,
+                            docType: v as DocDraft["docType"],
+                            useInActs: v === "certificate" || v === "declaration" || v === "passport" || v === "protocol",
+                          }))
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -436,7 +452,7 @@ export function MaterialWizard(props: { objectId: number; open: boolean; onOpenC
                   </>
                 )}
 
-                {(docMode === "registry" || doc.docType === "certificate" || doc.docType === "declaration") && (
+                {(docMode === "registry" || doc.docType === "certificate" || doc.docType === "declaration" || doc.docType === "passport" || doc.docType === "protocol") && (
                   <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
                     <div className="text-sm">Использовать в актах</div>
                     <Switch checked={doc.useInActs} onCheckedChange={(v) => setDoc((p) => ({ ...p, useInActs: v }))} />
