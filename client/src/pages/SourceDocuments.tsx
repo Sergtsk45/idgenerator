@@ -39,10 +39,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { type ApiError, useCreateDocument, useDeleteDocument, useDocuments, useSetDocumentScope, useUpdateDocument } from "@/hooks/use-documents";
+import { type ApiError, useCreateDocument, useDeleteDocument, useDeleteDocumentFile, useDocuments, useSetDocumentScope, useUpdateDocument, useUploadDocumentFile } from "@/hooks/use-documents";
 import { useCurrentObject } from "@/hooks/use-source-data";
 import { ExternalLink, FileText, Globe2, Loader2, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { openDocumentFile } from "@/lib/document-file";
 
 const DOC_TYPES = ["certificate", "declaration", "passport", "protocol", "scheme", "other"] as const;
 const PAGE_SIZE = 20;
@@ -118,6 +119,8 @@ export default function SourceDocuments() {
   const createDoc = useCreateDocument();
   const updateDoc = useUpdateDocument();
   const deleteDoc = useDeleteDocument();
+  const uploadFile = useUploadDocumentFile();
+  const deleteFile = useDeleteDocumentFile();
   const setDocScope = useSetDocumentScope();
   const currentObjectQuery = useCurrentObject();
   const currentObjectTitle = String((currentObjectQuery.data as any)?.title ?? "текущий объект");
@@ -130,6 +133,7 @@ export default function SourceDocuments() {
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [makeGlobalTarget, setMakeGlobalTarget] = useState<any | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const docsQuery = useDocuments({
@@ -159,12 +163,14 @@ export default function SourceDocuments() {
 
   const openCreate = () => {
     setEditingDoc(null);
+    setSelectedFile(null);
     setForm(emptyForm(createScope));
     setSheetOpen(true);
   };
 
   const openEdit = (doc: any) => {
     setEditingDoc(doc);
+    setSelectedFile(null);
     setForm(formFromDocument(doc));
     setSheetOpen(true);
   };
@@ -172,7 +178,7 @@ export default function SourceDocuments() {
   const submit = async () => {
     try {
       if (editingDoc) {
-        await updateDoc.mutateAsync({
+        const updated = await updateDoc.mutateAsync({
           id: Number(editingDoc.id),
           patch: {
             docType: form.docType,
@@ -184,10 +190,11 @@ export default function SourceDocuments() {
             fileUrl: form.fileUrl || null,
           },
         });
+        if (selectedFile) await uploadFile.mutateAsync({ id: Number(updated.id), file: selectedFile });
         toast({ title: "Сохранено", description: "Документ обновлен" });
       } else {
         const scope = viewMode === "all" ? form.scope : createScope;
-        await createDoc.mutateAsync({
+        const created = await createDoc.mutateAsync({
           docType: form.docType as any,
           scope,
           viewMode,
@@ -199,10 +206,23 @@ export default function SourceDocuments() {
           meta: {},
           fileUrl: form.fileUrl || null,
         } as any);
-        toast({ title: "Создано", description: "Документ добавлен в реестр" });
+        let fileUploaded = true;
+        if (selectedFile && scope === "project") {
+          try {
+            await uploadFile.mutateAsync({ id: Number(created.id), file: selectedFile });
+          } catch {
+            fileUploaded = false;
+          }
+        }
+        toast({
+          title: fileUploaded ? "Создано" : "Документ создан без PDF",
+          description: fileUploaded ? "Документ добавлен в реестр" : "Откройте документ для редактирования и повторите загрузку.",
+          variant: fileUploaded ? "default" : "destructive",
+        });
       }
       setSheetOpen(false);
       setEditingDoc(null);
+      setSelectedFile(null);
       setForm(emptyForm(createScope));
     } catch (e) {
       toast({
@@ -363,7 +383,12 @@ export default function SourceDocuments() {
                           size="compact"
                           className="h-11 sm:h-7 px-3 sm:px-2 text-[11px] gap-1"
                           disabled={!d.fileUrl}
-                          onClick={() => d.fileUrl && window.open(d.fileUrl, "_blank", "noopener,noreferrer")}
+                          onClick={() => {
+                            if (!d.fileUrl) return;
+                            void openDocumentFile(d.fileUrl).catch((error) => {
+                              toast({ title: "Ошибка", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+                            });
+                          }}
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                           Открыть
@@ -385,7 +410,7 @@ export default function SourceDocuments() {
                               <Pencil className="h-4 w-4 mr-2" />
                               Редактировать
                             </DropdownMenuItem>
-                            {d.scope === "project" && (
+                            {d.scope === "project" && !d.fileUrl?.startsWith("/api/documents/files/") && (
                               <DropdownMenuItem disabled={setDocScope.isPending} onClick={() => setMakeGlobalTarget(d)}>
                                 <Globe2 className="h-4 w-4 mr-2" />
                                 Сделать глобальным
@@ -505,9 +530,47 @@ export default function SourceDocuments() {
                 <Label className="o-overline">URL файла (опц.)</Label>
                 <Input value={form.fileUrl} onChange={(e) => setForm((p) => ({ ...p, fileUrl: e.target.value }))} />
               </div>
+              <div className="grid gap-1.5">
+                <Label className="o-overline">Загрузить PDF</Label>
+                <Input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  disabled={form.scope === "global"}
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                />
+                {selectedFile ? <p className="text-xs text-muted-foreground">{selectedFile.name}</p> : null}
+                {form.scope === "global" ? <p className="text-xs text-muted-foreground">Загрузка доступна для документов проекта.</p> : null}
+                {editingDoc?.fileUrl ? (
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => void openDocumentFile(form.fileUrl).catch((error) => {
+                      toast({ title: "Ошибка", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+                    })}>
+                      Открыть
+                    </Button>
+                    {editingDoc.scope === "project" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={deleteFile.isPending}
+                        onClick={async () => {
+                          try {
+                            await deleteFile.mutateAsync(Number(editingDoc.id));
+                            setForm((current) => ({ ...current, fileUrl: "" }));
+                            setEditingDoc((current: any) => ({ ...current, fileUrl: null }));
+                          } catch (error) {
+                            toast({ title: "Ошибка", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+                          }
+                        }}
+                      >
+                        Удалить файл
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
 
-              <Button variant="odoo-primary" onClick={submit} disabled={createDoc.isPending || updateDoc.isPending} className="w-full gap-2">
-                {createDoc.isPending || updateDoc.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              <Button variant="odoo-primary" onClick={submit} disabled={createDoc.isPending || updateDoc.isPending || uploadFile.isPending} className="w-full gap-2">
+                {createDoc.isPending || updateDoc.isPending || uploadFile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 {editingDoc ? "Сохранить" : "Создать"}
               </Button>
             </div>

@@ -13,6 +13,15 @@ import { api } from '@shared/routes';
 import { storage, appAuth, getObjectId, resolveCurrentObject, type AuthenticatedRequest } from './_common';
 import { requireFeature, requireQuota } from '../middleware/tariff';
 import { DocumentInUseError } from '../storage';
+import {
+  DOCUMENT_FILE_MAX_BYTES,
+  documentFilename,
+  documentFileUrl,
+  isPdf,
+  removeDocumentFile,
+  resolveDocumentFile,
+  saveDocumentFile,
+} from '../document-files';
 
 // ── Invoice upload config ────────────────────────────────────────────────────
 
@@ -53,6 +62,39 @@ const correctionRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: DOCUMENT_FILE_MAX_BYTES },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf' && file.originalname.toLowerCase().endsWith('.pdf')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are accepted'));
+    }
+  },
+});
+
+const documentUploadRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many document upload requests, please try again later' },
+});
+
+function receiveDocumentFile(req: any, res: any, next: any) {
+  documentUpload.single('file')(req, res, (error) => {
+    if (!error) return next();
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'File too large (max 50 MB)' });
+    }
+    if (error.message === 'Only PDF files are accepted') {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(400).json({ message: 'File upload failed' });
+  });
+}
 
 // ── Route registration ───────────────────────────────────────────────────────
 
@@ -518,6 +560,97 @@ export function registerMaterialsRoutes(app: Express): void {
         return res.status(400).json({ message: err.errors[0].message });
       }
       console.error('Document set scope failed:', err);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
+  app.post(
+    api.documents.uploadFile.path,
+    documentUploadRateLimiter,
+    ...appAuth,
+    resolveCurrentObject,
+    receiveDocumentFile,
+    async (req, res) => {
+      const id = Number(req.params.id);
+      const objectId = getObjectId(req);
+      if (!Number.isInteger(id) || id <= 0 || !objectId) {
+        return res.status(400).json({ message: 'Invalid document or current object' });
+      }
+      if (!req.file) return res.status(400).json({ message: 'PDF file is required' });
+      if (!isPdf(req.file.buffer)) return res.status(400).json({ message: 'File content is not a PDF' });
+
+      try {
+        const userId = (req as AuthenticatedRequest).user.id;
+        const document = await storage.getProjectDocument(id, userId, objectId);
+        if (!document) return res.status(404).json({ message: 'Not found' });
+
+        const filename = documentFilename(id, req.file.originalname);
+        const fileUrl = documentFileUrl(objectId, filename);
+        await saveDocumentFile(objectId, filename, req.file.buffer);
+        const updated = await storage.updateDocument(id, userId, objectId, { fileUrl });
+        if (!updated) {
+          await removeDocumentFile(fileUrl);
+          return res.status(404).json({ message: 'Not found' });
+        }
+        if (document.fileUrl !== fileUrl) {
+          await removeDocumentFile(document.fileUrl).catch((error) => console.error('Old document file cleanup failed:', error));
+        }
+        return res.status(200).json(updated);
+      } catch (error) {
+        console.error('Document file upload failed:', error);
+        return res.status(500).json({ message: 'Internal Server Error' });
+      }
+    },
+  );
+
+  app.get(api.documents.getFile.path, ...appAuth, async (req, res) => {
+    const objectId = Number(req.params.objectId);
+    const filename = String(req.params.filename || '');
+    const documentId = Number(filename.match(/^(\d+)_/)?.[1]);
+    if (!Number.isInteger(objectId) || objectId <= 0 || !Number.isInteger(documentId)) {
+      return res.status(400).json({ message: 'Invalid document file path' });
+    }
+    try {
+      const filePath = resolveDocumentFile(objectId, filename);
+      const document = await storage.getProjectDocument(documentId, (req as AuthenticatedRequest).user.id, objectId);
+      if (!document || document.fileUrl !== documentFileUrl(objectId, filename)) {
+        return res.status(404).json({ message: 'Not found' });
+      }
+      res.type('application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      return res.sendFile(filePath, (error) => {
+        if (!error) return;
+        if (!res.headersSent) {
+          res.status((error as any).statusCode === 404 ? 404 : 500).json({ message: 'File not found' });
+        } else {
+          res.end();
+        }
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Invalid document file path') {
+        return res.status(400).json({ message: error.message });
+      }
+      console.error('Document file download failed:', error);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
+  app.delete(api.documents.deleteFile.path, ...appAuth, resolveCurrentObject, async (req, res) => {
+    const id = Number(req.params.id);
+    const objectId = getObjectId(req);
+    if (!Number.isInteger(id) || id <= 0 || !objectId) {
+      return res.status(400).json({ message: 'Invalid document or current object' });
+    }
+    try {
+      const userId = (req as AuthenticatedRequest).user.id;
+      const document = await storage.getProjectDocument(id, userId, objectId);
+      if (!document) return res.status(404).json({ message: 'Not found' });
+      const updated = await storage.updateDocument(id, userId, objectId, { fileUrl: null });
+      if (!updated) return res.status(404).json({ message: 'Not found' });
+      await removeDocumentFile(document.fileUrl).catch((error) => console.error('Document file cleanup failed:', error));
+      return res.status(200).json(updated);
+    } catch (error) {
+      console.error('Document file delete failed:', error);
       return res.status(500).json({ message: 'Internal Server Error' });
     }
   });

@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateBatch, useProjectMaterial, useSaveProjectMaterialToCatalog } from "@/hooks/use-materials";
-import { useCreateDocument, useCreateDocumentBinding, useDocuments, usePatchDocumentBinding } from "@/hooks/use-documents";
+import { useCreateDocument, useCreateDocumentBinding, useDocuments, usePatchDocumentBinding, useUploadDocumentFile } from "@/hooks/use-documents";
 import { MaterialDetailView } from "@/components/materials/MaterialDetailView";
 import { BatchForm, type BatchDraft } from "@/components/materials/BatchForm";
 import { format } from "date-fns";
@@ -66,6 +66,7 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
   const patchBinding = usePatchDocumentBinding(materialId);
   const createBatch = useCreateBatch(materialId, objectId);
   const createDocument = useCreateDocument();
+  const uploadDocumentFile = useUploadDocumentFile();
   const createBinding = useCreateDocumentBinding();
 
   const data: any = materialQuery.data;
@@ -93,6 +94,7 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
   });
   const [newDocDateText, setNewDocDateText] = useState<string>(formatIsoToDmy(newDoc.docDate) ?? "");
   const [newDocCalendarOpen, setNewDocCalendarOpen] = useState(false);
+  const [newDocFile, setNewDocFile] = useState<File | null>(null);
 
   useEffect(() => {
     setNewDocDateText(formatIsoToDmy(newDoc.docDate) ?? "");
@@ -505,6 +507,15 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                     <Label>URL файла (опц.)</Label>
                     <Input value={newDoc.fileUrl ?? ""} onChange={(e) => setNewDoc((p) => ({ ...p, fileUrl: e.target.value }))} />
                   </div>
+                  <div className="grid gap-2">
+                    <Label>Загрузить PDF</Label>
+                    <Input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={(e) => setNewDocFile(e.target.files?.[0] ?? null)}
+                    />
+                    {newDocFile ? <p className="text-xs text-muted-foreground">{newDocFile.name}</p> : null}
+                  </div>
 
                   {isQualityBindingRole(deriveBindingRole(newDoc.docType)) ? (
                     <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
@@ -516,7 +527,7 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                   <Button
                     type="button"
                     className="w-full rounded-xl"
-                    disabled={createDocument.isPending || createBinding.isPending}
+                    disabled={createDocument.isPending || createBinding.isPending || uploadDocumentFile.isPending}
                     onClick={async () => {
                       try {
                         const batchIdForBinding = bindDocTarget === "batch" ? bindDocSelectedBatchId : null;
@@ -535,6 +546,14 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                           meta: {},
                           fileUrl: newDoc.fileUrl || null,
                         } as any);
+                        let fileUploaded = true;
+                        if (newDocFile) {
+                          try {
+                            await uploadDocumentFile.mutateAsync({ id: Number((created as any).id), file: newDocFile });
+                          } catch {
+                            fileUploaded = false;
+                          }
+                        }
                         const role = deriveBindingRole(newDoc.docType);
                         await createBinding.mutateAsync({
                           documentId: Number((created as any).id),
@@ -545,9 +564,14 @@ export function MaterialFullCard({ materialId, objectId }: MaterialFullCardProps
                           useInActs: isQualityBindingRole(role) ? Boolean(newDoc.useInActs) : false,
                           isPrimary: false,
                         } as any);
-                        toast({ title: "Готово", description: "Документ создан и привязан" });
+                        toast({
+                          title: fileUploaded ? "Готово" : "Документ привязан без PDF",
+                          description: fileUploaded ? "Документ создан и привязан" : "Повторите загрузку из реестра документов.",
+                          variant: fileUploaded ? "default" : "destructive",
+                        });
                         setBindDocOpen(false);
                         setNewDoc({ docType: "certificate", scope: "project", useInActs: true });
+                        setNewDocFile(null);
                       } catch (e) {
                         toast({ title: "Ошибка", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
                       }

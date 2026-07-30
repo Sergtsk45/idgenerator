@@ -124,9 +124,15 @@ const documentScopeSchema = z.enum(["global", "project"]);
 const documentViewModeSchema = z.enum(["project", "global", "all"]);
 const documentFileUrlSchema = z
   .string()
-  .url()
-  .refine((value) => value.startsWith("http://") || value.startsWith("https://"), {
-    message: "fileUrl must start with http:// or https://",
+  .refine((value) => {
+    if (/^\/api\/documents\/files\/\d+\/[^/]+\.pdf$/.test(value)) return true;
+    try {
+      return ["http:", "https:"].includes(new URL(value).protocol);
+    } catch {
+      return false;
+    }
+  }, {
+    message: "fileUrl must be http(s) or an application document-file path",
   });
 
 const linkEmailSchema = z.object({
@@ -665,6 +671,38 @@ export const api = {
       input: z.object({
         scope: z.literal("global"),
       }),
+      responses: {
+        200: z.custom<typeof documents.$inferSelect>(),
+        400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    uploadFile: {
+      method: "POST" as const,
+      path: "/api/documents/:id/file",
+      input: z.object({}),
+      responses: {
+        200: z.custom<typeof documents.$inferSelect>(),
+        400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+        404: z.object({ message: z.string() }),
+        429: z.object({ message: z.string() }),
+      },
+    },
+    getFile: {
+      method: "GET" as const,
+      path: "/api/documents/files/:objectId/:filename",
+      responses: {
+        200: z.any(),
+        400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    deleteFile: {
+      method: "DELETE" as const,
+      path: "/api/documents/:id/file",
       responses: {
         200: z.custom<typeof documents.$inferSelect>(),
         400: z.object({ message: z.string() }),

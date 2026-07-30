@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-07-30] - Загрузка PDF к project-документам
+
+### Добавлено
+- `POST /api/documents/:id/file`, `GET /api/documents/files/:objectId/:filename`, `DELETE /api/documents/:id/file` — upload/download/delete PDF с auth и проверкой доступа к объекту.
+- UI загрузки PDF в `/source/documents` и карточке материала; открытие защищённых файлов через authenticated fetch.
+- `server/document-files.ts`, `client/src/lib/document-file.ts`, `tests/document-files.test.ts`.
+- Хранение через `DOCUMENTS_UPLOAD_DIR` (по умолчанию `uploads/documents/`); для prod/staging нужен persistent volume.
+
+### Изменено
+- `fileUrl` может быть внешним `http(s)` или внутренним `/api/documents/files/...`.
+- Global-документы в v1 не принимают upload файла.
+
+---
+
 ## [2026-07-30] - Документы качества: passport/protocol в quality-ролях
 
 ### Изменено

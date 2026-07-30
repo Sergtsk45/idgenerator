@@ -6,6 +6,7 @@ vite.config.ts.*
 *.tar.gz
 # Generated PDFs
 generated_pdfs/
+uploads/documents/
 test-output-*.pdf
 # Local / temp
 tmp/

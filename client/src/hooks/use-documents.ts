@@ -147,6 +147,53 @@ export function useUpdateDocument() {
   });
 }
 
+export function useUploadDocumentFile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, file }: { id: number; file: File }) => {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch(buildUrl(api.documents.uploadFile.path, { id }), {
+        method: api.documents.uploadFile.method,
+        headers: createApiHeaders(),
+        body,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to upload document file");
+      }
+      return api.documents.uploadFile.responses[200].parse(await res.json());
+    },
+    onSuccess: async () => {
+      await invalidateDocuments(queryClient);
+      await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
+    },
+  });
+}
+
+export function useDeleteDocumentFile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(buildUrl(api.documents.deleteFile.path, { id }), {
+        method: api.documents.deleteFile.method,
+        headers: createApiHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to delete document file");
+      }
+      return api.documents.deleteFile.responses[200].parse(await res.json());
+    },
+    onSuccess: async () => {
+      await invalidateDocuments(queryClient);
+      await queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path] });
+    },
+  });
+}
+
 export function useSetDocumentScope() {
   const queryClient = useQueryClient();
   return useMutation({

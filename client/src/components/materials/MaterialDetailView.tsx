@@ -14,6 +14,7 @@ import { DocumentCard, type DocumentCardModel } from "@/components/documents/Doc
 import { AlertTriangle, CheckCircle2, Star, Trash2, Unlink } from "lucide-react";
 import { formatIsoToDmy } from "@/lib/dateFormat";
 import { isQualityBindingRole } from "@shared/documentBinding";
+import { openDocumentFile } from "@/lib/document-file";
 
 type BatchModel = {
   id: number;
@@ -248,7 +249,7 @@ export function MaterialDetailView(props: {
                           )}
                         </div>
                       }
-                      onOpen={d.fileUrl ? () => window.open(d.fileUrl || undefined, "_blank", "noopener,noreferrer") : undefined}
+                      onOpen={d.fileUrl ? () => void openDocumentFile(String(d.fileUrl)).catch(console.error) : undefined}
                     />
                   );
                 })}

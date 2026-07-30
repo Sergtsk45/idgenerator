@@ -198,6 +198,7 @@ export interface IStorage {
   // Documents
   searchDocuments(params: { objectId: number; viewMode?: DocumentViewMode; query?: string; docType?: string }): Promise<Document[]>;
   createDocument(objectId: number, userId: number, data: Omit<InsertDocument, "objectId">): Promise<Document>;
+  getProjectDocument(id: number, userId: number, objectId: number): Promise<Document | undefined>;
   updateDocument(
     id: number,
     userId: number,
@@ -1380,6 +1381,20 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async getProjectDocument(id: number, userId: number, objectId: number): Promise<Document | undefined> {
+    const [document] = await db
+      .select({ document: documents })
+      .from(documents)
+      .innerJoin(objects, and(eq(objects.id, documents.objectId), eq(objects.userId, userId as any)))
+      .where(and(
+        eq(documents.id, id as any),
+        eq(documents.scope, "project"),
+        eq(documents.objectId, objectId as any),
+        isNull(documents.deletedAt),
+      ));
+    return document?.document;
+  }
+
   async updateDocument(
     id: number,
     userId: number,
@@ -1433,6 +1448,7 @@ export class DatabaseStorage implements IStorage {
       if (!existing) return undefined;
       if (existing.scope === "project" && existing.objectId !== objectId) return undefined;
       if (existing.scope === "global") return existing;
+      if (existing.fileUrl?.startsWith("/api/documents/files/")) return undefined;
 
       const [updated] = await tx
         .update(documents)

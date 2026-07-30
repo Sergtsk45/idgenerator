@@ -6,6 +6,16 @@
 
 Для привязок материалов документом качества считается любая роль из `quality`, `passport`, `protocol`. Роли паспортов и протоколов сохраняются для различимости, но участвуют в актах, readiness-проверках и quality-счётчиках наравне с сертификатами и декларациями. `scheme` и `other` в это правило не входят.
 
+PDF можно прикрепить к project-документу запросом `POST /api/documents/:id/file` с `multipart/form-data`, поле формы — `file`. API сохранит защищённый относительный `fileUrl`; скачать или открыть файл можно через `GET /api/documents/files/:objectId/:filename` с обычной авторизацией приложения. Удаление файла: `DELETE /api/documents/:id/file`.
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -F "file=@passport.pdf;type=application/pdf" \
+  https://idgenerator.duckdns.org/api/documents/58/file
+```
+
+По умолчанию файлы хранятся в `uploads/documents/`. Для production задайте `DOCUMENTS_UPLOAD_DIR` на persistent volume: каталог не должен исчезать при пересборке или редеплое.
+
 ---
 
 ## 🚀 Быстрый старт
