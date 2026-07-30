@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-07-30] - Документы качества: passport/protocol в quality-ролях
+
+### Изменено
+- Роли привязок `passport` и `protocol` считаются документами качества наравне с `quality`: участвуют в актах, readiness и quality-счётчиках.
+- Общая проверка вынесена в `shared/documentBinding.ts` (`QUALITY_BINDING_ROLES`, `isQualityBindingRole`).
+
+### Добавлено
+- `tests/document-binding-quality.test.ts` — unit-тесты классификации quality-ролей.
+
+---
+
 ## [2026-07-30] - График Ганта: выравнивание строк и порядок ВОР
 
 ### Исправлено
