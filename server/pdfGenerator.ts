@@ -3,7 +3,6 @@ import * as fs from "fs";
 import * as path from "path";
 import { createRequire } from "module";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
-import { storage } from "./storage";
 
 const require = createRequire(path.join(process.cwd(), "server/pdfGenerator.ts"));
 const PdfPrinter = require("pdfmake/js/Printer.js").default;
@@ -318,6 +317,20 @@ function formatDate(dateStr: string): string {
   }
 }
 
+export async function generatePdfBuffer(
+  docDefinition: TDocumentDefinitions,
+  options?: Record<string, unknown>,
+): Promise<Buffer> {
+  const pdfDoc = await printer.createPdfKitDocument(docDefinition, options);
+  return new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
+    pdfDoc.on("error", reject);
+    pdfDoc.end();
+  });
+}
+
 export async function generateAosrPdf(data: ActData): Promise<Buffer> {
   const docDefinition = loadAosrTemplateDefinition();
   replacePlaceholdersDeep(docDefinition, buildAosrPlaceholderValues(data));
@@ -384,15 +397,7 @@ export async function generateAosrPdf(data: ActData): Promise<Buffer> {
   };
 
   try {
-    const pdfDoc = await printer.createPdfKitDocument(docDefinition, { tableLayouts });
-
-    return new Promise<Buffer>((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
-      pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on("error", (err: Error) => reject(err));
-      pdfDoc.end();
-    });
+    return await generatePdfBuffer(docDefinition, { tableLayouts });
   } catch (err) {
     console.error("PDF generation error:", err);
     throw err;
@@ -596,6 +601,7 @@ function translateDocTypeRu(docType: string | null | undefined): string {
 }
 
 export async function buildP3MaterialsText(actId: number): Promise<string> {
+  const { storage } = await import("./storage");
   const usages = await storage.getActMaterialUsages(actId);
   if (!usages || usages.length === 0) return "";
 
@@ -635,6 +641,7 @@ export async function buildP3MaterialsText(actId: number): Promise<string> {
 }
 
 export async function buildAttachmentsText(actId: number): Promise<string> {
+  const { storage } = await import("./storage");
   const list = await storage.getActDocAttachments(actId);
   if (!list || list.length === 0) return "";
 

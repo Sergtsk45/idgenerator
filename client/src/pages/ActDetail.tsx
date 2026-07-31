@@ -43,10 +43,11 @@ import { format } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
 import { useLanguageStore } from "@/lib/i18n";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { ApiError, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { openPdfDownload } from "@/lib/pdf-download";
 import { useActDocumentAttachments, useActMaterialUsages } from "@/hooks/use-act-materials";
+import { api, buildUrl } from "@shared/routes";
 
 interface ActDetailProps {
   params: { id: string };
@@ -112,6 +113,14 @@ export default function ActDetail({ params }: ActDetailProps) {
     },
   });
 
+  const exportAttachments = useMutation({
+    mutationFn: async () => {
+      const url = buildUrl(api.acts.exportAttachments.path, { id: actId });
+      const response = await apiRequest(api.acts.exportAttachments.method, url);
+      return api.acts.exportAttachments.responses[200].parse(await response.json());
+    },
+  });
+
   const currentTemplate = useMemo(() => {
     if (!act || !templatesData?.templates) return null;
     const actTemplateId = Number((act as any).actTemplateId ?? 0);
@@ -148,6 +157,59 @@ export default function ActDetail({ params }: ActDetailProps) {
       clearInterval(progressTimer);
       setExporting(false);
       setExportProgress(0);
+    }
+  };
+
+  const handleAttachmentsExport = async () => {
+    try {
+      const result = await exportAttachments.mutateAsync();
+      toast({
+        title: t("Приложения экспортированы", "Attachments exported"),
+        description: t(
+          `Документов в пакете: ${result.documentsCount}`,
+          `Documents in package: ${result.documentsCount}`,
+        ),
+        duration: 1800,
+      });
+      openPdfDownload(result.url, result.filename);
+    } catch (error: unknown) {
+      const problemResponse =
+        error instanceof ApiError && error.status === 422
+          ? api.acts.exportAttachments.responses[422].safeParse(error.data)
+          : null;
+      if (problemResponse?.success) {
+        toast({
+          title: t("Не удалось экспортировать приложения", "Failed to export attachments"),
+          description: (
+            <div className="space-y-1">
+              <p>{problemResponse.data.message}</p>
+              <ul className="list-disc pl-4">
+                {problemResponse.data.problems.map((problem) => (
+                  <li key={`${problem.documentId}-${problem.reason}`}>{problem.title}</li>
+                ))}
+              </ul>
+            </div>
+          ),
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const payload =
+        error instanceof ApiError && error.data && typeof error.data === "object"
+          ? (error.data as { message?: unknown })
+          : null;
+      const message =
+        typeof payload?.message === "string"
+          ? payload.message
+          : error instanceof Error
+            ? error.message
+            : t("Не удалось экспортировать приложения", "Failed to export attachments");
+      toast({
+        title: t("Ошибка", "Error"),
+        description: message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -480,7 +542,7 @@ export default function ActDetail({ params }: ActDetailProps) {
           )}
         </Accordion>
 
-        {/* 18.4+18.5 — PDF export button + sheet */}
+        {/* 18.4+18.5 — Separate act and attachments exports */}
         <div className="space-y-3">
           {exporting && (
             <div className="space-y-1">
@@ -489,66 +551,86 @@ export default function ActDetail({ params }: ActDetailProps) {
             </div>
           )}
 
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="odoo-primary" className="w-full gap-2" disabled={exporting}>
-                {exporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                {t("Экспорт PDF", "Export PDF")}
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl max-h-[70vh]">
-              <SheetHeader className="pb-4">
-                <SheetTitle className="text-left text-[15px]">
-                  {t("Выбор шаблона PDF", "Select PDF template")}
-                </SheetTitle>
-              </SheetHeader>
-              <div className="space-y-2">
-                {currentTemplate && (
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between px-4 py-3 bg-[--p50] border border-[--p200] rounded-[--o-radius-md] hover:bg-[--p100] transition-colors text-[13px]"
-                    onClick={async () => {
-                      setSheetOpen(false);
-                      await handleExport([]);
-                    }}
-                  >
-                    <span className="text-[--g900] font-medium">
-                      {t("По шаблону акта", "Use act template")}: {language === "ru" ? currentTemplate.title : (currentTemplate.titleEn ?? currentTemplate.title)}
-                    </span>
-                    <Download className="h-4 w-4 text-[--g500]" />
-                  </button>
-                )}
-
-                {templatesLoading ? (
-                  <div className="flex items-center justify-center py-6 text-[--g500]">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    {t("Загрузка шаблонов...", "Loading templates...")}
-                  </div>
-                ) : (
-                  (templatesData?.templates ?? []).map((template) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="odoo-primary" className="w-full gap-2" disabled={exporting}>
+                  {exporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  {t("Экспорт акта", "Export act")}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="rounded-t-2xl max-h-[70vh]">
+                <SheetHeader className="pb-4">
+                  <SheetTitle className="text-left text-[15px]">
+                    {t("Выбор шаблона PDF", "Select PDF template")}
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="space-y-2">
+                  {currentTemplate && (
                     <button
-                      key={template.templateId}
                       type="button"
-                      className="w-full flex items-center justify-between px-4 py-3 bg-white border border-[--g200] rounded-[--o-radius-md] hover:bg-[--g50] transition-colors text-[13px]"
+                      className="w-full flex items-center justify-between px-4 py-3 bg-[--p50] border border-[--p200] rounded-[--o-radius-md] hover:bg-[--p100] transition-colors text-[13px]"
                       onClick={async () => {
                         setSheetOpen(false);
-                        await handleExport([template.templateId]);
+                        await handleExport([]);
                       }}
                     >
                       <span className="text-[--g900] font-medium">
-                        {template.code} — {language === "ru" ? template.title : (template.titleEn ?? template.title)}
+                        {t("По шаблону акта", "Use act template")}: {language === "ru" ? currentTemplate.title : (currentTemplate.titleEn ?? currentTemplate.title)}
                       </span>
-                      <Download className="h-4 w-4 text-[--g400]" />
+                      <Download className="h-4 w-4 text-[--g500]" />
                     </button>
-                  ))
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+                  )}
+
+                  {templatesLoading ? (
+                    <div className="flex items-center justify-center py-6 text-[--g500]">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      {t("Загрузка шаблонов...", "Loading templates...")}
+                    </div>
+                  ) : (
+                    (templatesData?.templates ?? []).map((template) => (
+                      <button
+                        key={template.templateId}
+                        type="button"
+                        className="w-full flex items-center justify-between px-4 py-3 bg-white border border-[--g200] rounded-[--o-radius-md] hover:bg-[--g50] transition-colors text-[13px]"
+                        onClick={async () => {
+                          setSheetOpen(false);
+                          await handleExport([template.templateId]);
+                        }}
+                      >
+                        <span className="text-[--g900] font-medium">
+                          {template.code} — {language === "ru" ? template.title : (template.titleEn ?? template.title)}
+                        </span>
+                        <Download className="h-4 w-4 text-[--g400]" />
+                      </button>
+                    ))
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            <Button
+              variant="odoo-secondary"
+              className="w-full gap-2"
+              disabled={documentsLoading || documentAttachments.length === 0 || exportAttachments.isPending}
+              onClick={handleAttachmentsExport}
+            >
+              {exportAttachments.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {documentsLoading
+                ? t("Загрузка документов...", "Loading documents...")
+                : documentAttachments.length === 0
+                  ? t("Нет документов для экспорта", "No documents to export")
+                  : t("Экспорт приложений", "Export attachments")}
+            </Button>
+          </div>
         </div>
 
       </div>

@@ -45,7 +45,8 @@
       - Добавление/удаление материалов/документации затрагивает только эту конкретную задачу
       - Изолированный режим: "свои материалы/документация для этой захватки"
   - **Генерация актов**: без изменений в логике — каждая захватка имеет свой `actNumber` → группируется в свой акт со своими сроками (`dateStart`/`dateEnd`) и материалами
-- **Экспорт PDF АОСР**: `POST /api/acts/:id/export` генерирует один или несколько PDF по выбранным шаблонам. Для АОСР используется pdfmake-шаблон `server/templates/aosr/aosr-template.json` с плейсхолдерами `{{...}}` (в эталонном варианте под `005_АОСР 4.pdf` материалы и приложения формируются **текстом**, а не таблицей; данные приходят через `formData`).
+- **Экспорт PDF АОСР**: `POST /api/acts/:id/export` генерирует один или несколько PDF по выбранным шаблонам. Для АОСР используется pdfmake-шаблон `server/templates/aosr/aosr-template.json` с плейсхолдерами `{{...}}`; приложения остаются в акте текстовым перечнем.
+- **Экспорт приложений**: отдельная кнопка в карточке акта вызывает `POST /api/acts/:id/export-attachments`, который собирает титульную страницу и PDF-файлы только из `act_document_attachments`. Порядок определяется `orderIndex`, дубликаты `documentId` удаляются; внешний URL, отсутствующий или повреждённый файл блокирует выдачу неполного комплекта.
 
 ## Архитектура (высокоуровневая)
 
@@ -156,11 +157,12 @@ flowchart LR
     - `server/routes/messages.ts` — журнал работ и обработка сообщений
     - `server/routes/schedule.ts` — График Ганта, задачи, материалы задач
     - `server/routes/estimates.ts` — смета/ЛСР и позиции
-    - `server/routes/acts.ts` — акты АОСР, шаблоны, экспорт PDF
+    - `server/routes/acts.ts` — акты АОСР, шаблоны, раздельный экспорт акта и приложений
     - `server/routes/admin.ts` — административный API
   - `server/storage.ts` — слой доступа к данным (Drizzle).
   - `server/db.ts` — подключение к Postgres через `DATABASE_URL`.
   - `server/pdfGenerator.ts` — генерация PDF (pdfmake), включая АОСР по шаблону `server/templates/aosr/aosr-template.json`.
+  - `server/actAttachmentsPdf.ts` — титульная страница и слияние PDF-приложений через `pdf-lib` (до 100 документов и 200 МБ).
   - `server/templates/aosr/` — шаблоны и каталог шаблонов актов (`aosr-template.json`, `templates-catalog.json`).
   - `server/replit_integrations/*` — заготовки интеграций (чат, генерация изображений, batch-утилиты).
   - `server/middleware/adminAuth.ts` — middleware для проверки admin-роли при доступе к защищённым endpoint'ам.
@@ -391,7 +393,8 @@ objects
 - **Estimates (Смета/ЛСР)**: `GET /api/estimates`, `GET /api/estimates/:id`, `POST /api/estimates/import`, `DELETE /api/estimates/:id` (опц. `?resetSchedule=1` — сбросить график/акты, если смета используется как источник графика). `/works` поддерживает импорт `.xlsx/.xls` через текущий Excel-парсер и `.rtf` ПК РИК через клиентский Web Worker; исходный RTF не отправляется на сервер, API получает только существующий JSON payload.
 - **Messages**: `GET /api/messages`, `POST /api/messages`, `PATCH /api/messages/:id`, `POST /api/messages/:id/process`
 - **Voice**: `POST /api/voice/transcribe` — загрузка аудио (FormData, поле `audio`, до 10 MB), транскрипция через OpenAI Whisper, возврат `{ text }`. Rate limit: 10 req/min.
-- **Acts**: `GET /api/acts`, `GET /api/acts/:id`, `POST /api/acts/:id/export`
+- **Acts**: `GET /api/acts`, `GET /api/acts/:id`, `POST /api/acts/:id/export`, `POST /api/acts/:id/export-attachments`
+  - экспорт приложений требует авторизацию и принадлежность акта текущему объекту; возвращает `409`, если документов нет, и `422` с `problems`, если полный пакет собрать нельзя; пользовательское имя PDF передаётся через безопасный `filename*=UTF-8''...`
   - `POST /api/acts/generate` и `POST /api/acts/create-with-templates` — **устарели** (410), создание актов только из графика работ
 - **Act Templates**: `GET /api/act-templates`
 - **Admin Panel** (только для администраторов):

@@ -2,6 +2,22 @@
 
 ---
 
+## Задача: ACT-ATT-PDF — Раздельный экспорт PDF-приложений к акту
+- **Статус**: Завершена (код; smoke на проде — ACT-ATT-05)
+- **Дата начала**: 2026-07-31
+- **Дата завершения**: 2026-07-31
+- **Описание**: Отдельный `POST /api/acts/:id/export-attachments`: титул + PDF из `act_document_attachments` через `pdf-lib`; UI «Экспорт приложений» в карточке акта.
+- **Шаги выполнения**:
+  - [x] `server/actAttachmentsPdf.ts` + `generatePdfBuffer`
+  - [x] API `export-attachments` (409/422) и безопасный `filename*`
+  - [x] UI ActDetail: раздельный экспорт
+  - [x] Тесты `tests/act-attachments-pdf.test.ts`
+  - [x] Документация `docs/project.md`, `docs/changelog.md`, трекер `docs/tasktrekcer-act-upgreid.md`
+  - [ ] Smoke на акте с паспортом (прод)
+- **Зависимости**: DOC-FILE-UPLOAD, act_document_attachments; далее штамп «Копия верна» (`docs/tasktrecker-copy-correct.md`)
+
+---
+
 ## Задача: ACT-QUALITY-RESOLVE — Автовыбор документов качества для актов
 - **Статус**: Завершена
 - **Дата начала**: 2026-07-31

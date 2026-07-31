@@ -9,6 +9,12 @@ test("act detail renders material usages and formal document attachments", async
   assert.match(source, /useActDocumentAttachments\(actId\)/);
   assert.match(source, /materialUsages\.map/);
   assert.match(source, /documentAttachments\.map/);
+  assert.match(source, /Экспорт акта/);
+  assert.match(source, /Экспорт приложений/);
+  assert.match(source, /documentAttachments\.length === 0/);
+  assert.match(source, /api\.acts\.exportAttachments/);
+  assert.match(source, /openPdfDownload\(result\.url, result\.filename\)/);
+  assert.match(source, /error\.status === 422/);
   assert.doesNotMatch(source, /Привязка материалов — в разделе/);
 });
 

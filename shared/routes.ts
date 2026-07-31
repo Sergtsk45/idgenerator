@@ -1136,6 +1136,37 @@ export const api = {
         404: z.object({ message: z.string() }),
       },
     },
+    exportAttachments: {
+      method: 'POST' as const,
+      path: '/api/acts/:id/export-attachments',
+      responses: {
+        200: z.object({
+          url: z.string(),
+          filename: z.string(),
+          documentsCount: z.number().int().nonnegative(),
+        }),
+        400: z.object({ message: z.string() }),
+        401: z.object({ error: z.string() }),
+        404: z.object({ message: z.string() }),
+        409: z.object({ message: z.string() }),
+        422: z.object({
+          message: z.string(),
+          problems: z.array(z.object({
+            documentId: z.number().int().nonnegative(),
+            title: z.string(),
+            reason: z.enum([
+              'missing',
+              'not_pdf',
+              'unreadable',
+              'unsupported_url',
+              'too_many_documents',
+              'total_size_exceeded',
+            ]),
+          })),
+        }),
+        500: z.object({ message: z.string() }),
+      },
+    },
   },
   schedules: {
     default: {

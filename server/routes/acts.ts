@@ -1,7 +1,7 @@
 /**
  * @file: acts.ts
  * @description: Acts (АОСР), act templates, PDF export and material/document attachment routes
- * @dependencies: _common.ts, @shared/routes, server/pdfGenerator, fs, path
+ * @dependencies: _common.ts, @shared/routes, server/pdfGenerator, server/actAttachmentsPdf, fs, path
  * @created: 2026-03-18
  */
 
@@ -19,6 +19,7 @@ import {
   loadTemplateCatalog,
   type ActData,
 } from '../pdfGenerator';
+import { buildActAttachmentsPdf } from '../actAttachmentsPdf';
 
 export function registerActsRoutes(app: Express): void {
   // ── Act Material Usages ────────────────────────────────────────────────────
@@ -162,6 +163,51 @@ export function registerActsRoutes(app: Express): void {
   });
 
   // ── PDF Export ─────────────────────────────────────────────────────────────
+
+  // POST /api/acts/:id/export-attachments — отдельный PDF-пакет приложений
+  app.post(api.acts.exportAttachments.path, ...appAuth, async (req, res) => {
+    const actId = Number(req.params.id);
+    if (!Number.isInteger(actId) || actId <= 0) {
+      return res.status(400).json({ message: 'Invalid act id' });
+    }
+
+    try {
+      const object = await storage.getCurrentObject(req.user!.id);
+      const act = await storage.getAct(actId);
+      if (!act || act.objectId !== object.id) {
+        return res.status(404).json({ message: 'Act not found' });
+      }
+
+      const result = await buildActAttachmentsPdf(actId);
+      if (result.documentsCount === 0) {
+        return res.status(409).json({ message: 'Нет документов для экспорта' });
+      }
+      if (result.problems.length > 0) {
+        const limitProblem = result.problems.find(
+          ({ reason }) => reason === 'too_many_documents' || reason === 'total_size_exceeded',
+        );
+        return res.status(422).json({
+          message: limitProblem?.title ?? 'Не удалось собрать полный пакет приложений',
+          problems: result.problems,
+        });
+      }
+
+      const pdfDir = path.join(process.cwd(), 'generated_pdfs');
+      await fs.promises.mkdir(pdfDir, { recursive: true });
+      const storedFilename = `act_attachments_${act.id}_${Date.now()}.pdf`;
+      const downloadFilename = `Акт_${act.actNumber ?? act.id}_приложения.pdf`;
+      await fs.promises.writeFile(path.join(pdfDir, storedFilename), result.buffer);
+
+      return res.status(200).json({
+        url: `/api/pdfs/${storedFilename}?filename=${encodeURIComponent(downloadFilename)}`,
+        filename: downloadFilename,
+        documentsCount: result.documentsCount,
+      });
+    } catch (error) {
+      console.error('Error exporting act attachments:', error);
+      return res.status(500).json({ message: 'Failed to export act attachments' });
+    }
+  });
 
   // POST /api/acts/:id/export — генерация PDF для акта
   app.post('/api/acts/:id/export', ...appAuth, async (req, res) => {
@@ -444,10 +490,17 @@ export function registerActsRoutes(app: Express): void {
     }
 
     const download = req.query.download === '1' || req.query.download === 'true';
+    const requestedDownloadName = typeof req.query.filename === 'string' ? req.query.filename : '';
+    const downloadName =
+      requestedDownloadName.length <= 200 &&
+      requestedDownloadName.toLowerCase().endsWith('.pdf') &&
+      path.basename(requestedDownloadName) === requestedDownloadName
+        ? requestedDownloadName
+        : filename;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
+      `${download ? 'attachment' : 'inline'}; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
     );
     res.setHeader('X-Content-Type-Options', 'nosniff');
     return res.sendFile(filePath);
