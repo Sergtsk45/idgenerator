@@ -2,7 +2,7 @@
 
 **Создан:** 2026-08-01  
 **Обновлён:** 2026-08-01  
-**Статус:** 🟡 Частично согласовано (D′ + формат п.3); ждут Q2/Q3/Q5–Q7  
+**Статус:** 🟡 Частично согласовано (D′ + п.3 + unique); ждут Q3/Q5–Q7  
 **Приоритет:** Высокий  
 **Контекст прода:** акт №2 (`id=18`) — у термометра/манометра много паспортов на материал, в акт уходит один primary; у части docs нет PDF → `export-attachments` 422.
 
@@ -132,13 +132,16 @@ flowchart LR
   U2 --> Att
 ```
 
-### Unique constraint
+### Unique constraint (согласовано — Q2 вариант 2)
 
-Сейчас: `UNIQUE (task_id, project_material_id, batch_id)`.
+**Было:** `UNIQUE (task_id, project_material_id, batch_id)` — партия в ключе, документ нет.  
+**Станет:** `UNIQUE (task_id, project_material_id, quality_document_id)` — `batch_id` **вне** unique.
 
-- При `batch_id NULL` PostgreSQL обычно **позволяет** несколько строк (NULL ≠ NULL в unique).
-- Блокер сейчас в основном **UI** (`selectedIds` по `projectMaterialId`).
-- Если оба раза указана **одна и та же** партия — unique ударит. Для D′ это ок: либо разные batch, либо без batch, либо ослабить unique до чего-то вроде `(task, material, batch, quality_document)` — решить в Q2.
+Следствия:
+- Можно несколько строк одного материала с разными docs (в т.ч. без партий или с одной партией + паспорт и сертификат).
+- Нельзя дважды добавить один и тот же `qualityDocumentId` к одному материалу в задаче.
+- `quality_document_id` в таких строках для multi-doc должен быть **NOT NULL** (или partial unique `WHERE quality_document_id IS NOT NULL` + отдельное правило для строк без doc — по умолчанию multi-doc строки всегда с doc).
+- Миграция: drop старого index → создать новый; проверить/почистить возможные дубли `(task, material, doc)` на проде перед уникальностью.
 
 ---
 
@@ -158,9 +161,10 @@ flowchart LR
 - **Шаги**:
   - [ ] Зафиксировать: партия ⟂ документы качества ⟂ выбор для акта
   - [x] Выбран **D′** + группировка п.3 (решение заказчика)
+  - [x] Unique: `(task_id, project_material_id, quality_document_id)`, batch вне unique
   - [ ] ADR в `ai_docs/develop/architecture/`
   - [ ] Коротко обновить `docs/project.md`
-- **Зависимости**: ответы Q2/Q3/Q5–Q7 (Q1/Q4 закрыты)
+- **Зависимости**: ответы Q3/Q5–Q7 (Q1/Q2/Q4 закрыты)
 
 ### INST-003 — Резолв и generate-acts без привязки к batch
 - **Статус**: Не начата
@@ -173,9 +177,10 @@ flowchart LR
 ### INST-004 — Unique / API для нескольких строк одного материала
 - **Статус**: Не начата
 - **Шаги**:
-  - [ ] Проверить фактическое поведение unique с `batch_id NULL`
-  - [ ] При необходимости миграция unique → включить `quality_document_id` или partial unique
-  - [ ] Понятные 409 при реальном дубле
+  - [ ] Preflight: найти дубли `(task_id, project_material_id, quality_document_id)` в `task_materials`
+  - [ ] Миграция: drop `task_materials_task_material_batch_uq` → create unique `(task_id, project_material_id, quality_document_id)` (имя например `task_materials_task_material_doc_uq`)
+  - [ ] Обновить `shared/schema.ts`
+  - [ ] API/storage: при replace ловить unique violation → 409 с понятным текстом
   - [ ] Опционально API «документы материала, пригодные для актов» (все quality-роли, не зависящие от batch)
 - **Зависимости**: INST-001
 
@@ -251,15 +256,10 @@ flowchart LR
 | # | Решение |
 |---|---|
 | **Q1** | **D′** — несколько строк материала, по одному `qualityDocumentId` на строку |
+| **Q2** | Unique `(task_id, project_material_id, quality_document_id)`; `batch_id` вне unique |
 | **Q4** | В п.3 материал пишется **один раз**, документы перечисляются: `… паспорт зав. №0091, паспорт зав. №0096`. В приложениях — отдельные PDF |
 
 ### Ещё открыто
-
-### Q2. Unique в БД
-Если две строки одного материала без партии (или с одной партией) и разными docs:
-- [ ] Оставить unique как есть (полагаемся на NULL-семантику PG) + запрет дублей в приложении
-- [ ] Новая уникальность: `(task_id, project_material_id, quality_document_id)` (batch вне unique) ← рекомендация
-- [ ] Убрать unique, дедуп только в UI/сервисе
 
 ### Q3. Можно ли дважды добавить один и тот же documentId к задаче/акту?
 - [ ] Нет, дедуп (рекомендация)
