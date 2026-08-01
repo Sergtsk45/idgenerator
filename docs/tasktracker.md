@@ -44,12 +44,14 @@
 ---
 
 ## Задача: ISS-014 — Sticky-строка дат при прокрутке Gantt
-- **Статус**: Не начата (техдолг / UX)
+- **Статус**: Завершена (код; smoke после деплоя)
 - **Дата фиксации**: 2026-08-01
+- **Дата завершения**: 2026-08-01
 - **Описание**: При вертикальной прокрутке графика Ганта шкала дат должна оставаться видимой сверху тонкой sticky-строкой; горизонтальный scroll дат и полос — без регрессий.
 - **Шаги выполнения**:
-  - [ ] Sticky header шкалы дат в контейнере таймлайна (`Schedule.tsx`)
-  - [ ] Sync с горизонтальным scroll и левой колонкой
+  - [x] Sticky header шкалы дат в контейнере таймлайна (`Schedule.tsx`)
+  - [x] Sync с горизонтальным scroll (`w-max min-w-full` + общий overflow-x)
+  - [x] Regression `tests/schedule-row-layout.test.ts`
   - [ ] Smoke desktop + tablet landscape
 - **Зависимости**: модуль Schedule/Gantt
 - **Детали**: `ai_docs/develop/issues/ISS-014-gantt-sticky-date-header.md`

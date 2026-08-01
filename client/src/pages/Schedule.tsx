@@ -1227,7 +1227,7 @@ export default function Schedule() {
                 <CardContent className="p-0">
                 <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-16rem)]">
                 {/* Header */}
-                <div className="bg-muted/20 border-b">
+                <div className="sticky top-0 z-20 w-max min-w-full bg-background border-b">
                   {/* Month row */}
                   <div className="flex border-b border-border/30">
                     <div className="w-[160px] md:w-[400px] shrink-0" />
@@ -1245,7 +1245,7 @@ export default function Schedule() {
                       return groups.map((g) => (
                         <div
                           key={g.label}
-                          className="shrink-0 border-l border-border/40 px-2 py-1 text-[11px] font-medium text-muted-foreground capitalize overflow-hidden whitespace-nowrap"
+                          className="shrink-0 border-l border-border/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize overflow-hidden whitespace-nowrap"
                           style={{ width: g.days * dayWidth }}
                         >
                           {g.label}
@@ -1255,7 +1255,7 @@ export default function Schedule() {
                   </div>
                   {/* Days row */}
                   <div className="flex">
-                    <div className="w-[160px] md:w-[400px] shrink-0 px-3 py-2">
+                    <div className="w-[160px] md:w-[400px] shrink-0 px-3 py-1">
                       <div className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
                         {language === "ru" ? "НАИМЕНОВАНИЕ РАБОТ" : "WORKS"}
                       </div>
@@ -1269,7 +1269,7 @@ export default function Schedule() {
                           <div
                             key={i}
                             className={cn(
-                              "shrink-0 border-l border-border/40 px-1 py-2 text-[10px]",
+                              "shrink-0 border-l border-border/40 px-1 py-1 text-[10px]",
                               isWeekend
                                 ? "bg-black/[0.045] text-muted-foreground/70 font-semibold"
                                 : "text-muted-foreground"

@@ -25,3 +25,9 @@ test("Schedule builds timeline layout from the same filtered tasks it renders", 
 
   assert.match(source, /const rows = filteredTasks\.map\(\(task\) =>/);
 });
+
+test("Schedule keeps the date header visible inside the Gantt scroller", async () => {
+  const source = await readFile("client/src/pages/Schedule.tsx", "utf8");
+
+  assert.match(source, /sticky top-0 z-20 w-max min-w-full bg-background border-b/);
+});

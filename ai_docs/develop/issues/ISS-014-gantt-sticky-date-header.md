@@ -5,7 +5,7 @@
 **Reported by:** Sergey (product feedback)  
 **Severity:** Low (UX)  
 **Type:** Feature / Tech debt  
-**Status:** Open  
+**Status:** Done (2026-08-01)  
 
 ## Description
 
@@ -49,9 +49,9 @@ P3 (UX improvement, не блокер)
 - `docs/TZfrontend/04-schedule-acts.md` (при необходимости — acceptance criterion)
 - `docs/techspec_schedule.md` (если есть секция UI Gantt)
 
-## Acceptance Criteria (когда возьмём в работу)
+## Acceptance Criteria
 
-- [ ] При вертикальном scroll Gantt строка дат остаётся видимой сверху.
-- [ ] Строка компактная (тонкая), не перекрывает существенно область полос.
-- [ ] Горизонтальный scroll дат и полос остаётся синхронным.
-- [ ] Нет регрессий на md/lg и landscape tablet.
+- [x] При вертикальном scroll Gantt строка дат остаётся видимой сверху (`sticky top-0` в скроллере).
+- [x] Строка компактная (уменьшены `py` у месяцев/дней).
+- [x] Горизонтальный scroll дат и полос остаётся синхронным (`w-max min-w-full` в том же overflow-x контейнере).
+- [ ] Smoke desktop + tablet landscape (ручная проверка после деплоя).
