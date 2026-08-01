@@ -1339,7 +1339,7 @@ export default function Schedule() {
                             <div className="flex items-start gap-2">
                               {/* Код позиции */}
                               <div
-                                className="w-10 shrink-0 truncate text-center font-mono text-[11px] text-muted-foreground"
+                                className="w-[3ch] shrink-0 truncate text-center font-mono text-[11px] text-muted-foreground"
                                 title={String(codeLabel)}
                               >
                                 {String(codeLabel)}
