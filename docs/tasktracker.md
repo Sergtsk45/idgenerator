@@ -3,18 +3,19 @@
 ---
 
 ## Задача: Выбор нескольких документов качества в акте (партия ⟂ docs)
-- **Статус**: В процессе (D′ + п.3 + unique + дедуп doc; ждут Q5–Q7)
+- **Статус**: В процессе (D′ + п.3 перечень + unique + дедуп + выбор график/акт; ждут Q6–Q7)
 - **Дата фиксации**: 2026-08-01
-- **Описание**: D′ — несколько строк `task_materials` с разными `qualityDocumentId`, партия optional и не ограничивает docs. Unique: `(task, material, document)`, batch вне unique; один и тот же паспорт в задаче запрещён. В п.3 АОСР группировка docs; в приложениях — отдельные PDF.
+- **Описание**: D′ multi-row; unique `(task, material, document)`; дубль паспорта запрещён; п.3 — перечень docs в одной ячейке; выбор/правка docs и в графике, и в карточке акта (флаг manual attachments).
 - **Шаги выполнения**:
   - [x] Диагностика прода: акт №2, термометр/манометр, один primary, `fileUrl=null` → 422
   - [x] Уточнение: партия ⟂ документы качества
-  - [x] Выбран D′ + целевой формат п.3 (группировка docs)
-  - [x] Unique `(task_id, project_material_id, quality_document_id)`, batch вне unique
-  - [x] Один и тот же паспорт/documentId — запретить (Q3)
+  - [x] D′ + п.3 перечень в одной ячейке (Q4)
+  - [x] Unique `(task, material, document)`, batch вне unique (Q2)
+  - [x] Дубль паспорта запрещён (Q3)
+  - [x] Выбор docs: график и карточка акта (Q5)
   - [x] План обновлён: `ai_docs/develop/plans/2026-08-01-act-quality-doc-instances.md`
-  - [ ] Ответы на Q5–Q7 (или «бери рекомендации»)
-  - [ ] ADR + реализация INST-001…009, в т.ч. миграция unique и `buildP3MaterialsText` groupBy
+  - [ ] Ответы на Q6–Q7 (или «бери рекомендации»)
+  - [ ] ADR + реализация INST-001…009 (unique, groupBy п.3, редактор приложений в ActDetail)
 - **Зависимости**: `task_materials`, `document_bindings`, `generate-acts`, `buildP3MaterialsText`, `export-attachments`
 - **Детали**: `ai_docs/develop/plans/2026-08-01-act-quality-doc-instances.md`
 
