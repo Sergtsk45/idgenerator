@@ -18,9 +18,9 @@ import {
 } from "../server/actAttachmentsPdf";
 import { api } from "../shared/routes";
 
-async function onePagePdf(width: number, height: number): Promise<Buffer> {
+async function testPdf(...pageSizes: Array<[number, number]>): Promise<Buffer> {
   const pdf = await PDFDocument.create();
-  pdf.addPage([width, height]);
+  for (const size of pageSizes) pdf.addPage(size);
   return Buffer.from(await pdf.save());
 }
 
@@ -30,6 +30,7 @@ test("attachment package is ordered, deduplicated and rejects incomplete input",
   const source = {
     getAct: async () => ({ id: 21, objectId: 6, actNumber: 5, dateEnd: "2026-07-31" }),
     getObject: async () => ({ title: "Тестовый объект" }),
+    getObjectSourceData: async () => ({ persons: { copy_certifier: { personName: "", position: "" } } }) as any,
     getActDocAttachments: async (): Promise<any[]> => [],
   };
 
@@ -38,8 +39,10 @@ test("attachment package is ordered, deduplicated and rejects incomplete input",
   try {
     const objectRoot = path.join(uploadRoot, "6");
     await mkdir(objectRoot);
-    await writeFile(path.join(objectRoot, "1_first_abcd1234.pdf"), await onePagePdf(200, 300));
-    await writeFile(path.join(objectRoot, "2_second_abcd1234.pdf"), await onePagePdf(400, 500));
+    const firstSource = await testPdf([200, 300], [250, 350]);
+    const secondSource = await testPdf([400, 500]);
+    await writeFile(path.join(objectRoot, "1_first_abcd1234.pdf"), firstSource);
+    await writeFile(path.join(objectRoot, "2_second_abcd1234.pdf"), secondSource);
 
     source.getActDocAttachments = async () => [
       {
@@ -63,14 +66,18 @@ test("attachment package is ordered, deduplicated and rejects incomplete input",
     const merged = await PDFDocument.load(success.buffer);
     assert.equal(success.documentsCount, 2);
     assert.deepEqual(success.problems, []);
-    assert.equal(merged.getPageCount(), 3);
+    assert.equal(merged.getPageCount(), 4);
     assert.deepEqual(
       merged.getPages().slice(1).map((page) => [page.getWidth(), page.getHeight()]),
       [
         [400, 500],
         [200, 300],
+        [250, 350],
       ],
     );
+    for (const page of merged.getPages().slice(1)) assert.ok(page.node.Contents(), "attachment page must have stamp content");
+    assert.deepEqual(await readFile(path.join(objectRoot, "1_first_abcd1234.pdf")), firstSource);
+    assert.deepEqual(await readFile(path.join(objectRoot, "2_second_abcd1234.pdf")), secondSource);
 
     await writeFile(path.join(objectRoot, "4_broken_abcd1234.pdf"), "not a pdf");
     source.getActDocAttachments = async () => [

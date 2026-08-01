@@ -87,7 +87,7 @@ import {
   type InsertTaskMaterial,
   type InsertInvoiceImport,
 } from "@shared/schema";
-import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
+import { COPY_CERTIFIER_ROLE, type PartyDto, type PersonDto, type SourceDataDto } from "@shared/routes";
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql, count } from "drizzle-orm";
 import { compareWorksOrder, isMainWorkPosition } from "@shared/workPositionKind";
 import { getQuota, getEffectiveTariff } from "@shared/tariff-features";
@@ -104,7 +104,8 @@ type ObjectPersonRole =
   | "rep_builder"
   | "rep_builder_control"
   | "rep_designer"
-  | "rep_work_performer";
+  | "rep_work_performer"
+  | typeof COPY_CERTIFIER_ROLE;
 
 type DocumentViewMode = "project" | "global" | "all";
 type DocumentScope = "project" | "global";
@@ -936,6 +937,7 @@ export class DatabaseStorage implements IStorage {
         rep_builder_control: ensurePerson("rep_builder_control"),
         rep_designer: ensurePerson("rep_designer"),
         rep_work_performer: ensurePerson("rep_work_performer"),
+        [COPY_CERTIFIER_ROLE]: ensurePerson(COPY_CERTIFIER_ROLE),
       },
     };
   }
@@ -1036,6 +1038,7 @@ export class DatabaseStorage implements IStorage {
       await upsertPerson("rep_builder_control", data.persons.rep_builder_control);
       await upsertPerson("rep_designer", data.persons.rep_designer);
       await upsertPerson("rep_work_performer", data.persons.rep_work_performer);
+      await upsertPerson(COPY_CERTIFIER_ROLE, data.persons[COPY_CERTIFIER_ROLE]);
 
       return await this.getObjectSourceData(objectId);
     });

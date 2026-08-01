@@ -26,7 +26,7 @@ import { useCreateDocument, useDocuments } from "@/hooks/use-documents";
 import { MaterialWizard } from "@/components/materials/MaterialWizard";
 import { useProjectMaterials } from "@/hooks/use-materials";
 import { useCurrentObject, useSaveSourceData, useSourceData } from "@/hooks/use-source-data";
-import type { SourceDataDto } from "@shared/routes";
+import { COPY_CERTIFIER_ROLE, type SourceDataDto } from "@shared/routes";
 
 function emptySourceData(): SourceDataDto {
   return {
@@ -45,6 +45,7 @@ function emptySourceData(): SourceDataDto {
       rep_builder_control: { personName: "" },
       rep_designer: { personName: "" },
       rep_work_performer: { personName: "" },
+      [COPY_CERTIFIER_ROLE]: { personName: "" },
     },
   };
 }
@@ -113,6 +114,7 @@ export default function SourceData() {
       rep_builder_control: t?.persons?.rep_builder_control ?? "Стройконтроль подрядчика",
       rep_designer: t?.persons?.rep_designer ?? "Представитель проектировщика",
       rep_work_performer: t?.persons?.rep_work_performer ?? "Производитель работ",
+      [COPY_CERTIFIER_ROLE]: t?.persons?.copy_certifier ?? "Заверитель копий",
     }),
     [t]
   );
@@ -297,8 +299,8 @@ export default function SourceData() {
                   </div>
                   <div className="mt-2 text-[11px] text-[--g500] tabular-nums">
                     {language === "ru"
-                      ? `Заполнено: ${personsFilledCount}/8`
-                      : `Filled: ${personsFilledCount}/8`}
+                      ? `Заполнено: ${personsFilledCount}/9`
+                      : `Filled: ${personsFilledCount}/9`}
                   </div>
                 </div>
               </OdooCard>
@@ -818,19 +820,23 @@ export default function SourceData() {
                         <Label>{t?.fields?.personPosition ?? (language === "ru" ? "Должность" : "Position")}</Label>
                         <Input value={person.position ?? ""} onChange={(e) => setPerson({ position: e.target.value })} className="rounded-xl" />
                       </div>
-                      <div className="grid gap-2">
-                        <Label>{t?.fields?.personBasisText ?? (language === "ru" ? "Основание (приказ/доверенность)" : "Authority basis")}</Label>
-                        <Input value={person.basisText ?? ""} onChange={(e) => setPerson({ basisText: e.target.value })} className="rounded-xl" />
-                      </div>
+                      {role !== COPY_CERTIFIER_ROLE ? (
+                        <>
+                          <div className="grid gap-2">
+                            <Label>{t?.fields?.personBasisText ?? (language === "ru" ? "Основание (приказ/доверенность)" : "Authority basis")}</Label>
+                            <Input value={person.basisText ?? ""} onChange={(e) => setPerson({ basisText: e.target.value })} className="rounded-xl" />
+                          </div>
 
-                      <div className="grid gap-2">
-                        <Label>{t?.fields?.personLineText ?? (language === "ru" ? "Строка представителя (опц.)" : "Representative line (opt.)")}</Label>
-                        <Input value={person.lineText ?? ""} onChange={(e) => setPerson({ lineText: e.target.value })} className="rounded-xl" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>{t?.fields?.personSignText ?? (language === "ru" ? "Подпись (опц.)" : "Signature (opt.)")}</Label>
-                        <Input value={person.signText ?? ""} onChange={(e) => setPerson({ signText: e.target.value })} className="rounded-xl" />
-                      </div>
+                          <div className="grid gap-2">
+                            <Label>{t?.fields?.personLineText ?? (language === "ru" ? "Строка представителя (опц.)" : "Representative line (opt.)")}</Label>
+                            <Input value={person.lineText ?? ""} onChange={(e) => setPerson({ lineText: e.target.value })} className="rounded-xl" />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label>{t?.fields?.personSignText ?? (language === "ru" ? "Подпись (опц.)" : "Signature (opt.)")}</Label>
+                            <Input value={person.signText ?? ""} onChange={(e) => setPerson({ signText: e.target.value })} className="rounded-xl" />
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 );

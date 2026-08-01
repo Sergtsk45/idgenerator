@@ -57,6 +57,8 @@ export const personDtoSchema = z.object({
   signText: z.string().optional(),
 });
 
+export const COPY_CERTIFIER_ROLE = "copy_certifier" as const;
+
 export const sourceDataDtoSchema = z.object({
   object: z.object({
     title: z.string(),
@@ -77,6 +79,7 @@ export const sourceDataDtoSchema = z.object({
     rep_builder_control: personDtoSchema,
     rep_designer: personDtoSchema,
     rep_work_performer: personDtoSchema,
+    [COPY_CERTIFIER_ROLE]: personDtoSchema.default({ personName: "" }),
   }),
 });
 

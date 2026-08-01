@@ -458,7 +458,7 @@ export default function Schedule() {
   const [zoomLevel, setZoomLevel] = useState<0 | 1 | 2 | 3>(1);
   const { dayWidth, visibleDays } = ZOOM_CONFIGS[zoomLevel];
   const timelineWidth = visibleDays * dayWidth;
-  const rowHeight = 88;
+  const rowHeight = 72;
   const auxRowHeight = 32;
 
   // When auxiliary rows are expanded, the left table grows,
@@ -1337,32 +1337,32 @@ export default function Schedule() {
                           {/* Main task row */}
                           <div className="px-3 py-2 border-b border-border/40" style={{ height: rowHeight, overflow: 'hidden' }}>
                             <div className="flex items-start gap-2">
-                              {/* Дата */}
-                              <div className="w-10 shrink-0 text-center hidden md:block">
-                                <div className="text-[13px] font-semibold leading-tight">
-                                  {format(parseISO(String(task.startDate)), "dd", { locale: language === "ru" ? ru : enUS })}
-                                </div>
-                                <div className="text-[10px] text-muted-foreground uppercase">
-                                  {format(parseISO(String(task.startDate)), "MMM", { locale: language === "ru" ? ru : enUS })}
-                                </div>
-                                <div className="text-[10px] text-muted-foreground uppercase">
-                                  {format(parseISO(String(task.startDate)), "EEE", { locale: language === "ru" ? ru : enUS })}
-                                </div>
+                              {/* Код позиции */}
+                              <div
+                                className="w-10 shrink-0 truncate text-center font-mono text-[11px] text-muted-foreground"
+                                title={String(codeLabel)}
+                              >
+                                {String(codeLabel)}
                               </div>
 
                               {/* Основной контент */}
                               <div className="flex-1 min-w-0">
-                                {/* Акт + ТЗ + БРГ (вместо статуса) + actions */}
-                                <div className="flex items-center justify-between mb-1">
+                                {/* Акт + ТЗ + БРГ (вместо статуса) + объём + actions */}
+                                <div className="flex items-center gap-2 mb-1">
                                   <span className={cn(
-                                    "text-[11px] font-medium px-2 py-0.5 rounded border",
+                                    "min-w-0 truncate text-[11px] font-medium px-2 py-0.5 rounded border",
                                     actNumber != null
                                       ? "border-primary/30 bg-primary/10 text-primary"
                                       : "border-border text-muted-foreground bg-muted/40"
                                   )}>
                                     {actTzBrgLine}
                                   </span>
-                                  <div className="flex items-center gap-0.5">
+                                  <span className="shrink-0 text-[12px] font-semibold text-primary">
+                                    {task.quantity == null
+                                      ? "—"
+                                      : `${Number(task.quantity).toLocaleString("ru-RU")} ${task.unit || unit}`.trim()}
+                                  </span>
+                                  <div className="ml-auto flex shrink-0 items-center gap-0.5">
                                     {hasAuxiliaries && (
                                       <Button
                                         variant="ghost"
@@ -1441,15 +1441,6 @@ export default function Schedule() {
                                   )}
                                 </div>
 
-                                {/* Код + объём */}
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-[11px] text-muted-foreground font-mono">{String(codeLabel)}</span>
-                                  {(task.quantity != null) && (
-                                    <span className="text-[12px] font-semibold text-primary">
-                                      {Number(task.quantity).toLocaleString("ru-RU")} {task.unit || unit}
-                                    </span>
-                                  )}
-                                </div>
                               </div>
                             </div>
                           </div>

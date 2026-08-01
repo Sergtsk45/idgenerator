@@ -9,6 +9,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { TDocumentDefinitions } from "pdfmake/interfaces";
 import { PDFDocument } from "pdf-lib";
+import type { SourceDataDto } from "@shared/routes";
+import { COPY_CERTIFIER_ROLE } from "@shared/routes";
+import { drawCopyCertifyStamp, embedCopyCertifyStampFont } from "./copyCertifyStamp";
 import { isPdf, resolveDocumentFile } from "./document-files";
 import { generatePdfBuffer } from "./pdfGenerator";
 
@@ -45,6 +48,7 @@ interface ActAttachmentsSource {
     dateEnd: string | null;
   } | undefined>;
   getObject(objectId: number): Promise<{ title: string } | undefined>;
+  getObjectSourceData(objectId: number): Promise<SourceDataDto>;
   getActDocAttachments(actId: number): Promise<
     Array<{
       documentId: number;
@@ -194,9 +198,18 @@ export async function buildActAttachmentsPdf(
     }),
   );
   const result = await PDFDocument.create();
-  for (const pdf of [await PDFDocument.load(title), ...sourcePdfs]) {
+  const titlePdf = await PDFDocument.load(title);
+  const titlePages = await result.copyPages(titlePdf, titlePdf.getPageIndices());
+  for (const page of titlePages) result.addPage(page);
+
+  const certifier = (await dataSource.getObjectSourceData(act.objectId)).persons[COPY_CERTIFIER_ROLE];
+  const stampFont = await embedCopyCertifyStampFont(result);
+  for (const pdf of sourcePdfs) {
     const pages = await result.copyPages(pdf, pdf.getPageIndices());
-    for (const page of pages) result.addPage(page);
+    for (const page of pages) {
+      drawCopyCertifyStamp(page, stampFont, certifier);
+      result.addPage(page);
+    }
   }
 
   return { buffer: Buffer.from(await result.save()), documentsCount, problems };
