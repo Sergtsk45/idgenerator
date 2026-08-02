@@ -10,7 +10,10 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireAuth, type McpAuthResolution } from "../authContext";
 import { toolError, toolSuccess, withToolLogging } from "../toolResult";
-import { VALID_INPUT_SOURCES } from "../../services/execution-workflow/workflowInputs";
+import {
+  VALID_INPUT_SOURCES,
+  WORKFLOW_INPUT_KEYS,
+} from "../../services/execution-workflow/workflowInputs";
 import {
   createExecutionWorkflow,
   getExecutionWorkflow,
@@ -20,6 +23,7 @@ import {
 
 const idempotencyKeySchema = z.string().min(1).max(200);
 const inputSourceSchema = z.enum(VALID_INPUT_SOURCES as [string, ...string[]]);
+const workflowInputKeySchema = z.enum(WORKFLOW_INPUT_KEYS);
 
 export function registerWorkflowTools(server: McpServer, authResolution: McpAuthResolution): void {
   // Resolve once so logging can attribute calls even when auth later fails inside the handler.
@@ -71,8 +75,8 @@ export function registerWorkflowTools(server: McpServer, authResolution: McpAuth
     {
       title: "Get missing workflow inputs",
       description:
-        "Temporary baseline contract: returns the schedule-planning inputs still needing " +
-        "confirmation. Will be superseded by the estimate-analysis-driven missing inputs engine.",
+        "Returns deterministic schedule-input questions, validation metadata, blocking issues, readiness, " +
+        "and the current input hash. This read-only tool never stores defaults or changes workflow stage.",
       inputSchema: { workflowId: z.number().int().positive() },
       annotations: { readOnlyHint: true, destructiveHint: false },
     },
@@ -97,7 +101,7 @@ export function registerWorkflowTools(server: McpServer, authResolution: McpAuth
         workflowId: z.number().int().positive(),
         expectedVersion: z.number().int().nonnegative(),
         idempotencyKey: idempotencyKeySchema,
-        key: z.string().min(1).max(100),
+        key: workflowInputKeySchema,
         value: z.unknown(),
         source: inputSourceSchema,
         confirmed: z.boolean(),

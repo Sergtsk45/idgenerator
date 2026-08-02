@@ -1,7 +1,7 @@
 # MCP endpoint — локальное подключение
 
 `POST/GET/DELETE /mcp` — Streamable HTTP, **stateless** (каждый HTTP-запрос обслуживается
-новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-004 из
+новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-005 из
 [`mcp-mvp-plan`](../../mcp-mvp-plan/).
 
 ## Требования
@@ -31,8 +31,12 @@
 |---|---|
 | `create_execution_workflow` | Создаёт workflow для объекта пользователя (idempotent) |
 | `get_execution_workflow` | Текущий stage/version/inputs/missing inputs |
-| `get_missing_workflow_inputs` | Временный список вопросов планирования графика |
-| `set_workflow_input` | Сохраняет input с `expectedVersion` + `idempotencyKey` |
+| `get_missing_workflow_inputs` | Формальные conditional вопросы и blocking issues для графика |
+| `set_workflow_input` | Валидирует и сохраняет catalog input с `expectedVersion` + `idempotencyKey` |
+
+`get_missing_workflow_inputs` возвращает формальные вопросы, `blockingIssues`, readiness и
+`scheduleInputHash`. Для crew mode требуются актуальные labor data; defaults 8 часов и 0.85
+не считаются заполненными без явного подтверждения.
 
 ### Estimate upload (TASK-003)
 
@@ -114,7 +118,7 @@ TASK-004 добавляет `WORKFLOW_ESTIMATE_NOT_SET`, `ESTIMATE_NOT_FOUND`.
 
 ## Известные ограничения
 
-- `get_missing_workflow_inputs` — временный базовый контракт; замена в TASK-005.
+- Schedule draft stale определяется сравнением `scheduleInputHash`; enforcement добавляется в TASK-006.
 - `create_upload_session` и `import_estimate_from_upload` выполняют свои stage transitions серверно.
 - Автоматическая уборка истёкших/осиротевших upload-файлов пока не реализована.
 - Порог labor coverage для режима планирования по численности задаётся в TASK-006.

@@ -168,7 +168,7 @@ test("execution workflow service: ownership, idempotency, concurrency, events", 
 
   await t.test("set_workflow_input never changes stage by itself (stage transitions are a separate concern)", () => {
     assert.equal(afterThird.stage, "created");
-    assert.equal(afterThird.missingInputs.length, 0);
+    assert.deepEqual(afterThird.missingInputs.map((input) => input.key), ["targetDurationDays"]);
   });
 
   await t.test("transitionWorkflowStage rejects skipping stages (created -> awaiting_schedule_inputs is not one hop)", async () => {

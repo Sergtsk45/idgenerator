@@ -83,6 +83,26 @@
 - **Следующая задача**: TASK-005 (missing-input engine)
 - **Известные ограничения**: классификация консервативная; coded resources без явного `resourceType` остаются unclassified; порог labor coverage для crew planning определяется в TASK-006.
 
+## Задача: MCP missing-input engine — TASK-005 (mcp-mvp-plan)
+- **Статус**: Завершена локально
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Единый детерминированный catalog вопросов и validation rules для параметров графика, зависящий от выбранного planning mode и актуального анализа сметы.
+- **Шаги выполнения**:
+  - [x] Stable catalog семи workflow input keys
+  - [x] UI-ready вопросы: date/single-select/number, options, validation, reason, defaults
+  - [x] Conditional ветки `target_duration` и `crew_size`
+  - [x] Blocking issue `LABOR_DATA_REQUIRED` с предложением target-duration
+  - [x] Строгая service-level валидация unknown/invalid values
+  - [x] Явное подтверждение defaults `shiftHours=8`, `utilizationFactor=0.85`
+  - [x] Канонический `scheduleInputHash` для stale detection в TASK-006
+  - [x] Fresh estimate-analysis loader без циклических imports
+  - [x] Первый input переводит `estimate_analysis_ready` в `awaiting_schedule_inputs`
+  - [x] No-op для идентичного input; audit event при invalidation рассчитанного draft
+  - [x] Pure/MCP/service tests и `check`/`test`/`build`
+- **Зависимости**: TASK-002, TASK-004
+- **Следующая задача**: TASK-006 (schedule planning)
+- **Известные ограничения**: реальный schedule draft появляется в TASK-006; stale пока представлен hash-контрактом и audit event, а не mutable flag.
+
 ---
 
 ## Задача: Создание материала из задачи графика с автопривязкой

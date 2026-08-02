@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-08-02] - Missing-input engine (TASK-005)
+
+### Добавлено
+- Catalog семи schedule inputs с едиными Zod validators, UI metadata, reasons и подтверждаемыми defaults.
+- Conditional rules для `target_duration` и `crew_size`; blocking issue `LABOR_DATA_REQUIRED` без выдумывания трудоёмкости.
+- Детерминированный `scheduleInputHash`, включающий актуальный analysis hash и только effective confirmed inputs.
+- Low-level current-analysis loader для безопасной проверки stale snapshot из workflow service.
+- Unit, MCP contract и DB-gated service tests.
+
+### Изменено
+- `get_missing_workflow_inputs` возвращает questions/missingInputs, blockingIssues, readiness и input hash.
+- `set_workflow_input` отклоняет unknown/invalid keys до записи, делает identical update no-op и переводит первый schedule input в `awaiting_schedule_inputs`.
+- При изменении существующего расчётного input пишется append-only `calculated_artifacts_invalidated` для будущего schedule draft.
+
+### Совместимость
+- Миграция не требуется; используются существующие workflow inputs/events/idempotency records.
+- Existing REST routes и утверждённые schedules не изменяются.
+
+---
+
 ## [2026-08-02] - Детерминированный анализ сметы (TASK-004)
 
 ### Добавлено

@@ -23,7 +23,16 @@ import { McpToolError, MCP_ERROR_CODES } from "../../mcp/errors";
 import * as repo from "./workflowRepository";
 import type { DbClient } from "./workflowRepository";
 import { assertTransitionAllowed } from "./workflowStateMachine";
-import { computeMissingInputs, VALID_INPUT_SOURCES, type MissingInput } from "./workflowInputs";
+import { loadCurrentEstimateAnalysis } from "../estimate-analysis/currentEstimateAnalysis";
+import {
+  evaluateMissingWorkflowInputs,
+  validateAndNormalizeWorkflowInput,
+  VALID_INPUT_SOURCES,
+  type MissingInput,
+  type MissingInputsContext,
+  type WorkflowBlockingIssue,
+  type WorkflowInputKey,
+} from "./workflowInputs";
 
 export interface WorkflowSnapshot {
   workflowId: number;
@@ -38,6 +47,49 @@ export interface WorkflowSnapshot {
 export interface WorkflowSnapshotWithInputs extends WorkflowSnapshot {
   inputs: Array<{ key: string; value: unknown; source: WorkflowInputSource; confirmed: boolean }>;
   missingInputs: MissingInput[];
+  questions: MissingInput[];
+  blockingIssues: WorkflowBlockingIssue[];
+  ready: boolean;
+  scheduleInputHash: string;
+}
+
+async function getMissingInputsContext(client: DbClient, workflow: ExecutionWorkflow): Promise<MissingInputsContext> {
+  if (!workflow.estimateId || ["created", "estimate_upload_pending", "estimate_imported"].includes(workflow.stage)) {
+    return {};
+  }
+  const analysis = await loadCurrentEstimateAnalysis(client, workflow);
+  if (!analysis) {
+    throw new McpToolError(MCP_ERROR_CODES.NOT_FOUND, "Current estimate analysis not found; call analyze_estimate", {
+      recoverable: true,
+    });
+  }
+  return {
+    analysisAvailable: true,
+    analysisInputHash: analysis.inputHash,
+    laborHoursAvailable: analysis.summary.laborHoursAvailable,
+  };
+}
+
+function inputsResult(
+  workflow: ExecutionWorkflow,
+  inputs: Awaited<ReturnType<typeof repo.getWorkflowInputs>>,
+  context: MissingInputsContext,
+): WorkflowSnapshotWithInputs {
+  const evaluation = evaluateMissingWorkflowInputs(inputs, context);
+  return {
+    ...toSnapshot(workflow),
+    inputs: inputs.map((input) => ({
+      key: input.key,
+      value: input.valueJson,
+      source: input.source,
+      confirmed: input.confirmed,
+    })),
+    missingInputs: evaluation.questions,
+    questions: evaluation.questions,
+    blockingIssues: evaluation.blockingIssues,
+    ready: evaluation.ready,
+    scheduleInputHash: evaluation.scheduleInputHash,
+  };
 }
 
 function toSnapshot(row: ExecutionWorkflow): WorkflowSnapshot {
@@ -156,31 +208,23 @@ export async function getExecutionWorkflow(
 ): Promise<WorkflowSnapshotWithInputs> {
   const workflow = await loadOwnedWorkflow(db, auth, workflowId);
   const inputs = await repo.getWorkflowInputs(db, workflow.id);
-  return {
-    ...toSnapshot(workflow),
-    inputs: inputs.map((i) => ({ key: i.key, value: i.valueJson, source: i.source, confirmed: i.confirmed })),
-    missingInputs: computeMissingInputs(inputs),
-  };
+  return inputsResult(workflow, inputs, await getMissingInputsContext(db, workflow));
 }
 
 export async function getMissingWorkflowInputs(
   auth: McpAuthContext,
   workflowId: number,
-): Promise<{ workflowId: number; stage: WorkflowStage; missingInputs: MissingInput[] }> {
+): Promise<WorkflowSnapshotWithInputs> {
   const workflow = await loadOwnedWorkflow(db, auth, workflowId);
   const inputs = await repo.getWorkflowInputs(db, workflow.id);
-  return {
-    workflowId: workflow.id,
-    stage: workflow.stage,
-    missingInputs: computeMissingInputs(inputs),
-  };
+  return inputsResult(workflow, inputs, await getMissingInputsContext(db, workflow));
 }
 
 export interface SetWorkflowInputArgs {
   workflowId: number;
   expectedVersion: number;
   idempotencyKey: string;
-  key: string;
+  key: WorkflowInputKey | string;
   value: unknown;
   source: WorkflowInputSource;
   confirmed: boolean;
@@ -193,6 +237,7 @@ export async function setWorkflowInput(
   if (!VALID_INPUT_SOURCES.includes(args.source)) {
     throw new McpToolError(MCP_ERROR_CODES.VALIDATION_ERROR, `Invalid input source "${args.source}"`);
   }
+  const normalized = validateAndNormalizeWorkflowInput(args.key, args.value);
 
   return withIdempotency(
     auth.userId,
@@ -201,46 +246,83 @@ export async function setWorkflowInput(
     {
       workflowId: args.workflowId,
       expectedVersion: args.expectedVersion,
-      key: args.key,
-      value: args.value,
+      key: normalized.key,
+      value: normalized.value,
       source: args.source,
       confirmed: args.confirmed,
     },
     async (tx) => {
       const workflow = await loadOwnedWorkflow(tx, auth, args.workflowId);
+      if (workflow.version !== args.expectedVersion) {
+        throw new McpToolError(MCP_ERROR_CODES.WORKFLOW_VERSION_CONFLICT, "Workflow was modified concurrently", {
+          recoverable: true,
+        });
+      }
+      const context = await getMissingInputsContext(tx, workflow);
+      const inputsBefore = await repo.getWorkflowInputs(tx, workflow.id);
+      const existing = inputsBefore.find((input) => input.key === normalized.key);
+      const unchanged = existing !== undefined
+        && JSON.stringify(existing.valueJson) === JSON.stringify(normalized.value)
+        && existing.source === args.source
+        && existing.confirmed === args.confirmed;
+
+      if (unchanged && workflow.stage !== "estimate_analysis_ready") {
+        return inputsResult(workflow, inputsBefore, context);
+      }
 
       // CAS FIRST: this is the concurrency gate. Nothing else is written before this
       // succeeds, so a losing request (stale expectedVersion) never persists its input —
       // the whole transaction rolls back when we throw below.
-      const updated = await repo.touchWorkflowIfVersionMatches(tx, workflow.id, args.expectedVersion);
+      const updated = workflow.stage === "estimate_analysis_ready"
+        ? await repo.updateWorkflowStageIfVersionMatches(
+            tx,
+            workflow.id,
+            args.expectedVersion,
+            "awaiting_schedule_inputs",
+          )
+        : await repo.touchWorkflowIfVersionMatches(tx, workflow.id, args.expectedVersion);
       if (!updated) {
         throw new McpToolError(MCP_ERROR_CODES.WORKFLOW_VERSION_CONFLICT, "Workflow was modified concurrently", {
           recoverable: true,
         });
       }
 
-      await repo.upsertWorkflowInput(tx, workflow.id, args.key, args.value, args.source, args.confirmed);
+      await repo.upsertWorkflowInput(
+        tx,
+        workflow.id,
+        normalized.key,
+        normalized.value,
+        args.source,
+        args.confirmed,
+      );
+      if (workflow.stage === "estimate_analysis_ready") {
+        await repo.insertWorkflowEvent(tx, {
+          workflowId: workflow.id,
+          eventType: "stage_transition",
+          actorType: "system",
+          actorId: null,
+          payloadJson: { from: workflow.stage, to: "awaiting_schedule_inputs" },
+        });
+      }
       await repo.insertWorkflowEvent(tx, {
         workflowId: workflow.id,
         eventType: "input_set",
         actorType: "agent",
         actorId: String(auth.userId),
-        payloadJson: { key: args.key, source: args.source, confirmed: args.confirmed },
+        payloadJson: { key: normalized.key, source: args.source, confirmed: args.confirmed },
       });
+      if (existing && !unchanged) {
+        await repo.insertWorkflowEvent(tx, {
+          workflowId: workflow.id,
+          eventType: "calculated_artifacts_invalidated",
+          actorType: "system",
+          actorId: null,
+          payloadJson: { key: normalized.key, artifacts: ["schedule_draft"] },
+        });
+      }
 
       const inputsAfter = await repo.getWorkflowInputs(tx, workflow.id);
-      const stillMissing = computeMissingInputs(inputsAfter);
-
-      return {
-        ...toSnapshot(updated),
-        inputs: inputsAfter.map((i) => ({
-          key: i.key,
-          value: i.valueJson,
-          source: i.source,
-          confirmed: i.confirmed,
-        })),
-        missingInputs: stillMissing,
-      };
+      return inputsResult(updated, inputsAfter, context);
     },
   );
 }
