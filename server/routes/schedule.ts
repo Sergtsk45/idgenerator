@@ -5,12 +5,69 @@
  * @created: 2026-03-21
  */
 
-import type { Express } from 'express';
+import type { Express, Request, Response } from 'express';
 import { z } from 'zod';
 import { api } from '@shared/routes';
 import { storage, appAuth } from './_common';
 import { addDaysISO } from './_dateUtils';
 import { requireFeature } from '../middleware/tariff';
+
+/** Проверяет, что задача графика принадлежит объекту текущего пользователя. */
+async function assertUserOwnsScheduleTask(
+  req: Request,
+  res: Response,
+  taskId: number,
+): Promise<{ objectId: number } | null> {
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ message: 'Authentication required' });
+    return null;
+  }
+
+  const task = await storage.getScheduleTask(taskId);
+  if (!task) {
+    res.status(404).json({ message: 'Schedule task not found' });
+    return null;
+  }
+
+  const scheduleId = Number((task as { scheduleId?: number }).scheduleId);
+  if (!Number.isFinite(scheduleId) || scheduleId <= 0) {
+    res.status(404).json({ message: 'Schedule task not found' });
+    return null;
+  }
+
+  const schedule = await storage.getScheduleWithTasks(scheduleId);
+  const objectId = Number((schedule as { objectId?: number } | undefined)?.objectId);
+  if (!schedule || !Number.isFinite(objectId) || objectId <= 0) {
+    res.status(404).json({ message: 'Schedule not found' });
+    return null;
+  }
+
+  const object = await storage.getObject(objectId);
+  if (!object || object.userId !== userId) {
+    res.status(403).json({ message: 'Access to this task is not allowed' });
+    return null;
+  }
+
+  return { objectId };
+}
+
+async function assertMaterialsBelongToObject(
+  res: Response,
+  objectId: number,
+  projectMaterialIds: number[],
+): Promise<boolean> {
+  const uniqueIds = Array.from(new Set(projectMaterialIds.filter((id) => Number.isFinite(id) && id > 0)));
+  for (const materialId of uniqueIds) {
+    const data = await storage.getProjectMaterial(materialId);
+    const materialObjectId = Number((data?.material as { objectId?: number } | undefined)?.objectId);
+    if (!data || materialObjectId !== objectId) {
+      res.status(403).json({ message: 'Material does not belong to this object' });
+      return false;
+    }
+  }
+  return true;
+}
 
 export function registerScheduleRoutes(app: Express): void {
 
@@ -815,12 +872,15 @@ export function registerScheduleRoutes(app: Express): void {
 
   // ── Task materials (p.3 AOSR sources) ──────────────────────────────────────
 
-  app.get(api.taskMaterials.list.path, async (req, res) => {
+  app.get(api.taskMaterials.list.path, ...appAuth, async (req, res) => {
     try {
       const taskId = Number(req.params.id);
       if (!Number.isFinite(taskId) || taskId <= 0) {
         return res.status(400).json({ message: "Invalid schedule task id" });
       }
+
+      const ownership = await assertUserOwnsScheduleTask(req, res, taskId);
+      if (!ownership) return;
 
       const list = await storage.getTaskMaterials(taskId);
       const dto = list.map((r: any) => {
@@ -864,12 +924,15 @@ export function registerScheduleRoutes(app: Express): void {
     }
   });
 
-  app.put(api.taskMaterials.replace.path, async (req, res) => {
+  app.put(api.taskMaterials.replace.path, ...appAuth, async (req, res) => {
     try {
       const taskId = Number(req.params.id);
       if (!Number.isFinite(taskId) || taskId <= 0) {
         return res.status(400).json({ message: "Invalid schedule task id" });
       }
+
+      const ownership = await assertUserOwnsScheduleTask(req, res, taskId);
+      if (!ownership) return;
 
       const input = api.taskMaterials.replace.input.parse(req.body);
       const items = input.items.map((it, idx) => ({
@@ -879,6 +942,13 @@ export function registerScheduleRoutes(app: Express): void {
         note: it.note ?? null,
         orderIndex: it.orderIndex ?? idx,
       }));
+
+      const materialsOk = await assertMaterialsBelongToObject(
+        res,
+        ownership.objectId,
+        items.map((it) => it.projectMaterialId),
+      );
+      if (!materialsOk) return;
 
       await storage.replaceTaskMaterials(taskId, items as any);
 
@@ -914,12 +984,15 @@ export function registerScheduleRoutes(app: Express): void {
     }
   });
 
-  app.post(api.taskMaterials.add.path, async (req, res) => {
+  app.post(api.taskMaterials.add.path, ...appAuth, async (req, res) => {
     try {
       const taskId = Number(req.params.id);
       if (!Number.isFinite(taskId) || taskId <= 0) {
         return res.status(400).json({ message: "Invalid schedule task id" });
       }
+
+      const ownership = await assertUserOwnsScheduleTask(req, res, taskId);
+      if (!ownership) return;
 
       const input = api.taskMaterials.add.input.parse(req.body);
       const materialData = {
@@ -929,6 +1002,13 @@ export function registerScheduleRoutes(app: Express): void {
         note: input.note ?? null,
         orderIndex: input.orderIndex,
       };
+
+      const materialsOk = await assertMaterialsBelongToObject(
+        res,
+        ownership.objectId,
+        [materialData.projectMaterialId],
+      );
+      if (!materialsOk) return;
 
       const created = await storage.createTaskMaterial(taskId, materialData as any);
 
@@ -951,15 +1031,23 @@ export function registerScheduleRoutes(app: Express): void {
     }
   });
 
-  app.delete(api.taskMaterials.remove.path, async (req, res) => {
+  app.delete(api.taskMaterials.remove.path, ...appAuth, async (req, res) => {
     try {
+      const taskIdParam = Number(req.params.id);
+      if (!Number.isFinite(taskIdParam) || taskIdParam <= 0) {
+        return res.status(400).json({ message: "Invalid schedule task id" });
+      }
+
+      const ownership = await assertUserOwnsScheduleTask(req, res, taskIdParam);
+      if (!ownership) return;
+
       const materialId = Number(req.params.materialId);
       if (!Number.isFinite(materialId) || materialId <= 0) {
         return res.status(400).json({ message: "Invalid material id" });
       }
 
       // SPLIT-019: Get taskId before deletion for sync
-      const materials = await storage.getTaskMaterials(Number(req.params.id));
+      const materials = await storage.getTaskMaterials(taskIdParam);
       const material = materials.find((m: any) => m.id === materialId);
       const taskId = material ? (material as any).taskId : null;
 

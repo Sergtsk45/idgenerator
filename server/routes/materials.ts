@@ -11,6 +11,7 @@ import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { api } from '@shared/routes';
 import { storage, appAuth, getObjectId, resolveCurrentObject, type AuthenticatedRequest } from './_common';
+import { requireObjectAccess } from '../middleware/objectAccess';
 import { requireFeature, requireQuota } from '../middleware/tariff';
 import { DocumentInUseError } from '../storage';
 import {
@@ -131,7 +132,7 @@ export function registerMaterialsRoutes(app: Express): void {
   // ── Project Materials ──────────────────────────────────────────────────────
 
   // GET /api/objects/:objectId/materials — список материалов проекта
-  app.get(api.projectMaterials.list.path, async (req, res) => {
+  app.get(api.projectMaterials.list.path, ...appAuth, requireObjectAccess, async (req, res) => {
     const objectId = Number(req.params.objectId);
     if (!Number.isFinite(objectId) || objectId <= 0) {
       return res.status(400).json({ message: 'Invalid objectId' });
@@ -146,7 +147,7 @@ export function registerMaterialsRoutes(app: Express): void {
   });
 
   // POST /api/objects/:objectId/materials — создать материал проекта
-  app.post(api.projectMaterials.create.path, async (req, res) => {
+  app.post(api.projectMaterials.create.path, ...appAuth, requireObjectAccess, async (req, res) => {
     const objectId = Number(req.params.objectId);
     if (!Number.isFinite(objectId) || objectId <= 0) {
       return res.status(400).json({ message: 'Invalid objectId' });
@@ -170,7 +171,7 @@ export function registerMaterialsRoutes(app: Express): void {
   });
 
   // GET /api/materials/:id — получить материал проекта
-  app.get(api.projectMaterials.get.path, async (req, res) => {
+  app.get(api.projectMaterials.get.path, ...appAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id) || id <= 0) {
       return res.status(400).json({ message: 'Invalid id' });
@@ -178,6 +179,11 @@ export function registerMaterialsRoutes(app: Express): void {
     try {
       const data = await storage.getProjectMaterial(id);
       if (!data) return res.status(404).json({ message: 'Not found' });
+      const objectId = Number((data.material as { objectId?: number }).objectId);
+      const object = Number.isFinite(objectId) ? await storage.getObject(objectId) : undefined;
+      if (!object || object.userId !== req.user!.id) {
+        return res.status(403).json({ message: 'Access to this material is not allowed' });
+      }
       return res.status(200).json(data);
     } catch (err) {
       console.error('Project material get failed:', err);
@@ -359,12 +365,20 @@ export function registerMaterialsRoutes(app: Express): void {
   // ── Material Batches ───────────────────────────────────────────────────────
 
   // POST /api/materials/:id/batches — создать партию
-  app.post(api.materialBatches.create.path, async (req, res) => {
+  app.post(api.materialBatches.create.path, ...appAuth, async (req, res) => {
     const projectMaterialId = Number(req.params.id);
     if (!Number.isFinite(projectMaterialId) || projectMaterialId <= 0) {
       return res.status(400).json({ message: 'Invalid project material id' });
     }
     try {
+      const materialData = await storage.getProjectMaterial(projectMaterialId);
+      if (!materialData) return res.status(404).json({ message: 'Not found' });
+      const objectId = Number((materialData.material as { objectId?: number }).objectId);
+      const object = Number.isFinite(objectId) ? await storage.getObject(objectId) : undefined;
+      if (!object || object.userId !== req.user!.id) {
+        return res.status(403).json({ message: 'Access to this material is not allowed' });
+      }
+
       const input = api.materialBatches.create.input.parse(req.body);
       const created = await storage.createBatch(projectMaterialId, input as any);
       return res.status(201).json(created);

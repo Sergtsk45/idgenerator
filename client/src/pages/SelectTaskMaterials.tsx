@@ -1,12 +1,11 @@
 /**
  * @file: SelectTaskMaterials.tsx
  * @description: Полноэкранная страница управления материалами задачи графика с автосохранением
- * @dependencies: wouter, @/hooks/use-task-materials, @/hooks/use-materials, @/components/ui/*
+ * @dependencies: wouter, @/hooks/use-task-materials, @/hooks/use-materials, MaterialWizard, selectTaskMaterialsHelpers
  * @created: 2026-02-24
  */
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { useLocation } from "wouter";
 import { Header } from "@/components/Header";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,13 +22,14 @@ import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { isQualityBindingRole } from "@shared/documentBinding";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MaterialWizard, type CreatedMaterialResult } from "@/components/materials/MaterialWizard";
+import {
+  appendCreatedMaterial,
+  toReplaceTaskMaterialsPayload,
+  type TaskMaterialItem,
+} from "@/pages/selectTaskMaterialsHelpers";
 
-type MaterialItem = {
-  projectMaterialId: number;
-  batchId: number | null;
-  qualityDocumentId: number | null;
-  note: string | null;
-};
+type MaterialItem = TaskMaterialItem;
 
 type ProjectMaterial = {
   id: number;
@@ -45,19 +45,24 @@ async function loadProjectMaterialDetails(materialId: number) {
   return api.projectMaterials.get.responses[200].parse(await res.json());
 }
 
-function getQualityDocumentOptions(details: any) {
-  const documents = new Map<number, any>(
-    (details?.documents ?? []).map((document: any) => [Number(document.id), document]),
+function getQualityDocumentOptions(details: unknown) {
+  const payload = details as {
+    documents?: Array<{ id: number; docType?: string; docNumber?: string | null; title?: string | null; fileUrl?: string | null }>;
+    bindings?: Array<{ documentId: number; bindingRole?: string | null; isPrimary?: boolean | null }>;
+  } | null | undefined;
+  const documents = new Map(
+    (payload?.documents ?? []).map((document) => [Number(document.id), document] as const),
   );
   const seen = new Set<number>();
-  return [...(details?.bindings ?? [])]
-    .filter((binding: any) => isQualityBindingRole(binding.bindingRole) && documents.has(Number(binding.documentId)))
-    .sort((a: any, b: any) => Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)))
-    .flatMap((binding: any) => {
+  return [...(payload?.bindings ?? [])]
+    .filter((binding) => isQualityBindingRole(binding.bindingRole) && documents.has(Number(binding.documentId)))
+    .sort((a, b) => Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)))
+    .flatMap((binding) => {
       const documentId = Number(binding.documentId);
       if (seen.has(documentId)) return [];
       seen.add(documentId);
       const document = documents.get(documentId);
+      if (!document) return [];
       return [{
         id: documentId,
         isPrimary: Boolean(binding.isPrimary),
@@ -73,7 +78,6 @@ function getQualityDocumentOptions(details: any) {
 }
 
 export default function SelectTaskMaterials() {
-  const [, navigate] = useLocation();
   const { language } = useLanguageStore();
   const t = translations[language].selectTaskMaterials;
   const { toast } = useToast();
@@ -90,6 +94,8 @@ export default function SelectTaskMaterials() {
 
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [materialWizardOpen, setMaterialWizardOpen] = useState(false);
+  const [labelOverrides, setLabelOverrides] = useState<Record<number, string>>({});
   const [docPickOpen, setDocPickOpen] = useState(false);
   const [pendingMaterialId, setPendingMaterialId] = useState<number | null>(null);
   const [pendingDocIds, setPendingDocIds] = useState<number[]>([]);
@@ -99,6 +105,9 @@ export default function SelectTaskMaterials() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const materialsRef = useRef(materials);
+  materialsRef.current = materials;
+
   const materialDetailsQueries = useQueries({
     queries: materials.map((item) => ({
       queryKey: [api.projectMaterials.get.path, item.projectMaterialId],
@@ -134,38 +143,46 @@ export default function SelectTaskMaterials() {
     setHasUnsavedChanges(false);
   }, [taskMaterialsData]);
 
+  const persistMaterials = useCallback(
+    async (nextMaterials: MaterialItem[]) => {
+      if (!taskId) {
+        throw new Error(t.taskMissing);
+      }
+      await replaceTaskMaterials.mutateAsync({
+        items: toReplaceTaskMaterialsPayload(nextMaterials),
+      });
+    },
+    [taskId, replaceTaskMaterials, t.taskMissing],
+  );
+
   // Save changes manually
   const saveChanges = useCallback(async () => {
     if (!taskId) {
-      console.warn("Cannot save materials: taskId is missing");
+      toast({
+        title: t.errorLoading,
+        description: t.taskMissing,
+        variant: "destructive",
+      });
       return;
     }
     try {
       setIsSaving(true);
-      await replaceTaskMaterials.mutateAsync({
-        items: materials.map((it, idx) => ({
-          projectMaterialId: it.projectMaterialId,
-          batchId: it.batchId ?? null,
-          qualityDocumentId: it.qualityDocumentId ?? null,
-          note: it.note ?? null,
-          orderIndex: idx,
-        })),
-      });
+      await persistMaterials(materialsRef.current);
       setHasUnsavedChanges(false);
       toast({
         title: t.saved,
         duration: 1800,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: t.errorLoading,
-        description: err?.message || "Failed to save materials",
+        description: err instanceof Error ? err.message : "Failed to save materials",
         variant: "destructive",
       });
     } finally {
       setIsSaving(false);
     }
-  }, [taskId, materials, replaceTaskMaterials, toast, t]);
+  }, [taskId, persistMaterials, toast, t]);
 
   const handleBack = async () => {
     // Save before leaving if there are unsaved changes
@@ -184,6 +201,8 @@ export default function SelectTaskMaterials() {
   }, [projectMaterials]);
 
   const getMaterialLabel = useCallback((materialId: number): string => {
+    const override = labelOverrides[materialId];
+    if (override) return override;
     const m = projectMaterialsMap.get(materialId);
     if (!m) return `Material #${materialId}`;
     return (
@@ -192,7 +211,7 @@ export default function SelectTaskMaterials() {
       (m.catalogMaterial?.name ? String(m.catalogMaterial.name) : "") ||
       `Material #${materialId}`
     );
-  }, [projectMaterialsMap]);
+  }, [projectMaterialsMap, labelOverrides]);
 
   const usedDocIds = useMemo(
     () => new Set(materials.map((m) => m.qualityDocumentId).filter((id): id is number => id != null)),
@@ -212,6 +231,54 @@ export default function SelectTaskMaterials() {
     const query = searchQuery.toLowerCase();
     return availableMaterials.filter((m) => m.label.toLowerCase().includes(query));
   }, [availableMaterials, searchQuery]);
+
+  const openCreateMaterialWizard = useCallback(() => {
+    if (!taskId) {
+      toast({
+        title: t.errorLoading,
+        description: t.taskMissing,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!Number.isFinite(objectId) || (objectId as number) <= 0) {
+      toast({
+        title: t.errorLoading,
+        description: t.objectNotReady,
+        variant: "destructive",
+      });
+      return;
+    }
+    setAddDialogOpen(false);
+    setSearchQuery("");
+    setMaterialWizardOpen(true);
+  }, [taskId, objectId, toast, t]);
+
+  const handleMaterialCreated = useCallback(
+    async (result: CreatedMaterialResult) => {
+      const nextMaterials = appendCreatedMaterial(materialsRef.current, result);
+      setLabelOverrides((prev) => ({ ...prev, [result.projectMaterialId]: result.displayName }));
+      setMaterials(nextMaterials);
+      setHasUnsavedChanges(true);
+
+      try {
+        setIsSaving(true);
+        await persistMaterials(nextMaterials);
+        setHasUnsavedChanges(false);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: [api.projectMaterials.list.path, objectId] }),
+          queryClient.invalidateQueries({ queryKey: [api.projectMaterials.get.path, result.projectMaterialId] }),
+          queryClient.invalidateQueries({ queryKey: [api.taskMaterials.list.path, taskId] }),
+        ]);
+      } catch (err) {
+        // Material already exists in object; keep local row for recovery / manual save.
+        throw err instanceof Error ? err : new Error(t.createdButNotLinked);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [persistMaterials, queryClient, objectId, taskId, t.createdButNotLinked],
+  );
 
   const handlePickMaterial = useCallback(async (materialId: number) => {
     const details = await queryClient.fetchQuery({
@@ -319,6 +386,7 @@ export default function SelectTaskMaterials() {
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-4">
             <p className="text-destructive font-medium">{t.errorLoading}</p>
+            <p className="text-sm text-muted-foreground">{t.taskMissing}</p>
             <Button onClick={handleBack}>{language === "ru" ? "Вернуться к графику" : "Back to schedule"}</Button>
           </div>
         </div>
@@ -501,67 +569,72 @@ export default function SelectTaskMaterials() {
 
       {/* Add material dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t.addMaterial}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4">
-            {/* Empty state: no materials in project */}
-            {(projectMaterials as ProjectMaterial[]).length === 0 && availableMaterials.length === 0 ? (
-              <div className="text-center py-8 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {language === "ru" 
-                    ? "Сначала добавьте материалы в проект" 
-                    : "Add materials to project first"}
-                </p>
-                <Button
-                  onClick={() => {
-                    setAddDialogOpen(false);
-                    navigate("/source/materials");
-                  }}
-                >
-                  {language === "ru" ? "Перейти к материалам" : "Go to materials"}
-                </Button>
-              </div>
-            ) : (
-              <>
-                {/* Search input */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder={t.searchPlaceholder}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
+            <Button
+              type="button"
+              className="w-full"
+              onClick={openCreateMaterialWizard}
+              disabled={!taskId || !Number.isFinite(objectId) || (objectId as number) <= 0}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {t.createNewMaterial}
+            </Button>
 
-                {/* Materials list */}
-                <div className="max-h-[300px] overflow-y-auto border rounded-lg">
-                  {filteredAvailableMaterials.length === 0 ? (
-                    <div className="text-center py-8 text-sm text-muted-foreground">
-                      {language === "ru" ? "Материалы не найдены" : "No materials found"}
-                    </div>
-                  ) : (
-                    <div className="divide-y">
-                      {filteredAvailableMaterials.map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => handlePickMaterial(m.id)}
-                          className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent transition-colors text-left"
-                        >
-                          <Check className="h-4 w-4 shrink-0 opacity-0" />
-                          <span className="text-sm flex-1 min-w-0 break-words">{m.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+            <div className="grid gap-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                {t.selectExistingMaterial}
+              </p>
+
+              {(projectMaterials as ProjectMaterial[]).length === 0 ? (
+                <div className="text-center py-6 space-y-2 border rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    {language === "ru"
+                      ? "В объекте пока нет материалов — создайте новый выше"
+                      : "No materials in the object yet — create a new one above"}
+                  </p>
                 </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder={t.searchPlaceholder}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+
+                  <div className="max-h-[300px] overflow-y-auto border rounded-lg">
+                    {filteredAvailableMaterials.length === 0 ? (
+                      <div className="text-center py-8 text-sm text-muted-foreground">
+                        {language === "ru" ? "Материалы не найдены" : "No materials found"}
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {filteredAvailableMaterials.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => handlePickMaterial(m.id)}
+                            className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent transition-colors text-left"
+                          >
+                            <Check className="h-4 w-4 shrink-0 opacity-0" />
+                            <span className="text-sm flex-1 min-w-0 break-words">{m.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <DialogFooter>
@@ -571,6 +644,17 @@ export default function SelectTaskMaterials() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {Number.isFinite(objectId) && (objectId as number) > 0 ? (
+        <MaterialWizard
+          objectId={objectId as number}
+          open={materialWizardOpen}
+          onOpenChange={setMaterialWizardOpen}
+          initialSource="new"
+          skipSourceStep
+          onCreated={handleMaterialCreated}
+        />
+      ) : null}
 
       {/* Multi-select quality documents (Q7) */}
       <Dialog
