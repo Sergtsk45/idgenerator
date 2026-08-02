@@ -29,7 +29,7 @@
   - [x] Повторный ручной smoke: реальный 413, `/mcp` недоступен при выключенном флаге, REST не затронут в обоих состояниях флага
 - **Зависимости**: нет (первая задача дорожной карты `mcp-mvp-plan`)
 - **Следующая задача**: TASK-002 (workflow state) — см. ниже
-- **Известные ограничения**: Host/Origin validation, audit log, per-tool метрики — TASK-012.
+- **Известные ограничения**: Host/Origin validation, audit log, per-tool метрики — закрыты в TASK-012.
 
 ## Задача: MCP workflow state — TASK-002 (mcp-mvp-plan)
 - **Статус**: Завершена (влита в единый deploy-вариант поверх foundation PR #3)
@@ -209,6 +209,21 @@
 - **Зависимости**: TASK-010
 - **Следующая задача**: TASK-012 (host/origin validation + audit log + per-tool metrics)
 - **Известные ограничения**: DB integration body требует `DATABASE_URL`; workflow resources read current persisted state and do not restart the workflow.
+
+## Задача: Security hardening, observability и rollout — TASK-012 (mcp-mvp-plan)
+- **Статус**: Завершена локально
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Host/origin validation для MCP HTTP, request/tool correlation ID, per-tool telemetry и audit logging, плюс pilot runbook/rollback notes.
+- **Шаги выполнения**:
+  - [x] Host/origin guard на `/mcp` до body parsing
+  - [x] Request/tool correlation ID и redacted logging
+  - [x] Per-tool metrics, audit events и per-user/tool rate limit
+  - [x] Security smoke/tests на origin guard и telemetry
+  - [x] Pilot runbook и rollback checklist
+  - [x] `npm run check`, `npm test`, `npm run build`
+- **Зависимости**: TASK-001…TASK-011
+- **Следующая задача**: post-MVP pilot / operational monitoring
+- **Известные ограничения**: HTTP host/origin policy сейчас оптимизирована под localhost/pilot hostnames; beyond-pilot allowlist надо зафиксировать в env перед external access.
 
 ---
 

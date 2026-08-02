@@ -4,7 +4,13 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { telegramAuthMiddleware } from "./middleware/telegramAuth";
-import { handleMcpRequest, mcpBodyErrorHandler, mcpBodyParser, mcpRateLimiter } from "./mcp/httpTransport";
+import {
+  handleMcpRequest,
+  mcpBodyErrorHandler,
+  mcpBodyParser,
+  mcpRateLimiter,
+} from "./mcp/httpTransport";
+import { validateMcpRequestHostOrigin } from "./mcp/httpGuards";
 
 const app = express();
 const httpServer = createServer(app);
@@ -41,7 +47,7 @@ app.use((req, res, next) => {
 // in production, since it never touches REST behavior when off.
 const mcpEnabled = process.env.MCP_ENABLED === "true";
 if (mcpEnabled) {
-  app.all("/mcp", mcpRateLimiter, mcpBodyParser, mcpBodyErrorHandler, handleMcpRequest);
+  app.all("/mcp", mcpRateLimiter, validateMcpRequestHostOrigin, mcpBodyParser, mcpBodyErrorHandler, handleMcpRequest);
 }
 
 app.use(

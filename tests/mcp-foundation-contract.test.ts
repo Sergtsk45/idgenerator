@@ -75,7 +75,7 @@ test("MCP endpoint does not proxy Express route handlers and is opt-in feature-f
   // especially important for production defaults.
   assert.match(source, /MCP_ENABLED\s*===\s*"true"/);
   assert.doesNotMatch(source, /MCP_ENABLED\s*!==\s*"false"/);
-  assert.match(source, /app\.all\("\/mcp"/);
+  assert.match(source, /app\.all\("\/mcp",\s*mcpRateLimiter,\s*validateMcpRequestHostOrigin,\s*mcpBodyParser,\s*mcpBodyErrorHandler,\s*handleMcpRequest\)/);
   assert.doesNotMatch(source, /registerRoutes\([^)]*\).*\/mcp/);
 });
 
@@ -93,12 +93,15 @@ test("MCP route is mounted before the app-wide body parser and Telegram auth mid
   assert.ok(mcpMountIndex < telegramAuthIndex, "MCP route must be mounted before Telegram auth middleware");
 
   // The MCP route must use its own body parser, not the shared one.
-  assert.match(source, /app\.all\("\/mcp",\s*mcpRateLimiter,\s*mcpBodyParser,\s*mcpBodyErrorHandler,\s*handleMcpRequest\)/);
+  assert.match(
+    source,
+    /app\.all\("\/mcp",\s*mcpRateLimiter,\s*validateMcpRequestHostOrigin,\s*mcpBodyParser,\s*mcpBodyErrorHandler,\s*handleMcpRequest\)/,
+  );
 });
 
 test("MCP error codes match the TASK-001 contract", async () => {
   const source = await readFile("server/mcp/errors.ts", "utf8");
-  for (const code of ["AUTH_REQUIRED", "AUTH_INVALID", "FORBIDDEN", "VALIDATION_ERROR", "INTERNAL_ERROR"]) {
+  for (const code of ["AUTH_REQUIRED", "AUTH_INVALID", "FORBIDDEN", "RATE_LIMITED", "VALIDATION_ERROR", "INTERNAL_ERROR"]) {
     assert.match(source, new RegExp(`"${code}"`));
   }
 });

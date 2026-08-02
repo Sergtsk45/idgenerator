@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-08-02] - Security hardening, telemetry и rollout notes (TASK-012)
+
+### Добавлено
+- `/mcp` host/origin validation до body parsing: cross-site и DNS-rebind style requests режутся до запуска MCP server.
+- Request-scoped correlation ID и redacted MCP request/tool/audit logging без Authorization header и raw tool payloads.
+- Per-tool telemetry: invocation count, latency, errors, audit events и per-user/tool rate limit.
+- `docs/mcp-pilot-runbook.md` с preflight, staging smoke, rollback и incident notes.
+
+### Изменено
+- `withToolLogging` теперь пишет per-tool telemetry и audit events для write/final действий.
+- MCP HTTP route получил дополнительный host/origin guard и stable `RATE_LIMITED` tool error contract.
+
+### Контракты и совместимость
+- REST routes остаются без изменений; `MCP_ENABLED=false` по-прежнему полностью отключает MCP transport.
+- Audit/telemetry logs не содержат bearer tokens, raw bodies или tool arguments.
+- Host/origin policy сейчас ориентирована на pilot hostnames и должна быть закреплена через env перед более широким доступом.
+
+---
+
 ## [2026-08-02] - Agent contract discovery и workflow resources (TASK-011)
 
 ### Добавлено

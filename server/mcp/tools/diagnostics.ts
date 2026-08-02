@@ -8,7 +8,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireAuth, type McpAuthResolution } from "../authContext";
-import { toolError, toolSuccess } from "../toolResult";
+import { toolError, toolSuccess, withToolLogging } from "../toolResult";
 import { storage } from "../../storage";
 
 /**
@@ -24,14 +24,14 @@ export function registerDiagnosticTools(server: McpServer, authResolution: McpAu
       description: "Health check for the authenticated MCP session.",
       inputSchema: {},
     },
-    async () => {
+    withToolLogging("ping", authResolution.status === "ok" ? authResolution.context.userId : 0, async () => {
       try {
         const authContext = requireAuth(authResolution);
         return toolSuccess({ pong: true, userId: authContext.userId });
       } catch (err) {
         return toolError(err);
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -41,7 +41,7 @@ export function registerDiagnosticTools(server: McpServer, authResolution: McpAu
       description: "Returns the profile of the user identified by the request's Bearer JWT.",
       inputSchema: {},
     },
-    async () => {
+    withToolLogging("get_current_user", authResolution.status === "ok" ? authResolution.context.userId : 0, async () => {
       try {
         const authContext = requireAuth(authResolution);
         return toolSuccess({
@@ -53,7 +53,7 @@ export function registerDiagnosticTools(server: McpServer, authResolution: McpAu
       } catch (err) {
         return toolError(err);
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -63,7 +63,7 @@ export function registerDiagnosticTools(server: McpServer, authResolution: McpAu
       description: "Lists objects owned by the authenticated user. Never returns other users' data.",
       inputSchema: {},
     },
-    async () => {
+    withToolLogging("list_objects", authResolution.status === "ok" ? authResolution.context.userId : 0, async () => {
       try {
         const authContext = requireAuth(authResolution);
         const list = await storage.listUserObjects(authContext.userId);
@@ -71,6 +71,6 @@ export function registerDiagnosticTools(server: McpServer, authResolution: McpAu
       } catch (err) {
         return toolError(err);
       }
-    },
+    }),
   );
 }

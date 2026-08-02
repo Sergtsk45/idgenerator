@@ -1,7 +1,7 @@
 # MCP endpoint — локальное подключение
 
 `POST/GET/DELETE /mcp` — Streamable HTTP, **stateless** (каждый HTTP-запрос обслуживается
-новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-011 из
+новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-012 из
 [`mcp-mvp-plan`](../../mcp-mvp-plan/).
 
 ## Требования
@@ -200,7 +200,7 @@ curl -s -X POST http://localhost:5000/mcp \
 
 Стабильные machine-readable коды в `content[0].text` при `isError: true`:
 
-`AUTH_REQUIRED`, `AUTH_INVALID`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`,
+`AUTH_REQUIRED`, `AUTH_INVALID`, `FORBIDDEN`, `RATE_LIMITED`, `NOT_FOUND`, `VALIDATION_ERROR`,
 `INTERNAL_ERROR`, `WORKFLOW_VERSION_CONFLICT`, `WORKFLOW_TRANSITION_NOT_ALLOWED`.
 
 TASK-003 также возвращает `UPLOAD_EXPIRED`, `UPLOAD_NOT_FOUND`,
@@ -232,4 +232,4 @@ TASK-010 добавляет `WORKLOG_NOT_READY`, `WORKLOG_DRAFT_NOT_FOUND`,
 - Planner MVP линейный: одна бригада, без CPM и параллельных работ.
 - `create_upload_session` и `import_estimate_from_upload` выполняют свои stage transitions серверно.
 - Автоматическая уборка истёкших/осиротевших upload-файлов пока не реализована.
-- Host/Origin validation для `/mcp`, audit log и per-tool метрики — TASK-012.
+- Host/Origin validation для `/mcp`, audit log, per-tool метрики и runbook для пилота — см. `docs/mcp-pilot-runbook.md`.

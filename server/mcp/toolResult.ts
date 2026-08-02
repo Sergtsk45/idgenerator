@@ -7,6 +7,13 @@
 
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { McpToolError, type McpErrorCode } from "./errors";
+import {
+  enforceToolRateLimit,
+  getMcpTelemetry,
+  getToolAuditKind,
+  recordAuditEvent,
+  recordToolOutcome,
+} from "./telemetry";
 
 export function toolSuccess(data: unknown): CallToolResult {
   return {
@@ -39,15 +46,34 @@ export function withToolLogging<Args extends unknown[]>(
 ): (...args: Args) => Promise<CallToolResult> {
   return async (...args: Args) => {
     const startedAt = Date.now();
+    const telemetry = getMcpTelemetry();
+    const requestLabel = telemetry?.requestId ? ` requestId=${telemetry.requestId}` : "";
     try {
+      enforceToolRateLimit(toolName, userId);
       const result = await handler(...args);
+      recordToolOutcome(toolName, userId, Date.now() - startedAt, Boolean(result.isError));
+      const auditKind = getToolAuditKind(toolName);
+      if (auditKind) {
+        recordAuditEvent(toolName, userId);
+        console.log(
+          `[mcp:audit]${requestLabel} tool=${toolName} user=${userId} action=${auditKind} outcome=${result.isError ? "error" : "ok"}`,
+        );
+      }
       console.log(
-        `[mcp:tool] ${toolName} user=${userId} ok=${!result.isError} durationMs=${Date.now() - startedAt}`,
+        `[mcp:tool]${requestLabel} ${toolName} user=${userId} ok=${!result.isError} durationMs=${Date.now() - startedAt}`,
       );
       return result;
     } catch (err) {
+      recordToolOutcome(toolName, userId, Date.now() - startedAt, true);
+      const auditKind = getToolAuditKind(toolName);
+      if (auditKind) {
+        recordAuditEvent(toolName, userId);
+        console.log(
+          `[mcp:audit]${requestLabel} tool=${toolName} user=${userId} action=${auditKind} outcome=error`,
+        );
+      }
       console.log(
-        `[mcp:tool] ${toolName} user=${userId} ok=false durationMs=${Date.now() - startedAt} threw=true`,
+        `[mcp:tool]${requestLabel} ${toolName} user=${userId} ok=false durationMs=${Date.now() - startedAt} threw=true`,
       );
       return toolError(err);
     }

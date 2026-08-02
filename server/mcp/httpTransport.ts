@@ -13,10 +13,12 @@
  */
 
 import express, { type NextFunction, type Request, Response } from "express";
+import { randomUUID } from "node:crypto";
 import rateLimit from "express-rate-limit";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { resolveMcpAuthContext } from "./authContext";
 import { createMcpServer } from "./createMcpServer";
+import { runWithMcpTelemetry } from "./telemetry";
 
 const MCP_MAX_BODY_BYTES = 256 * 1024;
 
@@ -54,6 +56,7 @@ function isBodyParserError(err: unknown): err is { status?: number; type?: strin
 export async function handleMcpRequest(req: Request, res: Response): Promise<void> {
   const start = Date.now();
   const requestedMethod = extractJsonRpcMethod(req.body);
+  const requestId = randomUUID();
 
   try {
     const authResolution = await resolveMcpAuthContext(req.headers.authorization);
@@ -65,14 +68,17 @@ export async function handleMcpRequest(req: Request, res: Response): Promise<voi
       void server.close();
     });
 
-    await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
-
     const userId = authResolution.status === "ok" ? authResolution.context.userId : null;
-    logMcpRequest({ method: requestedMethod, userId, status: res.statusCode, durationMs: Date.now() - start });
+
+    await runWithMcpTelemetry({ requestId, userId }, async () => {
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    });
+
+    logMcpRequest({ requestId, method: requestedMethod, userId, status: res.statusCode, durationMs: Date.now() - start });
   } catch (error) {
-    console.error("[mcp] transport error:", error);
-    logMcpRequest({ method: requestedMethod, userId: null, status: 500, durationMs: Date.now() - start, failed: true });
+    console.error(`[mcp] transport error requestId=${requestId}:`, error);
+    logMcpRequest({ requestId, method: requestedMethod, userId: null, status: 500, durationMs: Date.now() - start, failed: true });
     if (!res.headersSent) {
       res.status(500).json({ code: "INTERNAL_ERROR", message: "Internal error" });
     }
@@ -86,9 +92,9 @@ function extractJsonRpcMethod(body: unknown): string | null {
   return null;
 }
 
-function logMcpRequest(entry: { method: string | null; userId: number | null; status: number; durationMs: number; failed?: boolean }): void {
+function logMcpRequest(entry: { requestId: string; method: string | null; userId: number | null; status: number; durationMs: number; failed?: boolean }): void {
   // Deliberately excludes Authorization header, JWT payload and tool arguments.
   console.log(
-    `[mcp] method=${entry.method ?? "unknown"} userId=${entry.userId ?? "anonymous"} status=${entry.status} durationMs=${entry.durationMs}${entry.failed ? " failed=true" : ""}`,
+    `[mcp] requestId=${entry.requestId} method=${entry.method ?? "unknown"} userId=${entry.userId ?? "anonymous"} status=${entry.status} durationMs=${entry.durationMs}${entry.failed ? " failed=true" : ""}`,
   );
 }
