@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { telegramAuthMiddleware } from "./middleware/telegramAuth";
+import { handleMcpRequest, mcpRateLimiter } from "./mcp/httpTransport";
 
 const app = express();
 const httpServer = createServer(app);
@@ -79,6 +80,15 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// MCP endpoint (Streamable HTTP, stateless). Feature-flagged so it can be killed
+// in production without touching REST behavior: set MCP_ENABLED=false to disable.
+const mcpEnabled = process.env.MCP_ENABLED !== "false";
+if (mcpEnabled) {
+  app.all("/mcp", mcpRateLimiter, handleMcpRequest);
+} else {
+  log("MCP endpoint disabled via MCP_ENABLED=false");
+}
 
 (async () => {
   await registerRoutes(httpServer, app);
