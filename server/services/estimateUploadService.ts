@@ -16,6 +16,15 @@ import {
   removeEstimateUpload,
   saveEstimateUpload,
 } from "../estimate-upload-files";
+import {
+  QUALITY_DOCUMENT_PDF_MIME,
+  QUALITY_DOCUMENT_UPLOAD_MAX_BYTES,
+  isPdfFilename,
+  isQualityDocumentPdf,
+  newQualityDocumentStorageKey,
+  removeQualityDocumentUpload,
+  saveQualityDocumentUpload,
+} from "../quality-document-upload-files";
 import { parseEstimateWorkbook } from "../../client/src/lib/estimateParser";
 import { importEstimateWithClient } from "./estimateImportService";
 import { assertTransitionAllowed } from "./execution-workflow/workflowStateMachine";
@@ -39,19 +48,26 @@ export interface CreateUploadSessionArgs {
   expectedVersion: number;
   idempotencyKey: string;
   originalFilename: string;
+  purpose?: "estimate" | "quality_document";
 }
 
-export async function createEstimateUploadSession(auth: McpAuthContext, args: CreateUploadSessionArgs) {
+export async function createUploadSession(auth: McpAuthContext, args: CreateUploadSessionArgs) {
+  const purpose = args.purpose ?? "estimate";
+  const { purpose: _requestedPurpose, ...legacyRequest } = args;
   const originalFilename = path.basename(args.originalFilename);
-  if (originalFilename !== args.originalFilename || !isXlsxFilename(originalFilename)) {
-    throw new McpToolError(MCP_ERROR_CODES.FILE_TYPE_NOT_ALLOWED, "Only .xlsx estimate files are allowed");
+  const validFilename = purpose === "estimate" ? isXlsxFilename(originalFilename) : isPdfFilename(originalFilename);
+  if (originalFilename !== args.originalFilename || !validFilename) {
+    throw new McpToolError(
+      MCP_ERROR_CODES.FILE_TYPE_NOT_ALLOWED,
+      purpose === "estimate" ? "Only .xlsx estimate files are allowed" : "Only .pdf quality documents are allowed",
+    );
   }
 
   return withIdempotency(
     auth.userId,
     "create_upload_session",
     args.idempotencyKey,
-    args,
+    purpose === "estimate" ? legacyRequest : { ...legacyRequest, purpose },
     async (tx) => {
       const workflow = await loadOwnedWorkflow(tx, auth, args.workflowId);
       if (workflow.version !== args.expectedVersion) {
@@ -59,13 +75,20 @@ export async function createEstimateUploadSession(auth: McpAuthContext, args: Cr
           recoverable: true,
         });
       }
-      assertTransitionAllowed(workflow.stage, "estimate_upload_pending");
+      if (purpose === "estimate") {
+        assertTransitionAllowed(workflow.stage, "estimate_upload_pending");
+      } else if (workflow.stage !== "materials_register_ready" && workflow.stage !== "awaiting_quality_documents") {
+        throw new McpToolError(
+          MCP_ERROR_CODES.WORKFLOW_TRANSITION_NOT_ALLOWED,
+          `Cannot create a quality document upload while workflow is at "${workflow.stage}"`,
+        );
+      }
 
       const updated = await workflowRepo.updateWorkflowStageIfVersionMatches(
         tx,
         workflow.id,
         args.expectedVersion,
-        "estimate_upload_pending",
+        purpose === "estimate" ? "estimate_upload_pending" : "awaiting_quality_documents",
       );
       if (!updated) {
         throw new McpToolError(MCP_ERROR_CODES.WORKFLOW_VERSION_CONFLICT, "Workflow was modified concurrently", {
@@ -80,28 +103,37 @@ export async function createEstimateUploadSession(auth: McpAuthContext, args: Cr
         userId: auth.userId,
         objectId: workflow.objectId,
         workflowId: workflow.id,
-        purpose: "estimate",
-        storageKey: newEstimateStorageKey(),
+        purpose,
+        storageKey: purpose === "estimate" ? newEstimateStorageKey() : newQualityDocumentStorageKey(),
         originalFilename,
         expiresAt,
       });
       await workflowRepo.insertWorkflowEvent(tx, {
         workflowId: workflow.id,
-        eventType: "estimate_upload_session_created",
+        eventType: purpose === "estimate" ? "estimate_upload_session_created" : "quality_document_upload_session_created",
         actorType: "agent",
         actorId: String(auth.userId),
         payloadJson: { uploadId, expiresAt: expiresAt.toISOString() },
       });
 
+      const uploadContract = purpose === "estimate"
+        ? {
+            allowedExtensions: [".xlsx"],
+            allowedMimeTypes: [ESTIMATE_XLSX_MIME],
+            maxBytes: ESTIMATE_UPLOAD_MAX_BYTES,
+          }
+        : {
+            allowedExtensions: [".pdf"],
+            allowedMimeTypes: [QUALITY_DOCUMENT_PDF_MIME],
+            maxBytes: QUALITY_DOCUMENT_UPLOAD_MAX_BYTES,
+          };
       return {
         uploadId,
         uploadUrl: `/api/mcp/uploads/${uploadId}`,
         uploadMethod: "POST" as const,
         fileField: "file" as const,
-        purpose: "estimate" as const,
-        allowedExtensions: [".xlsx"],
-        allowedMimeTypes: [ESTIMATE_XLSX_MIME],
-        maxBytes: ESTIMATE_UPLOAD_MAX_BYTES,
+        purpose,
+        ...uploadContract,
         expiresAt: expiresAt.toISOString(),
         workflowId: workflow.id,
         stage: updated.stage,
@@ -111,12 +143,15 @@ export async function createEstimateUploadSession(auth: McpAuthContext, args: Cr
   );
 }
 
+export const createEstimateUploadSession = createUploadSession;
+
 export async function storeEstimateUpload(
   auth: McpAuthContext,
   uploadId: string,
   file: { originalname: string; mimetype: string; buffer: Buffer; size: number },
 ) {
   const session = await getOwnedUpload(auth, uploadId);
+  if (session.purpose !== "estimate") throw uploadNotFound();
   if (session.status === "consumed") {
     throw new McpToolError(MCP_ERROR_CODES.UPLOAD_ALREADY_CONSUMED, "Upload session was already consumed");
   }
@@ -159,6 +194,73 @@ export async function storeEstimateUpload(
     throw error;
   }
 }
+
+export async function storeQualityDocumentUpload(
+  auth: McpAuthContext,
+  uploadId: string,
+  file: { originalname: string; mimetype: string; buffer: Buffer; size: number },
+) {
+  const session = await getOwnedUpload(auth, uploadId);
+  if (session.purpose !== "quality_document") {
+    throw new McpToolError(MCP_ERROR_CODES.DOCUMENT_UPLOAD_INVALID, "Upload session is not for a quality document");
+  }
+  if (session.status === "consumed") {
+    throw new McpToolError(MCP_ERROR_CODES.UPLOAD_ALREADY_CONSUMED, "Upload session was already consumed");
+  }
+  if (session.status !== "pending") {
+    throw new McpToolError(MCP_ERROR_CODES.DOCUMENT_UPLOAD_INVALID, "Upload session already contains a file");
+  }
+  if (session.expiresAt.getTime() <= Date.now()) {
+    throw new McpToolError(MCP_ERROR_CODES.UPLOAD_EXPIRED, "Upload session expired");
+  }
+  if (file.size > QUALITY_DOCUMENT_UPLOAD_MAX_BYTES) {
+    throw new McpToolError(MCP_ERROR_CODES.FILE_TOO_LARGE, "Quality document is too large");
+  }
+  if (
+    path.basename(file.originalname) !== session.originalFilename ||
+    !isPdfFilename(file.originalname) ||
+    file.mimetype !== QUALITY_DOCUMENT_PDF_MIME ||
+    !isQualityDocumentPdf(file.buffer)
+  ) {
+    throw new McpToolError(MCP_ERROR_CODES.DOCUMENT_UPLOAD_INVALID, "File is not an allowed PDF quality document");
+  }
+
+  const sha256 = createHash("sha256").update(file.buffer).digest("hex");
+  await saveQualityDocumentUpload(session.storageKey, file.buffer);
+  try {
+    const [updated] = await db
+      .update(uploadSessions)
+      .set({
+        status: "uploaded",
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+        sha256,
+        uploadedAt: new Date(),
+      })
+      .where(and(eq(uploadSessions.id, session.id), eq(uploadSessions.status, "pending")))
+      .returning();
+    if (!updated) {
+      throw new McpToolError(MCP_ERROR_CODES.DOCUMENT_UPLOAD_INVALID, "Upload session already contains a file");
+    }
+    return { uploadId: updated.id, status: updated.status, sizeBytes: updated.sizeBytes, sha256: updated.sha256 };
+  } catch (error) {
+    await removeQualityDocumentUpload(session.storageKey).catch(() => undefined);
+    throw error;
+  }
+}
+
+export async function storeMcpUpload(
+  auth: McpAuthContext,
+  uploadId: string,
+  file: { originalname: string; mimetype: string; buffer: Buffer; size: number },
+) {
+  const session = await getOwnedUpload(auth, uploadId);
+  if (session.purpose === "estimate") return storeEstimateUpload(auth, uploadId, file);
+  if (session.purpose === "quality_document") return storeQualityDocumentUpload(auth, uploadId, file);
+  throw uploadNotFound();
+}
+
+export const storeUpload = storeMcpUpload;
 
 export interface ImportEstimateFromUploadArgs {
   workflowId: number;

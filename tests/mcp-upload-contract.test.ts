@@ -17,7 +17,7 @@ test("upload endpoint requires app auth, is feature-flagged and REST import uses
   const routes = await readFile("server/routes/estimates.ts", "utf8");
   assert.match(routes, /MCP_ENABLED === 'true'/);
   assert.match(routes, /app\.post\([\s\S]*'\/api\/mcp\/uploads\/:uploadId'[\s\S]*\.\.\.appAuth/);
-  assert.match(routes, /storeEstimateUpload/);
+  assert.match(routes, /storeMcpUpload/);
   assert.match(routes, /const result = await importEstimate\(input, obj\.id\)/);
 
   const storage = await readFile("server/storage.ts", "utf8");

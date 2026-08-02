@@ -13,16 +13,18 @@ import { api } from '@shared/routes';
 import { storage, appAuth } from './_common';
 import { importEstimate } from '../services/estimateImportService';
 import { ESTIMATE_UPLOAD_MAX_BYTES } from '../estimate-upload-files';
+import { QUALITY_DOCUMENT_UPLOAD_MAX_BYTES } from '../quality-document-upload-files';
 import { MCP_ERROR_CODES, McpToolError } from '../mcp/errors';
-import { storeEstimateUpload } from '../services/estimateUploadService';
+import { storeMcpUpload } from '../services/estimateUploadService';
 
-const estimateUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: ESTIMATE_UPLOAD_MAX_BYTES } });
+const uploadMaxBytes = Math.max(ESTIMATE_UPLOAD_MAX_BYTES, QUALITY_DOCUMENT_UPLOAD_MAX_BYTES);
+const mcpUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: uploadMaxBytes } });
 const estimateUploadRateLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
 
-function receiveEstimateUpload(req: Request, res: Response, next: NextFunction): void {
-  estimateUpload.single('file')(req, res, (error: unknown) => {
+function receiveMcpUpload(req: Request, res: Response, next: NextFunction): void {
+  mcpUpload.single('file')(req, res, (error: unknown) => {
     if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ code: MCP_ERROR_CODES.FILE_TOO_LARGE, message: 'Estimate file is too large' });
+      return res.status(413).json({ code: MCP_ERROR_CODES.FILE_TOO_LARGE, message: 'Upload is too large' });
     }
     if (error) return res.status(400).json({ code: MCP_ERROR_CODES.FILE_TYPE_NOT_ALLOWED, message: 'Invalid upload' });
     next();
@@ -42,11 +44,11 @@ export function registerEstimateRoutes(app: Express): void {
       '/api/mcp/uploads/:uploadId',
       estimateUploadRateLimiter,
       ...appAuth,
-      receiveEstimateUpload,
+      receiveMcpUpload,
       async (req, res) => {
-        if (!req.file) return res.status(400).json({ code: MCP_ERROR_CODES.FILE_TYPE_NOT_ALLOWED, message: 'XLSX file is required' });
+        if (!req.file) return res.status(400).json({ code: MCP_ERROR_CODES.FILE_TYPE_NOT_ALLOWED, message: 'File is required' });
         try {
-          const result = await storeEstimateUpload(
+          const result = await storeMcpUpload(
             { userId: req.user!.id, displayName: req.user!.displayName, email: req.user!.email, role: req.user!.role },
             String(req.params.uploadId),
             req.file,

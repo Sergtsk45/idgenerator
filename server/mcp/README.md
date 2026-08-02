@@ -42,12 +42,13 @@
 
 | Tool | Описание |
 |---|---|
-| `create_upload_session` | Создаёт одноразовую 30-минутную XLSX-сессию и возвращает authenticated upload URL |
+| `create_upload_session` | Создаёт одноразовую 30-минутную XLSX/PDF-сессию по `purpose` и возвращает authenticated upload URL |
 | `import_estimate_from_upload` | Импортирует XLSX, привязывает estimate к workflow и consumed upload (idempotent) |
 
 Upload выполняется как `multipart/form-data`, поле `file`, на возвращённый URL с тем же
-`Authorization: Bearer <jwt>`. Допускается только `.xlsx` с MIME
-`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, лимит — 20 MB.
+`Authorization: Bearer <jwt>`. Purpose по умолчанию — `estimate`: `.xlsx`, MIME
+`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, лимит 20 MB.
+Purpose `quality_document` принимает только `.pdf`, MIME `application/pdf`, лимит 50 MB.
 
 ### Estimate analysis (TASK-004)
 
@@ -85,6 +86,17 @@ Dedup выполняется только по полному normalized name+un
 Seed requirements — проверяемая MVP-эвристика, а не утверждение нормативной достаточности.
 Для TASK-007 нужен линейный approved schedule с одной task на main position; split schedule
 возвращается как stale, пока source-link не поддерживает связь с несколькими tasks.
+
+### Document ingestion (TASK-008)
+
+| Tool | Описание |
+|---|---|
+| `attach_document_from_upload` | Создаёт project document из consumed PDF, привязывает к owned material и возвращает актуальные missing requirements |
+| `list_material_documents` | Возвращает активные документы одного material register item без изменения workflow |
+
+Допустимые типы: `certificate`, `declaration`, `passport`, `protocol`. Binding role
+выводится сервером; один upload нельзя привязать к другому материалу, а retry с тем же
+idempotency key не создаёт повторный document/binding.
 
 Все tools ownership-scoped по `userId` из проверенного JWT — не из аргументов вызова.
 
@@ -145,6 +157,9 @@ TASK-006 добавляет `SCHEDULE_INPUTS_INCOMPLETE`, `LABOR_DATA_REQUIRED`,
 
 TASK-007 добавляет `MATERIAL_REGISTER_NOT_READY`, `MATERIAL_REGISTER_NOT_FOUND`,
 `MATERIAL_REGISTER_STALE`.
+
+TASK-008 добавляет `DOCUMENT_UPLOAD_INVALID`, `MATERIAL_NOT_OWNED`,
+`DOCUMENT_ALREADY_ATTACHED`.
 
 Для конфликтов версий может присутствовать `recoverable: true`.
 

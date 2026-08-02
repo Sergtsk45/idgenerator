@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { importEstimate as importEstimateThroughService } from "./services/estimateImportService";
+import * as documentRepo from "./services/document/documentRepository";
 import {
   objects,
   objectParties,
@@ -1375,18 +1376,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDocument(objectId: number, userId: number, data: Omit<InsertDocument, "objectId">): Promise<Document> {
-    const scope = data.scope === "global" ? "global" : "project";
-    const [created] = await db
-      .insert(documents)
-      .values({
-        ...(data as any),
-        scope,
-        objectId: scope === "project" ? objectId : null,
-        createdByUserId: userId,
-        updatedByUserId: userId,
-      })
-      .returning();
-    return created;
+    return documentRepo.createDocument(db, objectId, userId, data);
   }
 
   async getProjectDocument(id: number, userId: number, objectId: number): Promise<Document | undefined> {
@@ -1418,29 +1408,7 @@ export class DatabaseStorage implements IStorage {
         .where(and(eq(objects.id, objectId as any), eq(objects.userId, userId as any)));
       if (!ownedObject) return undefined;
 
-      const [existing] = await tx
-        .select()
-        .from(documents)
-        .where(and(eq(documents.id, id as any), isNull(documents.deletedAt)));
-      if (!existing) return undefined;
-      if (existing.scope === "project" && existing.objectId !== objectId) return undefined;
-
-      const [updated] = await tx
-        .update(documents)
-        .set({
-          ...(patch.docType !== undefined ? { docType: patch.docType as any } : {}),
-          ...(patch.title !== undefined ? { title: patch.title as any } : {}),
-          ...(patch.docNumber !== undefined ? { docNumber: patch.docNumber as any } : {}),
-          ...(patch.docDate !== undefined ? { docDate: patch.docDate as any } : {}),
-          ...(patch.validFrom !== undefined ? { validFrom: patch.validFrom as any } : {}),
-          ...(patch.validTo !== undefined ? { validTo: patch.validTo as any } : {}),
-          ...(patch.fileUrl !== undefined ? { fileUrl: patch.fileUrl as any } : {}),
-          updatedByUserId: userId,
-        })
-        .where(eq(documents.id, id as any))
-        .returning();
-
-      return updated;
+      return documentRepo.updateDocument(tx, id, userId, objectId, patch);
     });
   }
 
@@ -1502,14 +1470,7 @@ export class DatabaseStorage implements IStorage {
       if (!(await this.isDocumentVisibleForObject(tx, Number(data.documentId), objectId))) return undefined;
       if (!(await this.isBindingTargetOwnedByObject(tx, data as any, objectId))) return undefined;
 
-      const [created] = await tx
-        .insert(documentBindings)
-        .values({
-          ...(data as any),
-          objectId: (data as any).objectId ?? objectId,
-        })
-        .returning();
-      return created;
+      return documentRepo.createBinding(tx, data, objectId);
     });
   }
 

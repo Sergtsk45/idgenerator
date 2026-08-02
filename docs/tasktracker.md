@@ -141,6 +141,24 @@
 - **Следующая задача**: TASK-008 (document ingestion)
 - **Известные ограничения**: seed rules — MVP-эвристика, не нормативное заключение; manual override применяется ко всему exact-dedup item; fuzzy dedup отсутствует намеренно; register build требует один schedule task на main position и отклоняет split schedule как stale до модели source→many tasks.
 
+## Задача: MCP document ingestion — TASK-008 (mcp-mvp-plan)
+- **Статус**: Завершена локально
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Owner-scoped загрузка PDF документов качества, создание project document и безопасная привязка к материалу реестра.
+- **Шаги выполнения**:
+  - [x] Upload purpose `quality_document`, PDF MIME/signature, 50 MB и traversal-safe staging
+  - [x] Миграция `0035_quality_document_uploads.sql` с durable document/material targets consumed upload
+  - [x] MCP `attach_document_from_upload` с server-derived binding role
+  - [x] MCP `list_material_documents` для активного material register item
+  - [x] Ownership workflow/upload/material/document и существующая защищённая раздача PDF
+  - [x] Optimistic concurrency, tool idempotency и CAS consumption по upload
+  - [x] Несколько документов на материал и запрет повторного использования upload для другой цели
+  - [x] Workflow stage/event и обновлённый missing document result
+  - [x] File/MCP/DB-gated tests и `check`/`test`/`build`
+- **Зависимости**: TASK-003, TASK-007
+- **Следующая задача**: TASK-009 (acts readiness)
+- **Известные ограничения**: filesystem и PostgreSQL не поддерживают общий atomic commit; rollback компенсируется, но process crash может оставить orphan-файл до будущей фоновой уборки.
+
 ---
 
 ## Задача: Создание материала из задачи графика с автопривязкой

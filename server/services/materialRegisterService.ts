@@ -389,17 +389,16 @@ export async function buildMaterialRegister(
   });
 }
 
-export async function getMaterialRegister(auth: McpAuthContext, workflowId: number) {
-  const workflow = await loadOwnedWorkflow(db, auth, workflowId);
-  const state = await registerRepo.getMaterialRegisterState(db, workflow.id);
+async function getCurrentMaterialRegister(client: DbClient, workflow: ExecutionWorkflow) {
+  const state = await registerRepo.getMaterialRegisterState(client, workflow.id);
   if (!state) throw new McpToolError(MCP_ERROR_CODES.MATERIAL_REGISTER_NOT_FOUND, "Material register not found");
-  const context = await loadBuildContext(db, workflow);
+  const context = await loadBuildContext(client, workflow);
   if (state.inputHash !== context.inputHash || state.rulesVersion !== String(MATERIAL_REGISTER_RULES_VERSION)) {
     throw new McpToolError(MCP_ERROR_CODES.MATERIAL_REGISTER_STALE, "Material register is stale", { recoverable: true });
   }
   const [items, activeProjectMaterials] = await Promise.all([
-    registerRepo.listMaterialRegisterItems(db, workflow.id),
-    registerRepo.listActiveProjectMaterials(db, workflow.objectId),
+    registerRepo.listMaterialRegisterItems(client, workflow.id),
+    registerRepo.listActiveProjectMaterials(client, workflow.objectId),
   ]);
   const activeProjectMaterialIds = new Set(activeProjectMaterials.map((material) => material.id));
   if (items.some((item) => !activeProjectMaterialIds.has(item.projectMaterialId))) {
@@ -407,7 +406,12 @@ export async function getMaterialRegister(auth: McpAuthContext, workflowId: numb
       recoverable: true,
     });
   }
-  return readRegister(db, workflow);
+  return readRegister(client, workflow);
+}
+
+export async function getMaterialRegister(auth: McpAuthContext, workflowId: number) {
+  const workflow = await loadOwnedWorkflow(db, auth, workflowId);
+  return getCurrentMaterialRegister(db, workflow);
 }
 
 export async function confirmMaterialClassification(
@@ -461,10 +465,9 @@ export async function confirmMaterialClassification(
   });
 }
 
-export async function getMissingQualityDocuments(auth: McpAuthContext, workflowId: number) {
-  const register = await getMaterialRegister(auth, workflowId);
-  const workflow = await loadOwnedWorkflow(db, auth, workflowId);
-  const matches = await registerRepo.listMaterialRequirementDocumentMatches(db, workflow.id);
+export async function getMissingQualityDocumentsWithClient(client: DbClient, workflow: ExecutionWorkflow) {
+  const register = await getCurrentMaterialRegister(client, workflow);
+  const matches = await registerRepo.listMaterialRequirementDocumentMatches(client, workflow.id);
   const today = new Date().toISOString().slice(0, 10);
   const byRule = new Map<string, typeof matches>();
   for (const row of matches) {
@@ -494,10 +497,15 @@ export async function getMissingQualityDocuments(auth: McpAuthContext, workflowI
     });
   }
   return {
-    workflowId,
+    workflowId: workflow.id,
     missingRequirements,
     blockingIssues: register.blockingIssues,
     ready: missingRequirements.length === 0 && register.blockingIssues.length === 0,
     disclaimer: "MVP seed requirements do not assert normative sufficiency and require user verification",
   };
+}
+
+export async function getMissingQualityDocuments(auth: McpAuthContext, workflowId: number) {
+  const workflow = await loadOwnedWorkflow(db, auth, workflowId);
+  return getMissingQualityDocumentsWithClient(db, workflow);
 }

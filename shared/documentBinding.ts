@@ -4,6 +4,14 @@ export function isQualityBindingRole(role: string | null | undefined): boolean {
   return QUALITY_BINDING_ROLES.some((qualityRole) => qualityRole === role);
 }
 
+export type AttachableQualityDocumentType = "certificate" | "declaration" | "passport" | "protocol";
+
+export function bindingRoleFromDocType(docType: AttachableQualityDocumentType): "quality" | "passport" | "protocol" {
+  if (docType === "passport") return "passport";
+  if (docType === "protocol") return "protocol";
+  return "quality";
+}
+
 export function resolveQualityDocumentId(
   bindings: Array<{
     documentId: number | string;

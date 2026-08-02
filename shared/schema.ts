@@ -1109,6 +1109,9 @@ export const materialRegisterRequirements = pgTable(
   }),
 );
 
+export const UPLOAD_PURPOSES = ["estimate", "quality_document"] as const;
+export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
+
 export const uploadSessions = pgTable(
   "upload_sessions",
   {
@@ -1122,7 +1125,7 @@ export const uploadSessions = pgTable(
     workflowId: integer("workflow_id")
       .notNull()
       .references(() => executionWorkflows.id, { onDelete: "cascade" }),
-    purpose: text("purpose").notNull(),
+    purpose: text("purpose").$type<UploadPurpose>().notNull(),
     status: text("status").notNull().default("pending"),
     storageKey: text("storage_key").notNull().unique(),
     originalFilename: text("original_filename").notNull(),
@@ -1133,13 +1136,19 @@ export const uploadSessions = pgTable(
     uploadedAt: timestamp("uploaded_at", { withTimezone: true }),
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
     estimateId: integer("estimate_id").references(() => estimates.id, { onDelete: "set null" }),
+    documentId: bigint("document_id", { mode: "number" }).references(() => documents.id, { onDelete: "set null" }),
+    projectMaterialId: bigint("project_material_id", { mode: "number" }).references(() => projectMaterials.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     userIdIdx: index("upload_sessions_user_id_idx").on(t.userId),
     workflowIdIdx: index("upload_sessions_workflow_id_idx").on(t.workflowId),
     expiresAtIdx: index("upload_sessions_expires_at_idx").on(t.expiresAt),
-    purposeCheck: check("upload_sessions_purpose_check", sql`purpose IN ('estimate')`),
+    documentIdIdx: index("upload_sessions_document_id_idx").on(t.documentId),
+    projectMaterialIdIdx: index("upload_sessions_project_material_id_idx").on(t.projectMaterialId),
+    purposeCheck: check("upload_sessions_purpose_check", sql`purpose IN ('estimate', 'quality_document')`),
     statusCheck: check("upload_sessions_status_check", sql`status IN ('pending', 'uploaded', 'consumed')`),
   }),
 );

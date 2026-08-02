@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-08-02] - Загрузка документов качества через MCP (TASK-008)
+
+### Добавлено
+- Upload purpose `quality_document` с одноразовой 30-минутной PDF-сессией, MIME/signature validation и лимитом 50 MB.
+- MCP tools `attach_document_from_upload` и `list_material_documents`.
+- Миграция `0035_quality_document_uploads.sql`: durable-связи consumed upload с созданным document и project material.
+- Owner-scoped document repository и транзакционный CAS для upload consumption.
+- File validation/path traversal и MCP contract tests; DB-gated сценарий покрывает ownership, retry, несколько документов и missing readiness.
+
+### Контракты и совместимость
+- `create_upload_session` по умолчанию сохраняет прежний estimate-контракт; для PDF требуется `purpose: quality_document`.
+- Допустимы только `certificate`, `declaration`, `passport`, `protocol`; binding role выводится сервером, `scheme/other` не принимаются.
+- Повтор одного attach не создаёт document/binding, а consumed upload нельзя применить к другому материалу.
+- Документы сохраняются через существующий object-scoped storage и доступны только владельцу объекта.
+- Filesystem и PostgreSQL не имеют общего atomic commit: обычный rollback компенсируется удалением файла; crash-orphan требует будущей фоновой уборки.
+
+---
+
 ## [2026-08-02] - Material register и requirements (TASK-007)
 
 ### Добавлено
