@@ -2,6 +2,45 @@
 
 ---
 
+## Задача: MCP-IDgenerator TASK-001 — MCP foundation (transport, auth context, diagnostic tools)
+- **Статус**: Завершена
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Добавлен защищённый MCP endpoint (`POST /mcp`, Streamable HTTP, stateless mode) поверх существующего Express-приложения. Переиспользует текущую JWT-аутентификацию (`authMiddleware`), не меняет и не дублирует REST routes. Добавлены read-only diagnostic tools `ping`, `get_current_user`, `list_objects`.
+- **Шаги выполнения**:
+  - [x] Зависимость `@modelcontextprotocol/sdk`
+  - [x] `server/mcp/{errors,toolResult,authContext,createMcpServer,httpTransport}.ts`
+  - [x] `server/mcp/tools/diagnostics.ts`: `ping`, `get_current_user`, `list_objects` (scoped через `storage.listUserObjects`)
+  - [x] `/mcp` защищён `authMiddleware({ required: true })`, rate limit (60 req/min per user), собственный body limit 1mb
+  - [x] Структурированное логирование tool-вызовов без токенов/аргументов (`withToolLogging`)
+  - [x] Стабильные коды ошибок: `AUTH_REQUIRED`, `AUTH_INVALID`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `INTERNAL_ERROR`, `WORKFLOW_VERSION_CONFLICT`, `WORKFLOW_TRANSITION_NOT_ALLOWED`
+  - [x] Smoke: initialize handshake, `tools/list`, `ping`, `list_objects` через curl с реальным JWT (401 без токена)
+  - [x] `npm run check` / `npm test` / `npm run build` зелёные
+- **Зависимости**: нет (первая задача MCP MVP)
+- **Известные ограничения**: stateless-режим создаёт новый `McpServer`/transport на каждый HTTP-запрос — не поддерживает resumable SSE-стримы; для MVP diagnostic/orchestration tools это не требуется.
+- **Детали**: `mcp-mvp-plan/tasks/TASK-001-mcp-foundation.md`
+
+## Задача: MCP-IDgenerator TASK-002 — Workflow state (state machine, inputs, events, idempotency)
+- **Статус**: Завершена
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Персистентная state machine для сквозного сценария агента (смета → график → материалы → акты → журнал), независимая от истории чата. Источник истины — PostgreSQL.
+- **Шаги выполнения**:
+  - [x] Миграция `0029_execution_workflow_state.sql`: `execution_workflows`, `execution_workflow_inputs`, `execution_workflow_events` (append-only), `tool_idempotency_records`
+  - [x] `server/services/execution-workflow/{workflowStateMachine,workflowInputs,workflowRepository,workflowService}.ts`
+  - [x] Линейная state machine (`allowedNextStages`/`assertTransitionAllowed`) по порядку стадий из `00-mvp-scenario.md`; `failed` достижим из любой нетерминальной стадии
+  - [x] Optimistic concurrency: `expectedVersion` + CAS-update (`WHERE version = expectedVersion`) → `WORKFLOW_VERSION_CONFLICT`
+  - [x] Idempotency: `(userId, toolName, idempotencyKey)` + hash аргументов; повтор с тем же ключом возвращает исходный результат, повтор с другим payload → `VALIDATION_ERROR`
+  - [x] MCP tools: `create_execution_workflow`, `get_execution_workflow`, `set_workflow_input`, `get_missing_workflow_inputs` (временный базовый контракт: 3 вопроса планирования графика, не зависящие от анализа сметы)
+  - [x] Ownership: чужой workflow/object → `NOT_FOUND` (без утечки существования), `userId` берётся только из проверенного auth context
+  - [x] `transitionWorkflowStage` — внутренний примитив для будущих orchestration-инструментов (TASK-003+), не отдельный MCP tool в этой задаче
+  - [x] Тесты: `tests/execution-workflow-state-machine.test.ts` (unit, без БД), `tests/execution-workflow-service.test.ts` (интеграционные против реального Postgres: ownership, idempotency retry/conflict, concurrency, event log), `tests/mcp-foundation.test.ts`
+  - [x] Ручной smoke через реальный HTTP-сервер и curl: 401 без auth, create → set_workflow_input → идемпотентный повтор → version conflict → 404 для чужого пользователя
+  - [x] `npm run check` / `npm test` / `npm run build` зелёные
+- **Зависимости**: TASK-001 (MCP foundation)
+- **Известные ограничения / non-goals**: не реализован анализ сметы и расчёт графика — `get_missing_workflow_inputs` возвращает временный статичный список (замена в TASK-005); `set_workflow_input` не меняет `stage` сам по себе — переходы стадий выполняют будущие orchestration tools через `transitionWorkflowStage`.
+- **Детали**: `mcp-mvp-plan/tasks/TASK-002-workflow-state.md`
+
+---
+
 ## Задача: Создание материала из задачи графика с автопривязкой
 - **Статус**: Завершена
 - **Дата фиксации**: 2026-08-02

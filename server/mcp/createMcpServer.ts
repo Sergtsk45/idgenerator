@@ -9,6 +9,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpAuthContext } from './authContext';
 import { registerDiagnosticTools } from './tools/diagnostics';
+import { registerWorkflowTools } from './tools/workflow';
 
 export function createMcpServer(auth: McpAuthContext): McpServer {
   const server = new McpServer(
@@ -17,6 +18,7 @@ export function createMcpServer(auth: McpAuthContext): McpServer {
   );
 
   registerDiagnosticTools(server, auth);
+  registerWorkflowTools(server, auth);
 
   return server;
 }

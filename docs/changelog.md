@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-08-02] - MCP-IDgenerator TASK-001+TASK-002: MCP foundation и execution workflow state
+
+### Добавлено
+- Защищённый MCP endpoint `POST /mcp` (Streamable HTTP, stateless), переиспользующий текущую JWT-аутентификацию: `server/mcp/{errors,toolResult,authContext,createMcpServer,httpTransport}.ts`.
+- Read-only diagnostic tools: `ping`, `get_current_user`, `list_objects` (`server/mcp/tools/diagnostics.ts`).
+- Execution workflow state machine: таблицы `execution_workflows`, `execution_workflow_inputs`, `execution_workflow_events` (append-only), `tool_idempotency_records` (`migrations/0029_execution_workflow_state.sql`).
+- `server/services/execution-workflow/{workflowStateMachine,workflowInputs,workflowRepository,workflowService}.ts` — линейная state machine, optimistic-concurrency версия, idempotency для write-инструментов.
+- MCP tools: `create_execution_workflow`, `get_execution_workflow`, `set_workflow_input`, `get_missing_workflow_inputs` (`server/mcp/tools/workflow.ts`).
+- Тесты: `tests/mcp-foundation.test.ts`, `tests/execution-workflow-state-machine.test.ts` (unit), `tests/execution-workflow-service.test.ts` (интеграционные, реальный Postgres, скипаются без `DATABASE_URL`).
+
+### Изменено
+- `server/routes.ts`: подключён `mountMcpHttpTransport(app)` после всех REST routes.
+- `shared/schema.ts`: добавлены `WORKFLOW_STAGES`, `executionWorkflows`, `executionWorkflowInputs`, `executionWorkflowEvents`, `toolIdempotencyRecords` и их типы.
+- `package.json`: добавлена зависимость `@modelcontextprotocol/sdk`.
+
+### Известные ограничения
+- `/mcp` работает в stateless-режиме (новый `McpServer`/transport на каждый запрос) — не поддерживает resumable SSE-стримы; для MVP diagnostic/orchestration tools это не требуется.
+- `get_missing_workflow_inputs` — временный базовый контракт (3 вопроса планирования графика), не зависящий от анализа сметы; будет заменён в TASK-005.
+- `set_workflow_input` не меняет `stage` сам по себе; переходы стадий выполняет внутренний примитив `transitionWorkflowStage`, который будут вызывать orchestration tools из TASK-003+.
+
+---
+
 ## [2026-08-02] - Создание материала из задачи графика с автопривязкой
 
 ### Добавлено

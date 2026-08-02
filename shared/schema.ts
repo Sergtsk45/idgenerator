@@ -782,6 +782,152 @@ export const invoiceImports = pgTable(
   })
 );
 
+// === EXECUTION WORKFLOW (MCP-IDgenerator MVP, TASK-002) ===
+//
+// Persistent state machine for the multi-step "estimate -> schedule -> materials ->
+// acts -> worklog -> package" scenario driven by an AI agent through MCP tools.
+// Source of truth lives here, NOT in chat history: the agent can be restarted or
+// swapped and must be able to resume by reading these tables.
+
+export const WORKFLOW_STAGES = [
+  "created",
+  "estimate_upload_pending",
+  "estimate_imported",
+  "estimate_analysis_ready",
+  "awaiting_schedule_inputs",
+  "schedule_draft_ready",
+  "schedule_approved",
+  "materials_register_ready",
+  "awaiting_quality_documents",
+  "acts_blocked",
+  "acts_ready",
+  "acts_generated",
+  "worklog_draft_ready",
+  "package_ready",
+  "completed",
+  "failed",
+] as const;
+
+export type WorkflowStage = (typeof WORKFLOW_STAGES)[number];
+
+export const WORKFLOW_INPUT_SOURCES = ["user", "estimate", "system_default", "calculated"] as const;
+export type WorkflowInputSource = (typeof WORKFLOW_INPUT_SOURCES)[number];
+
+export const executionWorkflows = pgTable(
+  "execution_workflows",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    objectId: integer("object_id")
+      .notNull()
+      .references(() => objects.id),
+    estimateId: integer("estimate_id").references(() => estimates.id, { onDelete: "set null" }),
+    scheduleId: integer("schedule_id").references(() => schedules.id, { onDelete: "set null" }),
+    stage: text("stage").$type<WorkflowStage>().notNull().default("created"),
+    status: text("status").$type<"active" | "completed" | "failed">().notNull().default("active"),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdIdx: index("execution_workflows_user_id_idx").on(t.userId),
+    objectIdIdx: index("execution_workflows_object_id_idx").on(t.objectId),
+    stageCheck: check(
+      "execution_workflows_stage_check",
+      sql`stage IN (${sql.raw(WORKFLOW_STAGES.map((s) => `'${s}'`).join(", "))})`
+    ),
+    statusCheck: check("execution_workflows_status_check", sql`status IN ('active', 'completed', 'failed')`),
+  })
+);
+
+export const executionWorkflowInputs = pgTable(
+  "execution_workflow_inputs",
+  {
+    id: serial("id").primaryKey(),
+    workflowId: integer("workflow_id")
+      .notNull()
+      .references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    valueJson: jsonb("value_json").$type<unknown>(),
+    source: text("source").notNull(),
+    confirmed: boolean("confirmed").notNull().default(false),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    workflowKeyUq: uniqueIndex("execution_workflow_inputs_workflow_key_uq").on(t.workflowId, t.key),
+    sourceCheck: check(
+      "execution_workflow_inputs_source_check",
+      sql`source IN (${sql.raw(WORKFLOW_INPUT_SOURCES.map((s) => `'${s}'`).join(", "))})`
+    ),
+  })
+);
+
+// Append-only audit trail of workflow lifecycle events. Never updated or deleted.
+export const executionWorkflowEvents = pgTable(
+  "execution_workflow_events",
+  {
+    id: serial("id").primaryKey(),
+    workflowId: integer("workflow_id")
+      .notNull()
+      .references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    actorType: text("actor_type").notNull(),
+    actorId: text("actor_id"),
+    payloadJson: jsonb("payload_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    workflowIdIdx: index("execution_workflow_events_workflow_id_idx").on(t.workflowId),
+    workflowIdCreatedAtIdx: index("execution_workflow_events_workflow_id_created_at_idx").on(
+      t.workflowId,
+      t.createdAt
+    ),
+    actorTypeCheck: check(
+      "execution_workflow_events_actor_type_check",
+      sql`actor_type IN ('user', 'agent', 'system')`
+    ),
+  })
+);
+
+// Idempotency records for write MCP tools. A repeated call with the same
+// (userId, toolName, idempotencyKey) short-circuits and returns the stored result
+// instead of re-executing the mutation.
+export const toolIdempotencyRecords = pgTable(
+  "tool_idempotency_records",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    toolName: text("tool_name").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    resultJson: jsonb("result_json").$type<unknown>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userToolKeyUq: uniqueIndex("tool_idempotency_records_user_tool_key_uq").on(
+      t.userId,
+      t.toolName,
+      t.idempotencyKey
+    ),
+  })
+);
+
+export type ExecutionWorkflow = typeof executionWorkflows.$inferSelect;
+export type InsertExecutionWorkflow = typeof executionWorkflows.$inferInsert;
+
+export type ExecutionWorkflowInput = typeof executionWorkflowInputs.$inferSelect;
+export type InsertExecutionWorkflowInput = typeof executionWorkflowInputs.$inferInsert;
+
+export type ExecutionWorkflowEvent = typeof executionWorkflowEvents.$inferSelect;
+export type InsertExecutionWorkflowEvent = typeof executionWorkflowEvents.$inferInsert;
+
+export type ToolIdempotencyRecord = typeof toolIdempotencyRecords.$inferSelect;
+export type InsertToolIdempotencyRecord = typeof toolIdempotencyRecords.$inferInsert;
+
 // === SCHEMAS ===
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, lastLoginAt: true });
