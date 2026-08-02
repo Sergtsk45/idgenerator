@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-08-02] - Material register и requirements (TASK-007)
+
+### Добавлено
+- Pure normalization/classification/dedup core с сохранением source names/IDs и conservative brand/model identity.
+- Миграция `0034_material_register.sql`: register state/items, indexed estimate resource links, applied requirement rows и generated task-material marker.
+- MCP tools `build_material_register`, `get_material_register`, `confirm_material_classification`, `get_missing_quality_documents`.
+- Seed requirements с stable rule ID/reason и явным disclaimer об отсутствии нормативной достаточности.
+- Автоматические связи project materials с schedule tasks по source estimate position.
+
+### Контракты и совместимость
+- Rebuild идемпотентен, не удаляет существующие `project_materials` и сохраняет manual classification.
+- Missing-doc readiness учитывает ANY acceptable doc type внутри rule, active binding `useInActs`, validity и object/global scope.
+- Unclassified item остаётся видимым, но возвращает blocking issue.
+- Existing REST material flows и ручные task-material rows не перезаписываются.
+
+---
+
 ## [2026-08-02] - Schedule planning и approval (TASK-006)
 
 ### Добавлено

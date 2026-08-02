@@ -1,7 +1,7 @@
 # MCP endpoint — локальное подключение
 
 `POST/GET/DELETE /mcp` — Streamable HTTP, **stateless** (каждый HTTP-запрос обслуживается
-новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-006 из
+новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-007 из
 [`mcp-mvp-plan`](../../mcp-mvp-plan/).
 
 ## Требования
@@ -12,7 +12,7 @@
   JWT — тот же, что выдаёт `POST /api/auth/login` / `/api/auth/register`.
 - Лимит тела запроса — 256 KB, обеспечивается собственным JSON-парсером `/mcp`
   (не связан с 10 MB лимитом REST): превышение → `413 PAYLOAD_TOO_LARGE`.
-- Перед использованием workflow/upload/analysis/schedule tools применить миграции `0029`–`0033`.
+- Перед использованием workflow/upload/analysis/schedule/material tools применить миграции `0029`–`0034`.
 - Для persistent хранения XLSX задайте `ESTIMATE_UPLOAD_DIR` (по умолчанию `uploads/estimates`).
 
 ## Доступные tools
@@ -72,6 +72,20 @@ Target-duration распределяется по формальным веса�
 Crew-size доступен только при 100% labor coverage. Календарь пропускает выходные;
 изменение effective input или сметы делает ранее рассчитанный draft stale.
 
+### Material register (TASK-007)
+
+| Tool | Описание |
+|---|---|
+| `build_material_register` | Строит/rebuild реестр из ресурсов актуальной сметы и связывает items с schedule tasks |
+| `get_material_register` | Возвращает classifications, source links, requirements и blockers |
+| `confirm_material_classification` | Сохраняет manual override одного register item |
+| `get_missing_quality_documents` | Возвращает неудовлетворённые seed requirements и unclassified blockers |
+
+Dedup выполняется только по полному normalized name+unit+category без fuzzy matching.
+Seed requirements — проверяемая MVP-эвристика, а не утверждение нормативной достаточности.
+Для TASK-007 нужен линейный approved schedule с одной task на main position; split schedule
+возвращается как stale, пока source-link не поддерживает связь с несколькими tasks.
+
 Все tools ownership-scoped по `userId` из проверенного JWT — не из аргументов вызова.
 
 ## Быстрая проверка через curl
@@ -128,6 +142,9 @@ TASK-004 добавляет `WORKFLOW_ESTIMATE_NOT_SET`, `ESTIMATE_NOT_FOUND`.
 
 TASK-006 добавляет `SCHEDULE_INPUTS_INCOMPLETE`, `LABOR_DATA_REQUIRED`,
 `SCHEDULE_DRAFT_STALE`, `SCHEDULE_APPROVAL_CONFLICT`.
+
+TASK-007 добавляет `MATERIAL_REGISTER_NOT_READY`, `MATERIAL_REGISTER_NOT_FOUND`,
+`MATERIAL_REGISTER_STALE`.
 
 Для конфликтов версий может присутствовать `recoverable: true`.
 

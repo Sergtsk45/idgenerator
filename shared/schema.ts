@@ -666,6 +666,9 @@ export const scheduleTasks = pgTable(
   })
 );
 
+export const TASK_MATERIAL_SOURCES = ["manual", "material_register"] as const;
+export type TaskMaterialSource = (typeof TASK_MATERIAL_SOURCES)[number];
+
 // Materials linked to a specific schedule task (used for p.3 AOSR and attachments)
 export const taskMaterials = pgTable(
   "task_materials",
@@ -681,6 +684,7 @@ export const taskMaterials = pgTable(
     qualityDocumentId: bigint("quality_document_id", { mode: "number" }).references(() => documents.id, {
       onDelete: "restrict",
     }),
+    source: text("source").$type<TaskMaterialSource>().notNull().default("manual"),
     note: text("note"),
     orderIndex: integer("order_index").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -694,6 +698,10 @@ export const taskMaterials = pgTable(
       t.projectMaterialId,
       t.qualityDocumentId,
     ),
+    generatedMaterialUq: uniqueIndex("task_materials_generated_material_uq")
+      .on(t.taskId, t.projectMaterialId)
+      .where(sql`source = 'material_register' AND quality_document_id IS NULL`),
+    sourceCheck: check("task_materials_source_check", sql`source IN ('manual', 'material_register')`),
   }),
 );
 
@@ -961,6 +969,146 @@ export const scheduleDrafts = pgTable(
   }),
 );
 
+export const MATERIAL_REGISTER_CLASSIFICATIONS = ["material", "equipment", "product", "unclassified"] as const;
+export type MaterialRegisterClassification = (typeof MATERIAL_REGISTER_CLASSIFICATIONS)[number];
+export const MATERIAL_CLASSIFICATION_METHODS = ["resource_type", "rule", "manual", "unclassified"] as const;
+export type MaterialClassificationMethod = (typeof MATERIAL_CLASSIFICATION_METHODS)[number];
+export const MATERIAL_CLASSIFICATION_CONFIDENCE = ["high", "medium", "low"] as const;
+export type MaterialClassificationConfidence = (typeof MATERIAL_CLASSIFICATION_CONFIDENCE)[number];
+export const MATERIAL_REGISTER_SOURCE_TYPES = ["position", "resource"] as const;
+export type MaterialRegisterSourceType = (typeof MATERIAL_REGISTER_SOURCE_TYPES)[number];
+export const MATERIAL_REQUIREMENT_DOCUMENT_TYPES = [
+  "certificate",
+  "declaration",
+  "passport",
+  "protocol",
+  "scheme",
+  "other",
+] as const;
+export type MaterialRequirementDocumentType = (typeof MATERIAL_REQUIREMENT_DOCUMENT_TYPES)[number];
+
+export const materialRegisterStates = pgTable("material_register_states", {
+  workflowId: integer("workflow_id")
+    .primaryKey()
+    .references(() => executionWorkflows.id, { onDelete: "cascade" }),
+  estimateId: integer("estimate_id")
+    .notNull()
+    .references(() => estimates.id, { onDelete: "cascade" }),
+  inputHash: text("input_hash").notNull(),
+  rulesVersion: text("rules_version").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const materialRegisterItems = pgTable(
+  "material_register_items",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    workflowId: integer("workflow_id")
+      .notNull()
+      .references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    projectMaterialId: bigint("project_material_id", { mode: "number" })
+      .notNull()
+      .references(() => projectMaterials.id, { onDelete: "cascade" }),
+    fingerprint: text("fingerprint").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    normalizedUnit: text("normalized_unit"),
+    classification: text("classification").$type<MaterialRegisterClassification>().notNull(),
+    classificationMethod: text("classification_method").$type<MaterialClassificationMethod>().notNull(),
+    confidence: text("confidence").$type<MaterialClassificationConfidence>().notNull(),
+    confirmed: boolean("confirmed").notNull().default(false),
+    classificationRuleId: text("classification_rule_id"),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    workflowMaterialUq: uniqueIndex("material_register_items_workflow_material_uq").on(t.workflowId, t.projectMaterialId),
+    workflowFingerprintUq: uniqueIndex("material_register_items_workflow_fingerprint_uq").on(t.workflowId, t.fingerprint),
+    workflowClassIdx: index("material_register_items_workflow_class_idx").on(t.workflowId, t.classification),
+    projectMaterialIdIdx: index("material_register_items_project_material_id_idx").on(t.projectMaterialId),
+    classificationCheck: check(
+      "material_register_items_classification_check",
+      sql`classification IN ('material', 'equipment', 'product', 'unclassified')`,
+    ),
+    methodCheck: check(
+      "material_register_items_method_check",
+      sql`classification_method IN ('resource_type', 'rule', 'manual', 'unclassified')`,
+    ),
+    confidenceCheck: check("material_register_items_confidence_check", sql`confidence IN ('high', 'medium', 'low')`),
+  }),
+);
+
+export const materialRegisterSourceLinks = pgTable(
+  "material_register_source_links",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    workflowId: integer("workflow_id")
+      .notNull()
+      .references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    itemId: bigint("item_id", { mode: "number" })
+      .notNull()
+      .references(() => materialRegisterItems.id, { onDelete: "cascade" }),
+    estimateId: integer("estimate_id")
+      .notNull()
+      .references(() => estimates.id, { onDelete: "cascade" }),
+    estimatePositionId: integer("estimate_position_id")
+      .notNull()
+      .references(() => estimatePositions.id, { onDelete: "cascade" }),
+    positionResourceId: integer("position_resource_id").references(() => positionResources.id, { onDelete: "cascade" }),
+    scheduleTaskId: integer("schedule_task_id").references(() => scheduleTasks.id, { onDelete: "set null" }),
+    sourceType: text("source_type").$type<MaterialRegisterSourceType>().notNull(),
+    sourceName: text("source_name").notNull(),
+    sourceUnit: text("source_unit"),
+    sourceQuantity: numeric("source_quantity", { precision: 20, scale: 4 }),
+    normalizedName: text("normalized_name").notNull(),
+    normalizedUnit: text("normalized_unit"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    itemIdIdx: index("material_register_source_links_item_id_idx").on(t.itemId),
+    estimatePositionIdIdx: index("material_register_source_links_estimate_position_id_idx").on(t.estimatePositionId),
+    positionResourceIdIdx: index("material_register_source_links_position_resource_id_idx").on(t.positionResourceId),
+    scheduleTaskIdIdx: index("material_register_source_links_schedule_task_id_idx").on(t.scheduleTaskId),
+    workflowResourceUq: uniqueIndex("material_register_source_links_workflow_resource_uq")
+      .on(t.workflowId, t.positionResourceId)
+      .where(sql`position_resource_id IS NOT NULL`),
+    workflowPositionUq: uniqueIndex("material_register_source_links_workflow_position_uq")
+      .on(t.workflowId, t.estimatePositionId)
+      .where(sql`position_resource_id IS NULL`),
+    sourceTypeCheck: check(
+      "material_register_source_links_source_type_check",
+      sql`(source_type = 'resource' AND position_resource_id IS NOT NULL) OR (source_type = 'position' AND position_resource_id IS NULL)`,
+    ),
+  }),
+);
+
+export const materialRegisterRequirements = pgTable(
+  "material_register_requirements",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    itemId: bigint("item_id", { mode: "number" })
+      .notNull()
+      .references(() => materialRegisterItems.id, { onDelete: "cascade" }),
+    ruleId: text("rule_id").notNull(),
+    documentType: text("document_type").$type<MaterialRequirementDocumentType>().notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    itemRuleDocumentUq: uniqueIndex("material_register_requirements_item_rule_document_uq").on(
+      t.itemId,
+      t.ruleId,
+      t.documentType,
+    ),
+    itemDocumentTypeIdx: index("material_register_requirements_item_document_type_idx").on(t.itemId, t.documentType),
+    documentTypeCheck: check(
+      "material_register_requirements_document_type_check",
+      sql`document_type IN ('certificate', 'declaration', 'passport', 'protocol', 'scheme', 'other')`,
+    ),
+  }),
+);
+
 export const uploadSessions = pgTable(
   "upload_sessions",
   {
@@ -1035,6 +1183,11 @@ export type InsertEstimateAnalysisSnapshot = typeof estimateAnalysisSnapshots.$i
 
 export type ScheduleDraft = typeof scheduleDrafts.$inferSelect;
 export type InsertScheduleDraft = typeof scheduleDrafts.$inferInsert;
+
+export type MaterialRegisterState = typeof materialRegisterStates.$inferSelect;
+export type MaterialRegisterItem = typeof materialRegisterItems.$inferSelect;
+export type MaterialRegisterSourceLink = typeof materialRegisterSourceLinks.$inferSelect;
+export type MaterialRegisterRequirement = typeof materialRegisterRequirements.$inferSelect;
 
 export type UploadSession = typeof uploadSessions.$inferSelect;
 export type InsertUploadSession = typeof uploadSessions.$inferInsert;

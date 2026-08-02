@@ -122,6 +122,25 @@
 - **Следующая задача**: TASK-007 (material register)
 - **Известные ограничения**: линейная модель, одна бригада, без CPM; при target меньше числа работ фактический минимум сопровождается warning; существующие ручные schedules не перезаписываются.
 
+## Задача: MCP material register — TASK-007 (mcp-mvp-plan)
+- **Статус**: Завершена локально
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Проверяемый реестр project materials/equipment/products из ресурсов сметы с source provenance, ручным override, seed requirements и task links.
+- **Шаги выполнения**:
+  - [x] Conservative normalization без удаления brand/model tokens
+  - [x] Rules-first classification и exact name+unit+category dedup
+  - [x] Миграция `0034_material_register.sql`: state/items/indexed source links/applied requirements
+  - [x] Generated marker и partial unique для безопасных `task_materials`
+  - [x] Rebuild не удаляет `project_materials` и не перезаписывает manual classification
+  - [x] Source estimate resource IDs и связи с schedule tasks по position order
+  - [x] Non-normative seed requirements с stable rule ID/reason
+  - [x] MCP tools `build_material_register`, `get_material_register`, `confirm_material_classification`, `get_missing_quality_documents`
+  - [x] Ownership, optimistic concurrency, idempotency и stale detection
+  - [x] Pure/MCP/DB-gated tests и `check`/`test`/`build`
+- **Зависимости**: TASK-004, TASK-006
+- **Следующая задача**: TASK-008 (document ingestion)
+- **Известные ограничения**: seed rules — MVP-эвристика, не нормативное заключение; manual override применяется ко всему exact-dedup item; fuzzy dedup отсутствует намеренно; register build требует один schedule task на main position и отклоняет split schedule как stale до модели source→many tasks.
+
 ---
 
 ## Задача: Создание материала из задачи графика с автопривязкой
