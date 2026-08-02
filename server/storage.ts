@@ -236,6 +236,8 @@ export interface IStorage {
   // Act Document Attachments
   getActDocAttachments(actId: number): Promise<Array<ActDocumentAttachment & { document?: Document | null }>>;
   replaceActDocAttachments(actId: number, items: Array<Omit<InsertActDocumentAttachment, "actId">>): Promise<void>;
+  setActAttachmentsManual(actId: number, manual: boolean): Promise<void>;
+  resetActDocAttachmentsFromUsages(actId: number): Promise<Array<ActDocumentAttachment & { document?: Document | null }>>;
 
   // Works
   getWorks(objectId: number): Promise<Work[]>;
@@ -1734,17 +1736,44 @@ export class DatabaseStorage implements IStorage {
   }
 
   async replaceTaskMaterials(taskId: number, items: Array<Omit<InsertTaskMaterial, "taskId">>): Promise<void> {
-    await db.transaction(async (tx) => {
-      await tx.delete(taskMaterials).where(eq(taskMaterials.taskId, taskId));
-      if (items.length === 0) return;
+    // Dedupe by (projectMaterialId, qualityDocumentId) — matches task_materials_task_material_doc_uq.
+    const seen = new Set<string>();
+    const deduped: Array<Omit<InsertTaskMaterial, "taskId">> = [];
+    for (const it of items) {
+      const materialId = Number((it as any).projectMaterialId);
+      const docId = (it as any).qualityDocumentId == null ? null : Number((it as any).qualityDocumentId);
+      const key = `${materialId}:${docId == null ? "null" : docId}`;
+      if (seen.has(key)) {
+        const err: any = new Error("Этот документ качества уже добавлен к материалу в задаче");
+        err.status = 409;
+        err.code = "TASK_MATERIAL_DOC_DUPLICATE";
+        throw err;
+      }
+      seen.add(key);
+      deduped.push(it);
+    }
 
-      const values = items.map((it, idx) => ({
-        ...(it as any),
-        taskId,
-        orderIndex: (it as any).orderIndex ?? idx,
-      }));
-      await tx.insert(taskMaterials).values(values as any);
-    });
+    try {
+      await db.transaction(async (tx) => {
+        await tx.delete(taskMaterials).where(eq(taskMaterials.taskId, taskId));
+        if (deduped.length === 0) return;
+
+        const values = deduped.map((it, idx) => ({
+          ...(it as any),
+          taskId,
+          orderIndex: (it as any).orderIndex ?? idx,
+        }));
+        await tx.insert(taskMaterials).values(values as any);
+      });
+    } catch (err: any) {
+      if (err?.code === "23505" || String(err?.message ?? "").includes("task_materials_task_material_doc_uq")) {
+        const conflict: any = new Error("Этот документ качества уже добавлен к материалу в задаче");
+        conflict.status = 409;
+        conflict.code = "TASK_MATERIAL_DOC_DUPLICATE";
+        throw conflict;
+      }
+      throw err;
+    }
   }
 
   async createTaskMaterial(taskId: number, item: Omit<InsertTaskMaterial, "taskId">): Promise<TaskMaterial> {
@@ -1821,6 +1850,33 @@ export class DatabaseStorage implements IStorage {
       const values = deduped.map((it) => ({ ...(it as any), actId }));
       await tx.insert(actDocumentAttachments).values(values as any);
     });
+  }
+
+  async setActAttachmentsManual(actId: number, manual: boolean): Promise<void> {
+    await db
+      .update(acts)
+      .set({ attachmentsManual: manual } as any)
+      .where(eq(acts.id, actId));
+  }
+
+  async resetActDocAttachmentsFromUsages(
+    actId: number,
+  ): Promise<Array<ActDocumentAttachment & { document?: Document | null }>> {
+    const usages = await this.getActMaterialUsages(actId);
+    const attachmentDocIds: number[] = [];
+    const seen = new Set<number>();
+    for (const usage of usages) {
+      const docId = usage.qualityDocumentId == null ? null : Number(usage.qualityDocumentId);
+      if (docId == null || !Number.isFinite(docId) || seen.has(docId)) continue;
+      seen.add(docId);
+      attachmentDocIds.push(docId);
+    }
+    await this.replaceActDocAttachments(
+      actId,
+      attachmentDocIds.map((documentId, orderIndex) => ({ documentId, orderIndex })),
+    );
+    await this.setActAttachmentsManual(actId, false);
+    return this.getActDocAttachments(actId);
   }
 
   async getWorks(objectId: number): Promise<Work[]> {

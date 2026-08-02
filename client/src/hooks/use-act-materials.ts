@@ -7,6 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type InsertActDocumentAttachment, type InsertActMaterialUsage } from "@shared/routes";
+import { createApiHeaders } from "@/lib/api-headers";
 
 export function useActMaterialUsages(actId?: number) {
   return useQuery({
@@ -14,7 +15,7 @@ export function useActMaterialUsages(actId?: number) {
     enabled: Number.isFinite(actId) && (actId as number) > 0,
     queryFn: async () => {
       const url = buildUrl(api.actMaterialUsages.list.path, { id: actId as number });
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, { credentials: "include", headers: createApiHeaders() });
       if (!res.ok) throw new Error("Failed to fetch act material usages");
       return api.actMaterialUsages.list.responses[200].parse(await res.json());
     },
@@ -28,7 +29,7 @@ export function useReplaceActMaterialUsages(actId: number) {
       const url = buildUrl(api.actMaterialUsages.replace.path, { id: actId });
       const res = await fetch(url, {
         method: api.actMaterialUsages.replace.method,
-        headers: { "Content-Type": "application/json" },
+        headers: createApiHeaders(true),
         body: JSON.stringify({ items }),
         credentials: "include",
       });
@@ -50,7 +51,7 @@ export function useActDocumentAttachments(actId?: number) {
     enabled: Number.isFinite(actId) && (actId as number) > 0,
     queryFn: async () => {
       const url = buildUrl(api.actDocumentAttachments.list.path, { id: actId as number });
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, { credentials: "include", headers: createApiHeaders() });
       if (!res.ok) throw new Error("Failed to fetch act document attachments");
       return api.actDocumentAttachments.list.responses[200].parse(await res.json());
     },
@@ -60,12 +61,15 @@ export function useActDocumentAttachments(actId?: number) {
 export function useReplaceActDocumentAttachments(actId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (items: Array<Omit<InsertActDocumentAttachment, "actId">>) => {
+    mutationFn: async (payload: {
+      items: Array<Omit<InsertActDocumentAttachment, "actId">>;
+      markManual?: boolean;
+    }) => {
       const url = buildUrl(api.actDocumentAttachments.replace.path, { id: actId });
       const res = await fetch(url, {
         method: api.actDocumentAttachments.replace.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+        headers: createApiHeaders(true),
+        body: JSON.stringify(payload),
         credentials: "include",
       });
       if (!res.ok) {
@@ -76,6 +80,30 @@ export function useReplaceActDocumentAttachments(actId: number) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [api.actDocumentAttachments.list.path, actId] });
+      await queryClient.invalidateQueries({ queryKey: [api.acts.get.path, actId] });
+    },
+  });
+}
+
+export function useResetActDocumentAttachments(actId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const url = buildUrl(api.actDocumentAttachments.resetFromUsages.path, { id: actId });
+      const res = await fetch(url, {
+        method: api.actDocumentAttachments.resetFromUsages.method,
+        headers: createApiHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to reset act document attachments");
+      }
+      return api.actDocumentAttachments.resetFromUsages.responses[200].parse(await res.json());
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [api.actDocumentAttachments.list.path, actId] });
+      await queryClient.invalidateQueries({ queryKey: [api.acts.get.path, actId] });
     },
   });
 }

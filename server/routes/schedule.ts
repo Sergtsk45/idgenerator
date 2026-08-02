@@ -363,10 +363,13 @@ export function registerScheduleRoutes(app: Express): void {
 
         // Persist to DB for PDF defaults
         await storage.replaceActMaterialUsages(result.act.id, actUsageItems as any);
-        await storage.replaceActDocAttachments(
-          result.act.id,
-          attachmentDocIds.map((documentId, orderIndex) => ({ documentId, orderIndex })) as any,
-        );
+        // Respect manual appendix edits in the act card (attachments_manual).
+        if (!(result.act as any).attachmentsManual) {
+          await storage.replaceActDocAttachments(
+            result.act.id,
+            attachmentDocIds.map((documentId, orderIndex) => ({ documentId, orderIndex })) as any,
+          );
+        }
 
         if (actUsageItems.length === 0) {
           warnings.push({ actNumber, type: "no_materials", message: `Акт №${actNumber}: нет материалов ни в одной задаче` });
@@ -899,9 +902,12 @@ export function registerScheduleRoutes(app: Express): void {
 
       const updated = await storage.getTaskMaterials(taskId);
       return res.status(200).json(updated as any);
-    } catch (err) {
+    } catch (err: any) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (err?.status === 409 || err?.code === "TASK_MATERIAL_DOC_DUPLICATE") {
+        return res.status(409).json({ message: err.message || "Дубликат документа качества в задаче" });
       }
       console.error("Replace task materials failed:", err);
       return res.status(500).json({ message: "Internal Server Error" });

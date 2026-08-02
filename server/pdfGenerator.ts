@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { createRequire } from "module";
 import type { PartyDto, PersonDto, SourceDataDto } from "@shared/routes";
+import { formatP3MaterialsGrouped, type P3UsageForGrouping } from "../shared/p3MaterialsText";
 
 const require = createRequire(path.join(process.cwd(), "server/pdfGenerator.ts"));
 const PdfPrinter = require("pdfmake/js/Printer.js").default;
@@ -618,26 +619,24 @@ export async function buildP3MaterialsText(actId: number): Promise<string> {
     ),
   );
 
-  const lines = usages.map((u) => {
+  const rows: P3UsageForGrouping[] = usages.map((u, idx) => {
     const name =
       String(u.catalogMaterial?.name ?? "").trim() ||
       String(u.projectMaterial?.nameOverride ?? "").trim() ||
       `Материал #${String(u.projectMaterialId)}`;
-
-    const standardRef = String((u.catalogMaterial as any)?.standardRef ?? "").trim();
-    const namePart = standardRef ? `${name} (${standardRef})` : name;
-
-    const qd = u.qualityDocument ?? fallbackQualityDocuments.get(Number(u.projectMaterialId));
-    const docPart = qd
-      ? `${translateDocTypeRu((qd as any).docType)}${(qd as any).docNumber ? ` №${String((qd as any).docNumber)}` : ""}${
-          (qd as any).docDate ? ` от ${formatDate(String((qd as any).docDate))}` : ""
-        }`
-      : "документ качества: не указан";
-
-    return `Материал: ${namePart} — Документ: ${docPart}`;
+    const qd = u.qualityDocument ?? fallbackQualityDocuments.get(Number(u.projectMaterialId)) ?? null;
+    return {
+      projectMaterialId: Number(u.projectMaterialId),
+      orderIndex: (u as any).orderIndex ?? idx,
+      materialName: name,
+      standardRef: String((u.catalogMaterial as any)?.standardRef ?? "").trim() || null,
+      docType: qd ? ((qd as any).docType ?? null) : null,
+      docNumber: qd ? ((qd as any).docNumber ?? null) : null,
+      hasDocument: Boolean(qd),
+    };
   });
 
-  return buildNumberedListText(lines);
+  return formatP3MaterialsGrouped(rows);
 }
 
 export async function buildAttachmentsText(actId: number): Promise<string> {

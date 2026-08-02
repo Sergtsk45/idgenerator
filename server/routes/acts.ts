@@ -83,8 +83,14 @@ export function registerActsRoutes(app: Express): void {
       return res.status(400).json({ message: 'Invalid act id' });
     }
     try {
+      const act = await storage.getAct(actId);
+      if (!act) return res.status(404).json({ message: 'Act not found' });
       const input = api.actDocumentAttachments.replace.input.parse(req.body);
       await storage.replaceActDocAttachments(actId, (input as any).items ?? []);
+      const markManual = (input as any).markManual !== false;
+      if (markManual) {
+        await storage.setActAttachmentsManual(actId, true);
+      }
       const items = await storage.getActDocAttachments(actId);
       return res.status(200).json(items);
     } catch (err) {
@@ -92,6 +98,23 @@ export function registerActsRoutes(app: Express): void {
         return res.status(400).json({ message: err.errors[0].message });
       }
       console.error('Act document attachments replace failed:', err);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
+  // POST /api/acts/:id/document-attachments/reset-from-usages
+  app.post(api.actDocumentAttachments.resetFromUsages.path, async (req, res) => {
+    const actId = Number(req.params.id);
+    if (!Number.isFinite(actId) || actId <= 0) {
+      return res.status(400).json({ message: 'Invalid act id' });
+    }
+    try {
+      const act = await storage.getAct(actId);
+      if (!act) return res.status(404).json({ message: 'Act not found' });
+      const items = await storage.resetActDocAttachmentsFromUsages(actId);
+      return res.status(200).json(items);
+    } catch (err) {
+      console.error('Act document attachments reset failed:', err);
       return res.status(500).json({ message: 'Internal Server Error' });
     }
   });
