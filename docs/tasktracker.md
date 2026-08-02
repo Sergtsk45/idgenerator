@@ -103,6 +103,25 @@
 - **Следующая задача**: TASK-006 (schedule planning)
 - **Известные ограничения**: реальный schedule draft появляется в TASK-006; stale пока представлен hash-контрактом и audit event, а не mutable flag.
 
+## Задача: MCP schedule planning — TASK-006 (mcp-mvp-plan)
+- **Статус**: Завершена локально
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Детерминированный линейный график по основным позициям сметы, versioned draft и атомарное утверждение в существующие `schedules`/`schedule_tasks`.
+- **Шаги выполнения**:
+  - [x] Pure planner с UTC-календарями `5x2`/`6x1` и последовательным порядком работ
+  - [x] Stable Hamilton allocation для `target_duration`, минимум 1 рабочий день
+  - [x] Analysis v2: labor/equipment current cost как формальный fallback-вес
+  - [x] Crew formula и строгий порог labor coverage 100%
+  - [x] Structured assumptions, confidence и warnings для fallback/rounding
+  - [x] Миграция `0033_schedule_drafts.sql`, immutable versioned payload + input hash
+  - [x] MCP tools `calculate_schedule_draft`, `get_schedule_draft`, `approve_schedule`
+  - [x] Ownership, optimistic concurrency, idempotency и stale enforcement
+  - [x] Approval создаёт отдельный workflow-owned schedule и position-linked tasks транзакционно
+  - [x] Pure/MCP/DB-gated tests и `check`/`test`/`build`
+- **Зависимости**: TASK-004, TASK-005
+- **Следующая задача**: TASK-007 (material register)
+- **Известные ограничения**: линейная модель, одна бригада, без CPM; при target меньше числа работ фактический минимум сопровождается warning; существующие ручные schedules не перезаписываются.
+
 ---
 
 ## Задача: Создание материала из задачи графика с автопривязкой

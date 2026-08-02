@@ -1,7 +1,7 @@
 # MCP endpoint — локальное подключение
 
 `POST/GET/DELETE /mcp` — Streamable HTTP, **stateless** (каждый HTTP-запрос обслуживается
-новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-005 из
+новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-006 из
 [`mcp-mvp-plan`](../../mcp-mvp-plan/).
 
 ## Требования
@@ -12,7 +12,7 @@
   JWT — тот же, что выдаёт `POST /api/auth/login` / `/api/auth/register`.
 - Лимит тела запроса — 256 KB, обеспечивается собственным JSON-парсером `/mcp`
   (не связан с 10 MB лимитом REST): превышение → `413 PAYLOAD_TOO_LARGE`.
-- Перед использованием workflow/upload/analysis tools применить миграции `0029`–`0032`.
+- Перед использованием workflow/upload/analysis/schedule tools применить миграции `0029`–`0033`.
 - Для persistent хранения XLSX задайте `ESTIMATE_UPLOAD_DIR` (по умолчанию `uploads/estimates`).
 
 ## Доступные tools
@@ -59,6 +59,18 @@ Upload выполняется как `multipart/form-data`, поле `file`, н�
 Coverage — процент основных работ с положительной поддержанной трудоёмкостью. Трудовые
 часы принимаются только для `ОТ`/`ОТМ` в человеко-часах либо untyped строки с единицей
 человеко-часов; неизвестные типы возвращаются в `unclassifiedResources`.
+
+### Schedule planning (TASK-006)
+
+| Tool | Описание |
+|---|---|
+| `calculate_schedule_draft` | Рассчитывает и сохраняет versioned draft по актуальным confirmed inputs |
+| `get_schedule_draft` | Возвращает последний draft без изменения workflow |
+| `approve_schedule` | Проверяет freshness и атомарно создаёт schedule с position-linked tasks |
+
+Target-duration распределяется по формальным весам с минимумом один рабочий день.
+Crew-size доступен только при 100% labor coverage. Календарь пропускает выходные;
+изменение effective input или сметы делает ранее рассчитанный draft stale.
 
 Все tools ownership-scoped по `userId` из проверенного JWT — не из аргументов вызова.
 
@@ -114,12 +126,14 @@ TASK-003 также возвращает `UPLOAD_EXPIRED`, `UPLOAD_NOT_FOUND`,
 
 TASK-004 добавляет `WORKFLOW_ESTIMATE_NOT_SET`, `ESTIMATE_NOT_FOUND`.
 
+TASK-006 добавляет `SCHEDULE_INPUTS_INCOMPLETE`, `LABOR_DATA_REQUIRED`,
+`SCHEDULE_DRAFT_STALE`, `SCHEDULE_APPROVAL_CONFLICT`.
+
 Для конфликтов версий может присутствовать `recoverable: true`.
 
 ## Известные ограничения
 
-- Schedule draft stale определяется сравнением `scheduleInputHash`; enforcement добавляется в TASK-006.
+- Planner MVP линейный: одна бригада, без CPM и параллельных работ.
 - `create_upload_session` и `import_estimate_from_upload` выполняют свои stage transitions серверно.
 - Автоматическая уборка истёкших/осиротевших upload-файлов пока не реализована.
-- Порог labor coverage для режима планирования по численности задаётся в TASK-006.
 - Host/Origin validation для `/mcp`, audit log и per-tool метрики — TASK-012.

@@ -10,7 +10,7 @@ import {
 } from "@shared/estimateClassification";
 import type { Estimate, EstimatePosition, EstimateSection, PositionResource } from "@shared/schema";
 
-export const ESTIMATE_ANALYSIS_VERSION = "1";
+export const ESTIMATE_ANALYSIS_VERSION = "2";
 export const ESTIMATE_ANALYSIS_SCHEMA_VERSION = 1;
 
 type HydratedPosition = EstimatePosition & { resources: PositionResource[] };
@@ -59,6 +59,7 @@ export type EstimateAnalysis = {
     unit: string | null;
     quantity: number | null;
     laborHours: number;
+    laborMachineCost: number;
     laborResourceIds: number[];
   }>;
   materialCandidates: EstimateSourceRef[];
@@ -80,6 +81,21 @@ export type EstimateAnalysis = {
 
 const byOrderAndId = (a: { orderIndex: number; id: number }, b: { orderIndex: number; id: number }) =>
   a.orderIndex - b.orderIndex || a.id - b.id;
+
+function planningResourceCategory(resource: PositionResource) {
+  const normalized = normalizeEstimateResourceType(resource.resourceType);
+  if (normalized === "labor") return isManHourUnit(resource.unit) ? "labor" : "unclassified";
+  if (normalized === "unclassified" && resource.resourceType == null && isManHourUnit(resource.unit)) return "labor";
+  return normalized;
+}
+
+function currentResourceCost(resource: PositionResource): number {
+  const total = parseEstimateNumeric(resource.totalCurrentCost);
+  if (total !== null && total > 0) return total;
+  const quantity = parseEstimateNumeric(resource.quantityTotal ?? resource.quantity);
+  const unitCost = parseEstimateNumeric(resource.currentCostPerUnit);
+  return quantity !== null && quantity > 0 && unitCost !== null && unitCost > 0 ? quantity * unitCost : 0;
+}
 
 function sourceRef(positionId: number, sourceType: "position" | "resource", sourceId: number): EstimateSourceRef {
   return { sourceType, sourceId, positionId };
@@ -151,6 +167,9 @@ export function computeEstimateAnalysis(input: HydratedEstimate): EstimateAnalys
 
   const mainWorks = mainPositions.map((position) => {
     const laborResources = getEstimatePositionLaborResources(position.resources);
+    const laborMachineCost = position.resources
+      .filter((resource) => ["labor", "equipment"].includes(planningResourceCategory(resource)))
+      .reduce((sum, resource) => sum + currentResourceCost(resource), 0);
     return {
       positionId: position.id,
       sectionId: position.sectionId,
@@ -160,6 +179,7 @@ export function computeEstimateAnalysis(input: HydratedEstimate): EstimateAnalys
       unit: position.unit,
       quantity: parseEstimateNumeric(position.quantity),
       laborHours: getEstimatePositionLaborHours(position.resources) ?? 0,
+      laborMachineCost,
       laborResourceIds: laborResources
         .filter((resource) => (parseEstimateNumeric(resource.quantityTotal ?? resource.quantity) ?? 0) > 0)
         .map((resource) => resource.id)
@@ -179,12 +199,7 @@ export function computeEstimateAnalysis(input: HydratedEstimate): EstimateAnalys
 
   for (const position of positions) {
     for (const resource of [...position.resources].sort(byOrderAndId)) {
-      const normalizedType = normalizeEstimateResourceType(resource.resourceType);
-      const classification = normalizedType === "labor"
-        ? (isManHourUnit(resource.unit) ? "labor" : "unclassified")
-        : normalizedType === "unclassified" && resource.resourceType == null && isManHourUnit(resource.unit)
-          ? "labor"
-          : normalizedType;
+      const classification = planningResourceCategory(resource);
       const ref = sourceRef(position.id, "resource", resource.id);
       if (classification === "material") materialCandidates.push(ref);
       if (classification === "equipment") equipmentCandidates.push(ref);

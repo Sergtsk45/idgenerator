@@ -924,6 +924,43 @@ export const estimateAnalysisSnapshots = pgTable(
   }),
 );
 
+// Versioned deterministic schedule drafts. The calculated payload is immutable;
+// approval only fills approvedScheduleId/approvedAt once, in the same transaction
+// that creates the persisted schedule and its tasks.
+export const scheduleDrafts = pgTable(
+  "schedule_drafts",
+  {
+    id: serial("id").primaryKey(),
+    workflowId: integer("workflow_id")
+      .notNull()
+      .references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    estimateId: integer("estimate_id")
+      .notNull()
+      .references(() => estimates.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    plannerVersion: text("planner_version").notNull(),
+    schemaVersion: integer("schema_version").notNull(),
+    inputHash: text("input_hash").notNull(),
+    draftJson: jsonb("draft_json").$type<unknown>().notNull(),
+    approvedScheduleId: integer("approved_schedule_id").references(() => schedules.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    workflowIdIdx: index("schedule_drafts_workflow_id_idx").on(t.workflowId),
+    estimateIdIdx: index("schedule_drafts_estimate_id_idx").on(t.estimateId),
+    workflowVersionUq: uniqueIndex("schedule_drafts_workflow_version_uq").on(t.workflowId, t.version),
+    inputVersionUq: uniqueIndex("schedule_drafts_input_version_uq").on(
+      t.workflowId,
+      t.inputHash,
+      t.plannerVersion,
+      t.schemaVersion,
+    ),
+    versionCheck: check("schedule_drafts_version_check", sql`version > 0`),
+    schemaVersionCheck: check("schedule_drafts_schema_version_check", sql`schema_version > 0`),
+  }),
+);
+
 export const uploadSessions = pgTable(
   "upload_sessions",
   {
@@ -995,6 +1032,9 @@ export type InsertExecutionWorkflowEvent = typeof executionWorkflowEvents.$infer
 
 export type EstimateAnalysisSnapshot = typeof estimateAnalysisSnapshots.$inferSelect;
 export type InsertEstimateAnalysisSnapshot = typeof estimateAnalysisSnapshots.$inferInsert;
+
+export type ScheduleDraft = typeof scheduleDrafts.$inferSelect;
+export type InsertScheduleDraft = typeof scheduleDrafts.$inferInsert;
 
 export type UploadSession = typeof uploadSessions.$inferSelect;
 export type InsertUploadSession = typeof uploadSessions.$inferInsert;

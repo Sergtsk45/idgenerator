@@ -24,6 +24,7 @@ import * as repo from "./workflowRepository";
 import type { DbClient } from "./workflowRepository";
 import { assertTransitionAllowed } from "./workflowStateMachine";
 import { loadCurrentEstimateAnalysis } from "../estimate-analysis/currentEstimateAnalysis";
+import { CREW_LABOR_COVERAGE_THRESHOLD_PERCENT } from "../schedule-planning/planSchedule";
 import {
   evaluateMissingWorkflowInputs,
   validateAndNormalizeWorkflowInput,
@@ -66,7 +67,8 @@ async function getMissingInputsContext(client: DbClient, workflow: ExecutionWork
   return {
     analysisAvailable: true,
     analysisInputHash: analysis.inputHash,
-    laborHoursAvailable: analysis.summary.laborHoursAvailable,
+    laborHoursAvailable: analysis.summary.laborCoveragePercent >= CREW_LABOR_COVERAGE_THRESHOLD_PERCENT
+      && analysis.mainWorks.every((work) => work.laborHours > 0),
   };
 }
 

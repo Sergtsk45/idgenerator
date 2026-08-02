@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-08-02] - Schedule planning и approval (TASK-006)
+
+### Добавлено
+- Pure planning core: календари 5×2/6×1, target-duration allocation, crew formula, assumptions/confidence/warnings.
+- Estimate analysis contract v2 с трассируемым агрегатом стоимости labor/equipment для второго уровня весов.
+- Versioned `schedule_drafts` с planner/schema version и каноническим input hash; миграция `0033_schedule_drafts.sql`.
+- MCP tools `calculate_schedule_draft`, `get_schedule_draft`, `approve_schedule`.
+- Транзакционное создание workflow-owned schedule и задач, связанных с основными позициями сметы.
+- Unit, MCP contract и DB-gated integration tests.
+
+### Контракты и совместимость
+- Crew planning требует 100% labor coverage; неполное покрытие возвращает `LABOR_DATA_REQUIRED`.
+- Draft нельзя утвердить после изменения сметы или effective inputs: `SCHEDULE_DRAFT_STALE`.
+- Повторное утверждение одной версии не дублирует schedule/tasks; конфликт существующей связи возвращает `SCHEDULE_APPROVAL_CONFLICT`.
+- Existing REST schedule routes и пользовательские графики не перезаписываются.
+
+---
+
 ## [2026-08-02] - Missing-input engine (TASK-005)
 
 ### Добавлено

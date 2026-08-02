@@ -88,6 +88,21 @@ export async function attachEstimateAndUpdateStageIfVersionMatches(
   return row;
 }
 
+export async function attachScheduleAndUpdateStageIfVersionMatches(
+  client: DbClient,
+  id: number,
+  expectedVersion: number,
+  scheduleId: number,
+  nextStage: WorkflowStage,
+): Promise<ExecutionWorkflow | undefined> {
+  const [row] = await client
+    .update(executionWorkflows)
+    .set({ scheduleId, stage: nextStage, version: expectedVersion + 1, updatedAt: new Date() })
+    .where(and(eq(executionWorkflows.id, id), eq(executionWorkflows.version, expectedVersion)))
+    .returning();
+  return row;
+}
+
 /**
  * Bumps the workflow version without changing stage (used by set_workflow_input).
  * Same optimistic-concurrency contract as updateWorkflowStageIfVersionMatches.

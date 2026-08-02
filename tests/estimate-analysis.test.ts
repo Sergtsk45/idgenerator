@@ -101,6 +101,7 @@ function laborFixture(): HydratedEstimate {
                 unit: "маш.-ч",
                 quantity: null,
                 quantityTotal: "2.0000",
+                totalCurrentCost: "30.0000",
                 orderIndex: 4,
               },
               {
@@ -112,6 +113,7 @@ function laborFixture(): HydratedEstimate {
                 unit: "чел.-ч",
                 quantity: "4.0000",
                 quantityTotal: null,
+                currentCostPerUnit: "2.0000",
                 orderIndex: 3,
               },
             ],
@@ -175,7 +177,7 @@ test("estimate analysis is deterministic, traceable and calculates labor coverag
   const second = computeEstimateAnalysis(fixture);
 
   assert.deepEqual(second, first);
-  assert.equal(first.analysisVersion, "1");
+  assert.equal(first.analysisVersion, "2");
   assert.equal(first.schemaVersion, 1);
   assert.match(first.inputHash, /^[a-f0-9]{64}$/);
   assert.deepEqual(first.summary, {
@@ -201,6 +203,7 @@ test("estimate analysis is deterministic, traceable and calculates labor coverag
   ]);
   assert.deepEqual(first.unclassifiedResources.map((resource) => resource.sourceId), [1005]);
   assert.equal(first.mainWorks.find((work) => work.positionId === 104)?.laborHours, 0);
+  assert.equal(first.mainWorks.find((work) => work.positionId === 103)?.laborMachineCost, 38);
 });
 
 test("analysis canonicalizes row order and invalidates its hash when source data changes", () => {
