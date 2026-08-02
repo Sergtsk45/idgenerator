@@ -8,7 +8,7 @@ Prepare a limited pilot for the MCP endpoint after TASK-012 hardening.
 
 - Confirm `MCP_ENABLED=true`.
 - Confirm `DATABASE_URL` points to the pilot database.
-- Confirm `MCP_ALLOWED_HOSTNAMES` or the default localhost-only policy matches the pilot host.
+- Confirm `MCP_ALLOWED_HOSTNAMES` and, if needed, `MCP_ALLOWED_ORIGINS` match the pilot host.
 - Run:
   - `npm run check`
   - `npm test`
@@ -25,6 +25,7 @@ Prepare a limited pilot for the MCP endpoint after TASK-012 hardening.
    - `set_workflow_input`, `approve_schedule`, `generate_acts`, `build_execution_package` emit `[mcp:audit]` log lines;
    - cross-site `Origin` headers are rejected with `FORBIDDEN`;
    - tool rate limiting returns `RATE_LIMITED` once the per-tool limit is exceeded.
+   - request logs include `requestId`, `method`, `userId`, `status`, and `durationMs`, but never JWTs or tool arguments.
 
 ## Rollback
 
@@ -45,6 +46,6 @@ Prepare a limited pilot for the MCP endpoint after TASK-012 hardening.
 - [ ] Host/origin validation in place.
 - [ ] Audit logs visible for write/final tools.
 - [ ] Per-tool rate limit observed.
+- [ ] Request IDs visible in MCP request logs.
 - [ ] No secrets in logs.
 - [ ] Rollback switch tested.
-
