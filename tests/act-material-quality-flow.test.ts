@@ -33,15 +33,15 @@ test("task material picker multi-selects quality documents into D′ rows", asyn
 });
 
 test("generate-acts persists fallback quality documents for both source branches and PDF keeps a fallback", async () => {
-  const schedule = await readFile("server/routes/schedule.ts", "utf8");
+  const generation = await readFile("server/services/acts/actGenerationService.ts", "utf8");
+  const repository = await readFile("server/services/acts/actRepository.ts", "utf8");
   const pdf = await readFile("server/pdfGenerator.ts", "utf8");
 
-  assert.match(schedule, /sourceType: 'estimate'/);
-  assert.match(schedule, /sourceType: 'works'/);
-  assert.match(schedule, /resolveQualityDocumentForMaterial/);
-  assert.match(schedule, /qualityDocumentId: qdId/);
-  assert.match(schedule, /attachmentDocIds\.map/);
-  assert.match(schedule, /attachmentsManual/);
+  assert.match(generation, /sourceType: input\.schedule\.sourceType/);
+  assert.match(generation, /qualityDocumentFallbacks/);
+  assert.match(generation, /qualityDocumentId/);
+  assert.match(generation, /replaceAutomaticActAttachments/);
+  assert.match(repository, /attachmentsManual/);
   assert.match(pdf, /u\.qualityDocument \?\? fallbackQualityDocuments/);
   assert.match(pdf, /formatP3MaterialsGrouped/);
 });

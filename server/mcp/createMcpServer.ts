@@ -16,6 +16,7 @@ import { registerEstimateAnalysisTools } from "./tools/estimateAnalysis";
 import { registerSchedulePlanningTools } from "./tools/schedulePlanning";
 import { registerMaterialRegisterTools } from "./tools/materialRegister";
 import { registerDocumentIngestionTools } from "./tools/documentIngestion";
+import { registerActTools } from "./tools/acts";
 
 const SERVER_NAME = "idgenerator-mcp";
 const SERVER_VERSION = "0.2.0";
@@ -30,6 +31,7 @@ export function createMcpServer(authResolution: McpAuthResolution): McpServer {
   registerSchedulePlanningTools(server, authResolution);
   registerMaterialRegisterTools(server, authResolution);
   registerDocumentIngestionTools(server, authResolution);
+  registerActTools(server, authResolution);
 
   return server;
 }

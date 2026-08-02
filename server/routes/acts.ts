@@ -8,6 +8,7 @@
 import type { Express } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { api } from '@shared/routes';
 import { storage, appAuth } from './_common';
@@ -20,17 +21,46 @@ import {
   type ActData,
 } from '../pdfGenerator';
 import { buildActAttachmentsPdf } from '../actAttachmentsPdf';
+import { exportActAttachments, exportActPdf, getOwnedArtifactFile } from '../services/actArtifactService';
+import { McpToolError, MCP_ERROR_CODES } from '../mcp/errors';
+import { db } from '../db';
+import * as actRepository from '../services/acts/actRepository';
+
+async function getOwnedAct(userId: number, actId: number) {
+  const [object, act] = await Promise.all([storage.getCurrentObject(userId), storage.getAct(actId)]);
+  return act?.objectId === object.id ? act : undefined;
+}
 
 export function registerActsRoutes(app: Express): void {
+  app.get('/api/act-artifacts/:artifactId/file', ...appAuth, async (req, res) => {
+    try {
+      const { artifact, buffer } = await getOwnedArtifactFile(
+        { userId: req.user!.id, displayName: req.user!.displayName, email: req.user!.email, role: req.user!.role },
+        String(req.params.artifactId),
+      );
+      res.type(artifact.mimeType);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(artifact.filename)}`);
+      return res.send(buffer);
+    } catch (error) {
+      if (error instanceof McpToolError && error.code === MCP_ERROR_CODES.ARTIFACT_NOT_OWNED) {
+        return res.status(404).json({ code: error.code, message: error.message });
+      }
+      console.error('Act artifact download failed:', error);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
   // ── Act Material Usages ────────────────────────────────────────────────────
 
   // GET /api/acts/:id/material-usages
-  app.get(api.actMaterialUsages.list.path, async (req, res) => {
+  app.get(api.actMaterialUsages.list.path, ...appAuth, async (req, res) => {
     const actId = Number(req.params.id);
     if (!Number.isFinite(actId) || actId <= 0) {
       return res.status(400).json({ message: 'Invalid act id' });
     }
     try {
+      if (!await getOwnedAct(req.user!.id, actId)) return res.status(404).json({ message: 'Act not found' });
       const items = await storage.getActMaterialUsages(actId);
       return res.status(200).json(items);
     } catch (err) {
@@ -40,16 +70,26 @@ export function registerActsRoutes(app: Express): void {
   });
 
   // PUT /api/acts/:id/material-usages
-  app.put(api.actMaterialUsages.replace.path, async (req, res) => {
+  app.put(api.actMaterialUsages.replace.path, ...appAuth, async (req, res) => {
     const actId = Number(req.params.id);
     if (!Number.isFinite(actId) || actId <= 0) {
       return res.status(400).json({ message: 'Invalid act id' });
     }
     try {
+      const act = await getOwnedAct(req.user!.id, actId);
+      if (!act) return res.status(404).json({ message: 'Act not found' });
+      if (act.status !== 'draft') return res.status(409).json({ message: 'Final act is immutable' });
+      if (!act.objectId) return res.status(404).json({ message: 'Act object not found' });
       const input = api.actMaterialUsages.replace.input.parse(req.body);
-      await storage.replaceActMaterialUsages(actId, (input as any).items ?? []);
-      const items = await storage.getActMaterialUsages(actId);
-      return res.status(200).json(items);
+      const items = (input as any).items ?? [];
+      const materialIds = items.map((item: any) => Number(item.projectMaterialId));
+      if (!await actRepository.projectMaterialsBelongToObject(db, materialIds, act.objectId)
+        || !await actRepository.explicitQualityDocumentsAreValid(db, items, act.objectId)) {
+        return res.status(404).json({ message: 'Material or quality document not found' });
+      }
+      await storage.replaceActMaterialUsages(actId, items);
+      const updatedItems = await storage.getActMaterialUsages(actId);
+      return res.status(200).json(updatedItems);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
@@ -62,12 +102,13 @@ export function registerActsRoutes(app: Express): void {
   // ── Act Document Attachments ───────────────────────────────────────────────
 
   // GET /api/acts/:id/document-attachments
-  app.get(api.actDocumentAttachments.list.path, async (req, res) => {
+  app.get(api.actDocumentAttachments.list.path, ...appAuth, async (req, res) => {
     const actId = Number(req.params.id);
     if (!Number.isFinite(actId) || actId <= 0) {
       return res.status(400).json({ message: 'Invalid act id' });
     }
     try {
+      if (!await getOwnedAct(req.user!.id, actId)) return res.status(404).json({ message: 'Act not found' });
       const items = await storage.getActDocAttachments(actId);
       return res.status(200).json(items);
     } catch (err) {
@@ -77,22 +118,28 @@ export function registerActsRoutes(app: Express): void {
   });
 
   // PUT /api/acts/:id/document-attachments
-  app.put(api.actDocumentAttachments.replace.path, async (req, res) => {
+  app.put(api.actDocumentAttachments.replace.path, ...appAuth, async (req, res) => {
     const actId = Number(req.params.id);
     if (!Number.isFinite(actId) || actId <= 0) {
       return res.status(400).json({ message: 'Invalid act id' });
     }
     try {
-      const act = await storage.getAct(actId);
+      const act = await getOwnedAct(req.user!.id, actId);
       if (!act) return res.status(404).json({ message: 'Act not found' });
+      if (act.status !== 'draft') return res.status(409).json({ message: 'Final act is immutable' });
+      if (!act.objectId) return res.status(404).json({ message: 'Act object not found' });
       const input = api.actDocumentAttachments.replace.input.parse(req.body);
-      await storage.replaceActDocAttachments(actId, (input as any).items ?? []);
+      const items = (input as any).items ?? [];
+      if (!await actRepository.documentsAreVisibleForObject(db, items.map((item: any) => Number(item.documentId)), act.objectId)) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      await storage.replaceActDocAttachments(actId, items);
       const markManual = (input as any).markManual !== false;
       if (markManual) {
         await storage.setActAttachmentsManual(actId, true);
       }
-      const items = await storage.getActDocAttachments(actId);
-      return res.status(200).json(items);
+      const updatedItems = await storage.getActDocAttachments(actId);
+      return res.status(200).json(updatedItems);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
@@ -103,14 +150,15 @@ export function registerActsRoutes(app: Express): void {
   });
 
   // POST /api/acts/:id/document-attachments/reset-from-usages
-  app.post(api.actDocumentAttachments.resetFromUsages.path, async (req, res) => {
+  app.post(api.actDocumentAttachments.resetFromUsages.path, ...appAuth, async (req, res) => {
     const actId = Number(req.params.id);
     if (!Number.isFinite(actId) || actId <= 0) {
       return res.status(400).json({ message: 'Invalid act id' });
     }
     try {
-      const act = await storage.getAct(actId);
+      const act = await getOwnedAct(req.user!.id, actId);
       if (!act) return res.status(404).json({ message: 'Act not found' });
+      if (act.status !== 'draft') return res.status(409).json({ message: 'Final act is immutable' });
       const items = await storage.resetActDocAttachmentsFromUsages(actId);
       return res.status(200).json(items);
     } catch (err) {
@@ -201,6 +249,20 @@ export function registerActsRoutes(app: Express): void {
         return res.status(404).json({ message: 'Act not found' });
       }
 
+      if (act.workflowId) {
+        const artifact = await exportActAttachments(
+          { userId: req.user!.id, displayName: req.user!.displayName, email: req.user!.email, role: req.user!.role },
+          {
+            workflowId: act.workflowId,
+            actId: act.id,
+            mode: act.status === 'generated' || act.status === 'signed' ? 'final' : 'draft',
+            idempotencyKey: `rest-export-attachments-${randomUUID()}`,
+          },
+        );
+        const documentsCount = (await storage.getActDocAttachments(act.id)).length;
+        return res.status(200).json({ ...artifact, documentsCount });
+      }
+
       const result = await buildActAttachmentsPdf(actId);
       if (result.documentsCount === 0) {
         return res.status(409).json({ message: 'Нет документов для экспорта' });
@@ -227,6 +289,9 @@ export function registerActsRoutes(app: Express): void {
         documentsCount: result.documentsCount,
       });
     } catch (error) {
+      if (error instanceof McpToolError && error.code === MCP_ERROR_CODES.ACTS_NOT_READY) {
+        return res.status(error.message.includes('no attachments') ? 409 : 422).json({ code: error.code, message: error.message });
+      }
       console.error('Error exporting act attachments:', error);
       return res.status(500).json({ message: 'Failed to export act attachments' });
     }
@@ -241,7 +306,45 @@ export function registerActsRoutes(app: Express): void {
         return res.status(404).json({ message: 'Act not found' });
       }
 
+      const currentObject = await storage.getCurrentObject(req.user!.id);
+      if (act.objectId !== currentObject.id) return res.status(404).json({ message: 'Act not found' });
+
       const { templateIds, formData } = req.body ?? {};
+
+      if (act.workflowId) {
+        const requestedTemplates = Array.isArray(templateIds) && templateIds.length > 0
+          ? Array.from(new Set(templateIds.filter((id): id is string => typeof id === 'string' && id.length > 0)))
+          : [null];
+        if (requestedTemplates.length > 20) return res.status(400).json({ message: 'Too many templates' });
+        for (const templateId of requestedTemplates) {
+          if (templateId !== null && !await storage.getActTemplateByTemplateId(templateId)) {
+            return res.status(400).json({ message: `Unknown act template: ${templateId}` });
+          }
+        }
+        const requestKey = typeof req.body?.idempotencyKey === 'string' && req.body.idempotencyKey.length >= 8
+          ? req.body.idempotencyKey
+          : randomUUID();
+        const artifacts = [];
+        for (let index = 0; index < requestedTemplates.length; index++) {
+          const templateId = requestedTemplates[index];
+          artifacts.push(await exportActPdf(
+            { userId: req.user!.id, displayName: req.user!.displayName, email: req.user!.email, role: req.user!.role }, {
+            workflowId: act.workflowId!,
+            actId: act.id,
+            mode: act.status === 'generated' || act.status === 'signed' ? 'final' : 'draft',
+            idempotencyKey: `rest-export-act-${requestKey}-${index}`,
+            templateIds: templateId ? [templateId] : undefined,
+            formData: formData && typeof formData === 'object' ? formData : undefined,
+            },
+          ));
+        }
+        return res.json({ files: artifacts.map((artifact, index) => ({
+          templateId: requestedTemplates[index] ?? 'default',
+          filename: artifact.filename,
+          url: artifact.url,
+          artifactId: artifact.artifactId,
+        })) });
+      }
 
       const objectId = (act as any).objectId ?? (await storage.getCurrentObject(req.user!.id)).id;
       const sourceData = await storage.getObjectSourceData(Number(objectId));
@@ -366,7 +469,7 @@ export function registerActsRoutes(app: Express): void {
 
         const pdfBuffer = await generateAosrPdf(actData);
         const safeActNumber = String(actNumber).replace(/[^0-9A-Za-z_-]+/g, '_');
-        const filename = `aosr-act-${safeActNumber}.pdf`;
+        const filename = `aosr-act-${act.id}-${safeActNumber}.pdf`;
         const filePath = path.join(pdfDir, filename);
         fs.writeFileSync(filePath, pdfBuffer);
         generatedFiles.push({ templateId: 'default', filename, url: `/api/pdfs/${filename}` });
@@ -496,7 +599,7 @@ export function registerActsRoutes(app: Express): void {
   });
 
   // GET /api/pdfs/:filename — раздача сгенерированных PDF
-  app.get('/api/pdfs/:filename', (req, res) => {
+  app.get('/api/pdfs/:filename', ...appAuth, async (req, res) => {
     const requested = String(req.params.filename ?? '');
     const filename = path.basename(requested);
     if (!filename || filename !== requested) {
@@ -507,6 +610,15 @@ export function registerActsRoutes(app: Express): void {
     }
 
     const filePath = path.join(process.cwd(), 'generated_pdfs', filename);
+
+    const currentObject = await storage.getCurrentObject(req.user!.id);
+    const defaultActId = Number(/^aosr-act-(\d+)-[^/]+\.pdf$/i.exec(filename)?.[1]);
+    const templateActId = Number(/^AOSR_.+_(\d+)_\d+\.pdf$/.exec(filename)?.[1]);
+    const ownedActs = await storage.getActs(currentObject.id);
+    const ownedAct = ownedActs.find((act) => act.id === defaultActId
+      || filename.startsWith(`act_attachments_${act.id}_`)
+      || act.id === templateActId);
+    if (!ownedAct) return res.status(404).json({ message: 'File not found' });
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ message: 'File not found' });

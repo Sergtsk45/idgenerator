@@ -77,7 +77,7 @@ export async function createUploadSession(auth: McpAuthContext, args: CreateUplo
       }
       if (purpose === "estimate") {
         assertTransitionAllowed(workflow.stage, "estimate_upload_pending");
-      } else if (workflow.stage !== "materials_register_ready" && workflow.stage !== "awaiting_quality_documents") {
+      } else if (!["materials_register_ready", "awaiting_quality_documents", "acts_blocked"].includes(workflow.stage)) {
         throw new McpToolError(
           MCP_ERROR_CODES.WORKFLOW_TRANSITION_NOT_ALLOWED,
           `Cannot create a quality document upload while workflow is at "${workflow.stage}"`,
@@ -88,7 +88,9 @@ export async function createUploadSession(auth: McpAuthContext, args: CreateUplo
         tx,
         workflow.id,
         args.expectedVersion,
-        purpose === "estimate" ? "estimate_upload_pending" : "awaiting_quality_documents",
+        purpose === "estimate"
+          ? "estimate_upload_pending"
+          : workflow.stage === "acts_blocked" ? "acts_blocked" : "awaiting_quality_documents",
       );
       if (!updated) {
         throw new McpToolError(MCP_ERROR_CODES.WORKFLOW_VERSION_CONFLICT, "Workflow was modified concurrently", {

@@ -11,6 +11,10 @@ import { api } from '@shared/routes';
 import { storage, appAuth } from './_common';
 import { addDaysISO } from './_dateUtils';
 import { requireFeature } from '../middleware/tariff';
+import { generateActsForOwnedSchedule } from '../services/acts/actGenerationService';
+import { MCP_ERROR_CODES, McpToolError } from '../mcp/errors';
+import { db } from '../db';
+import * as actRepository from '../services/acts/actRepository';
 
 /** Проверяет, что задача графика принадлежит объекту текущего пользователя. */
 async function assertUserOwnsScheduleTask(
@@ -168,309 +172,18 @@ export function registerScheduleRoutes(app: Express): void {
       if (!Number.isFinite(id)) {
         return res.status(400).json({ message: "Invalid schedule id" });
       }
-
       api.schedules.generateActs.input.parse(req.body ?? {});
-
-      const schedule = await storage.getScheduleWithTasks(id);
-      if (!schedule) {
-        return res.status(404).json({ message: "Schedule not found" });
-      }
-
-      const groups = new Map<number, typeof schedule.tasks>();
-      let skippedNoActNumber = 0;
-
-      for (const task of schedule.tasks) {
-        const actNumber = (task as any).actNumber as number | null | undefined;
-        if (actNumber == null) {
-          skippedNoActNumber++;
-          continue;
-        }
-        if (!Number.isFinite(actNumber) || actNumber <= 0) {
-          return res.status(400).json({ message: `Invalid actNumber for task ${task.id}` });
-        }
-
-        const list = groups.get(actNumber) ?? [];
-        list.push(task);
-        groups.set(actNumber, list);
-      }
-
-      const actNumbers = Array.from(groups.keys()).sort((a, b) => a - b);
-      let created = 0;
-      let updated = 0;
-      const deletedActNumbers: number[] = [];
-      const warnings: Array<{ actNumber: number; type: string; message: string }> = [];
-
-      const mergeFreeText = (values: Array<string | null | undefined>): string => {
-        const tokens: string[] = [];
-        const seen = new Set<string>();
-        for (const v of values) {
-          const raw = String(v ?? "").trim();
-          if (!raw) continue;
-          const parts = raw
-            .split(/[\n,;]+/g)
-            .map((p) => p.trim())
-            .filter(Boolean);
-          for (const p of parts) {
-            const key = p.toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            tokens.push(p);
-          }
-        }
-        return tokens.join(", ");
-      };
-
-      for (const actNumber of actNumbers) {
-        const tasks = (groups.get(actNumber) ?? []).slice().sort((a: any, b: any) => Number(a.orderIndex ?? 0) - Number(b.orderIndex ?? 0));
-        if (tasks.length === 0) continue;
-
-        // Determine act template type (one per actNumber)
-        const distinctTemplateIds = Array.from(
-          new Set(tasks.map((t: any) => (t as any).actTemplateId).filter((v: any) => v != null)),
-        ).map((v: any) => Number(v));
-        const actTemplateId = distinctTemplateIds.length > 0 ? distinctTemplateIds[0] : null;
-        if (distinctTemplateIds.length === 0) {
-          warnings.push({
-            actNumber,
-            type: "no_template_type",
-            message: `Акт №${actNumber}: не выбран тип акта (шаблон) ни у одной задачи`,
-          });
-        } else if (distinctTemplateIds.length > 1) {
-          warnings.push({
-            actNumber,
-            type: "mixed_template_types",
-            message: `Акт №${actNumber}: в задачах выбрано несколько типов актов (${distinctTemplateIds.join(", ")}). Используется первый.`,
-          });
-        }
-
-        let minStart: string | null = null;
-        let maxEnd: string | null = null;
-
-        for (const t of tasks) {
-          const start = String(t.startDate);
-          const durationDays = Number(t.durationDays ?? 0);
-          // dateEnd is inclusive: if duration is 1 day, end = start
-          const end = addDaysISO(start, Math.max(0, durationDays - 1));
-
-          if (!minStart || start < minStart) minStart = start;
-          if (!maxEnd || end > maxEnd) maxEnd = end;
-        }
-
-        // Aggregate task-scoped docs
-        const projectDrawingsAgg = mergeFreeText(tasks.map((t: any) => (t as any).projectDrawings));
-        const normativeRefsAgg = mergeFreeText(tasks.map((t: any) => (t as any).normativeRefs));
-        const schemeSeen = new Set<string>();
-        const executiveSchemesAgg: Array<{ title: string; fileUrl?: string }> = [];
-        for (const t of tasks) {
-          const list = (t as any).executiveSchemes;
-          if (!Array.isArray(list)) continue;
-          for (const s of list) {
-            const title = String((s as any)?.title ?? "").trim();
-            const fileUrl = String((s as any)?.fileUrl ?? "").trim();
-            if (!title) continue;
-            const key = `${title.toLowerCase()}|${fileUrl}`;
-            if (schemeSeen.has(key)) continue;
-            schemeSeen.add(key);
-            executiveSchemesAgg.push(fileUrl ? { title, fileUrl } : { title });
-          }
-        }
-
-        // Generate worksData from task-level quantity (independent from source).
-        // Multiple tasks with the same sourceId have their quantities summed.
-        let worksData: Array<{
-          sourceType: 'works' | 'estimate';
-          sourceId: number;
-          description: string;
-          quantity: number;
-          unit?: string;
-          code?: string;
-        }>;
-
-        if (schedule.sourceType === 'estimate') {
-          // Group tasks by estimatePositionId and sum their independent quantities
-          const positionIdToTasks = new Map<number, typeof tasks>();
-          for (const t of tasks) {
-            if (t.estimatePositionId) {
-              const key = Number(t.estimatePositionId);
-              const list = positionIdToTasks.get(key) ?? [];
-              list.push(t);
-              positionIdToTasks.set(key, list);
-            }
-          }
-          const positionIds = Array.from(positionIdToTasks.keys());
-          const positions = await storage.getEstimatePositionsByIds(positionIds);
-          positions.sort((a, b) => String(a.code ?? '').localeCompare(String(b.code ?? '')));
-
-          worksData = positions.map((p) => {
-            const taskGroup = positionIdToTasks.get(p.id) ?? [];
-            // Sum independent task quantities; fall back to source quantity if task has none
-            const qty = taskGroup.reduce((sum, t) => {
-              const tQty = (t as any).quantity;
-              if (tQty != null) return sum + Number(tQty);
-              const rawQty: any = (p as any).quantity;
-              return sum + (rawQty != null ? Number(rawQty) : 0);
-            }, 0);
-            // Use task unit if set, else fall back to source
-            const unit = ((taskGroup[0] as any)?.unit ?? (p as any).unit) ?? undefined;
-            return {
-              sourceType: 'estimate' as const,
-              sourceId: p.id,
-              description: p.name,
-              quantity: Number.isFinite(qty) ? qty : 0,
-              unit,
-              code: p.code ?? undefined,
-            };
-          });
-        } else {
-          // Source: Works (BoQ) — group by workId and sum independent task quantities
-          const workIdToTasks = new Map<number, typeof tasks>();
-          for (const t of tasks) {
-            if (t.workId) {
-              const key = Number(t.workId);
-              const list = workIdToTasks.get(key) ?? [];
-              list.push(t);
-              workIdToTasks.set(key, list);
-            }
-          }
-          const workIds = Array.from(workIdToTasks.keys());
-          const works = await storage.getWorksByIds(workIds);
-          works.sort((a, b) => String(a.code).localeCompare(String(b.code)));
-
-          worksData = works.map((w) => {
-            const taskGroup = workIdToTasks.get(w.id) ?? [];
-            // Sum independent task quantities; fall back to source quantityTotal if task has none
-            const qty = taskGroup.reduce((sum, t) => {
-              const tQty = (t as any).quantity;
-              if (tQty != null) return sum + Number(tQty);
-              const rawQty: any = (w as any).quantityTotal;
-              return sum + (rawQty != null ? Number(rawQty) : 0);
-            }, 0);
-            // Use task unit if set, else fall back to source
-            const unit = ((taskGroup[0] as any)?.unit ?? w.unit) ?? undefined;
-            return {
-              sourceType: 'works' as const,
-              sourceId: w.id,
-              description: w.description,
-              quantity: Number.isFinite(qty) ? qty : 0,
-              unit,
-              code: w.code,
-            };
-          });
-        }
-
-        const result = await storage.upsertActByNumber({
-          actNumber,
-          actTemplateId,
-          dateStart: minStart,
-          dateEnd: maxEnd,
-          status: "draft",
-          worksData: worksData as any,
-          projectDrawingsAgg: projectDrawingsAgg || null,
-          normativeRefsAgg: normativeRefsAgg || null,
-          executiveSchemesAgg: executiveSchemesAgg.length > 0 ? executiveSchemesAgg : null,
-        }, req.user!.id);
-
-        if (result.created) created++;
-        else updated++;
-
-        // Replace act materials and formal attachments from task_materials
-        const taskIdToWorkId = new Map<number, number | null>();
-        for (const t of tasks) taskIdToWorkId.set(Number((t as any).id), (t as any).workId != null ? Number((t as any).workId) : null);
-
-        const taskMaterialsLists = await Promise.all(tasks.map((t: any) => storage.getTaskMaterials(Number(t.id))));
-        const flatTaskMaterials = taskMaterialsLists.flat();
-        const materialIds = Array.from(new Set(flatTaskMaterials.map((row: any) => Number(row.projectMaterialId))));
-        // ponytail: one lookup per unique material; replace with a batch resolver if acts routinely reach hundreds of materials.
-        const fallbackQualityDocuments = new Map(
-          await Promise.all(
-            materialIds.map(async (projectMaterialId) => [
-              projectMaterialId,
-              await storage.resolveQualityDocumentForMaterial(projectMaterialId),
-            ] as const),
-          ),
-        );
-
-        const actUsageItems: any[] = [];
-        const attachmentDocIds: number[] = [];
-        const attachmentDocSeen = new Set<number>();
-        let missingQualityDocs = 0;
-
-        for (const row of flatTaskMaterials) {
-          const fallbackDocument = fallbackQualityDocuments.get(Number((row as any).projectMaterialId));
-          const qdId =
-            (row as any).qualityDocumentId == null
-              ? fallbackDocument == null
-                ? null
-                : Number(fallbackDocument.id)
-              : Number((row as any).qualityDocumentId);
-          if (qdId == null) missingQualityDocs++;
-          if (qdId != null && !attachmentDocSeen.has(qdId)) {
-            attachmentDocSeen.add(qdId);
-            attachmentDocIds.push(qdId);
-          }
-          actUsageItems.push({
-            projectMaterialId: Number((row as any).projectMaterialId),
-            workId: taskIdToWorkId.get(Number((row as any).taskId)) ?? null,
-            batchId: (row as any).batchId == null ? null : Number((row as any).batchId),
-            qualityDocumentId: qdId,
-            note: (row as any).note ?? null,
-            orderIndex: Number((row as any).orderIndex ?? 0),
-          });
-        }
-
-        // Persist to DB for PDF defaults
-        await storage.replaceActMaterialUsages(result.act.id, actUsageItems as any);
-        // Respect manual appendix edits in the act card (attachments_manual).
-        if (!(result.act as any).attachmentsManual) {
-          await storage.replaceActDocAttachments(
-            result.act.id,
-            attachmentDocIds.map((documentId, orderIndex) => ({ documentId, orderIndex })) as any,
-          );
-        }
-
-        if (actUsageItems.length === 0) {
-          warnings.push({ actNumber, type: "no_materials", message: `Акт №${actNumber}: нет материалов ни в одной задаче` });
-        } else if (missingQualityDocs > 0) {
-          warnings.push({
-            actNumber,
-            type: "no_quality_docs",
-            message: `Акт №${actNumber}: у ${missingQualityDocs} материалов не указан документ качества`,
-          });
-        }
-        if (!projectDrawingsAgg) {
-          warnings.push({ actNumber, type: "no_drawings", message: `Акт №${actNumber}: не заполнены номера чертежей проекта` });
-        }
-        if (!normativeRefsAgg) {
-          warnings.push({ actNumber, type: "no_normatives", message: `Акт №${actNumber}: не заполнены СНиП/ГОСТ/РД` });
-        }
-      }
-
-      // Delete acts which no longer have any tasks (global actNumber uniqueness is assumed).
-      const actNumbersSet = new Set<number>(actNumbers);
-      const generateActsObj = await storage.getCurrentObject(req.user!.id);
-      const existingActs = await storage.getActs(generateActsObj.id);
-      for (const a of existingActs as any[]) {
-        const n = (a as any).actNumber;
-        if (n == null) continue;
-        const num = Number(n);
-        if (actNumbersSet.has(num)) continue;
-        if (String((a as any).status ?? "") === "signed") continue;
-        const ok = await storage.deleteActByNumber(num);
-        if (ok) deletedActNumbers.push(num);
-      }
-
-      return res.status(200).json({
-        scheduleId: id,
-        actNumbers,
-        created,
-        updated,
-        skippedNoActNumber,
-        deletedActNumbers,
-        warnings,
-      });
+      const result = await generateActsForOwnedSchedule(req.user!.id, id);
+      return res.status(200).json(result);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (err instanceof McpToolError && err.code === MCP_ERROR_CODES.NOT_FOUND) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+      if (err instanceof McpToolError && err.code === MCP_ERROR_CODES.VALIDATION_ERROR) {
+        return res.status(400).json({ message: err.message });
       }
       console.error("Generate acts from schedule failed:", err);
       return res.status(500).json({ message: "Internal Server Error" });
@@ -608,6 +321,8 @@ export function registerScheduleRoutes(app: Express): void {
       if (!Number.isFinite(id)) {
         return res.status(400).json({ message: "Invalid schedule task id" });
       }
+      const ownership = await assertUserOwnsScheduleTask(req, res, id);
+      if (!ownership) return;
 
       const input = api.scheduleTasks.patch.input.parse(req.body);
       const existing = await storage.getScheduleTask(id);
@@ -691,22 +406,6 @@ export function registerScheduleRoutes(app: Express): void {
           actTemplateId: nextTemplateId,
         });
 
-        // Also update act record (if exists) to keep list view consistent before next generate-acts.
-        const act = await storage.getActByNumber(Number(nextActNumber));
-        if (act && (act as any).status !== "signed") {
-          await storage.upsertActByNumber({
-            actNumber: Number(nextActNumber),
-            actTemplateId: nextTemplateId,
-            dateStart: (act as any).dateStart ?? null,
-            dateEnd: (act as any).dateEnd ?? null,
-            location: (act as any).location ?? null,
-            status: (act as any).status ?? "draft",
-            worksData: ((act as any).worksData ?? []) as any,
-            projectDrawingsAgg: (act as any).projectDrawingsAgg ?? null,
-            normativeRefsAgg: (act as any).normativeRefsAgg ?? null,
-            executiveSchemesAgg: (act as any).executiveSchemesAgg ?? null,
-          }, req.user!.id);
-        }
       }
 
       // Remove route-level helper flag before passing to storage
@@ -949,6 +648,9 @@ export function registerScheduleRoutes(app: Express): void {
         items.map((it) => it.projectMaterialId),
       );
       if (!materialsOk) return;
+      if (!await actRepository.explicitQualityDocumentsAreValid(db, items, ownership.objectId)) {
+        return res.status(404).json({ message: 'Quality document not found' });
+      }
 
       await storage.replaceTaskMaterials(taskId, items as any);
 
@@ -1009,6 +711,9 @@ export function registerScheduleRoutes(app: Express): void {
         [materialData.projectMaterialId],
       );
       if (!materialsOk) return;
+      if (!await actRepository.explicitQualityDocumentsAreValid(db, [materialData], ownership.objectId)) {
+        return res.status(404).json({ message: 'Quality document not found' });
+      }
 
       const created = await storage.createTaskMaterial(taskId, materialData as any);
 

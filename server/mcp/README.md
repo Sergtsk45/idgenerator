@@ -1,7 +1,7 @@
 # MCP endpoint — локальное подключение
 
 `POST/GET/DELETE /mcp` — Streamable HTTP, **stateless** (каждый HTTP-запрос обслуживается
-новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-007 из
+новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-009 из
 [`mcp-mvp-plan`](../../mcp-mvp-plan/).
 
 ## Требования
@@ -98,6 +98,18 @@ Seed requirements — проверяемая MVP-эвристика, а не у�
 выводится сервером; один upload нельзя привязать к другому материалу, а retry с тем же
 idempotency key не создаёт повторный document/binding.
 
+### Acts readiness и artifacts (TASK-009)
+
+| Tool | Описание |
+|---|---|
+| `check_acts_readiness` | Возвращает readiness и blockers по каждой группе act number |
+| `generate_acts` | Создаёт draft/final акты; final требует `confirmFinal: true` и ноль blockers |
+| `export_act_pdf` | Создаёт owner-scoped PDF artifact акта |
+| `export_act_attachments` | Создаёт owner-scoped PDF-пакет приложений |
+
+Draft не переводит workflow в generated state. Повторная генерация сохраняет manual
+attachments и не изменяет signed acts. Artifact URL требует authenticated REST request.
+
 Все tools ownership-scoped по `userId` из проверенного JWT — не из аргументов вызова.
 
 ## Быстрая проверка через curl
@@ -160,6 +172,9 @@ TASK-007 добавляет `MATERIAL_REGISTER_NOT_READY`, `MATERIAL_REGISTER_NO
 
 TASK-008 добавляет `DOCUMENT_UPLOAD_INVALID`, `MATERIAL_NOT_OWNED`,
 `DOCUMENT_ALREADY_ATTACHED`.
+
+TASK-009 добавляет `ACTS_NOT_READY`, `ACT_GENERATION_REQUIRES_CONFIRMATION`,
+`ARTIFACT_NOT_OWNED`.
 
 Для конфликтов версий может присутствовать `recoverable: true`.
 

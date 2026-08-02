@@ -318,7 +318,7 @@ export default function Acts() {
           description: language === "ru" ? `Создано ${exportResult.files.length} PDF-документов` : `Generated ${exportResult.files.length} PDF documents`,
           duration: 1800,
         });
-        exportResult.files.forEach((file: { url: string; filename: string }) => openPdfDownload(file.url, file.filename));
+        await Promise.all(exportResult.files.map((file: { url: string; filename: string }) => openPdfDownload(file.url, file.filename)));
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : undefined;
@@ -353,7 +353,7 @@ export default function Acts() {
           duration: 1800,
         });
 
-        exportResult.files.forEach((file: { url: string; filename: string }) => openPdfDownload(file.url, file.filename));
+        await Promise.all(exportResult.files.map((file: { url: string; filename: string }) => openPdfDownload(file.url, file.filename)));
       }
     } catch (error: any) {
       toast({

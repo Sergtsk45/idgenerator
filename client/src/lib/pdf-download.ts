@@ -5,31 +5,26 @@
  * @created: 2026-07-22
  */
 
-import { isTelegramWebAppAvailable } from "@/lib/telegram";
+import { apiRequest } from "@/lib/queryClient";
 
 export function withDownloadQuery(url: string): string {
   return url.includes("?") ? `${url}&download=1` : `${url}?download=1`;
 }
 
-export function openPdfDownload(url: string, filename?: string) {
+export async function openPdfDownload(url: string, filename?: string) {
   const downloadUrl = withDownloadQuery(url);
-  const absoluteUrl = new URL(downloadUrl, window.location.origin).toString();
-
-  if (isTelegramWebAppAvailable() && window.Telegram?.WebApp?.openLink) {
-    window.Telegram.WebApp.openLink(absoluteUrl, { try_instant_view: false });
-    return;
-  }
-
+  const response = await apiRequest("GET", downloadUrl);
+  const objectUrl = URL.createObjectURL(await response.blob());
   try {
     const a = document.createElement("a");
-    a.href = absoluteUrl;
+    a.href = objectUrl;
     if (filename) a.download = filename;
     a.rel = "noopener";
     a.style.display = "none";
     document.body.appendChild(a);
     a.click();
     a.remove();
-  } catch {
-    window.open(absoluteUrl, "_blank", "noopener,noreferrer");
+  } finally {
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
   }
 }

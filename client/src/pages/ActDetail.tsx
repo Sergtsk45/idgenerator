@@ -277,7 +277,7 @@ export default function ActDetail({ params }: ActDetailProps) {
           description: t(`Создано ${exportResult.files.length} PDF-документов`, `Generated ${exportResult.files.length} PDF documents`),
           duration: 1800,
         });
-        exportResult.files.forEach((file: { url: string; filename: string }) => openPdfDownload(file.url, file.filename));
+        await Promise.all(exportResult.files.map((file: { url: string; filename: string }) => openPdfDownload(file.url, file.filename)));
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : undefined;
@@ -304,7 +304,7 @@ export default function ActDetail({ params }: ActDetailProps) {
         ),
         duration: 1800,
       });
-      openPdfDownload(result.url, result.filename);
+      await openPdfDownload(result.url, result.filename);
     } catch (error: unknown) {
       const problemResponse =
         error instanceof ApiError && error.status === 422

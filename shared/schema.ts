@@ -359,26 +359,40 @@ export type ExecutiveSchemeLink = {
 };
 
 // Acts (AOSR)
-export const acts = pgTable("acts", {
-  id: serial("id").primaryKey(),
-  objectId: integer("object_id").references(() => objects.id),
-  // Global act number (business identifier). Nullable for legacy records.
-  actNumber: integer("act_number").unique(),
-  actTemplateId: integer("act_template_id").references(() => actTemplates.id, { onDelete: "set null" }),
-  dateStart: date("date_start"),
-  dateEnd: date("date_end"),
-  location: text("location"),
-  status: text("status").default("draft"), // draft, generated, signed
-  // Aggregated works for this act (with explicit source reference)
-  worksData: jsonb("works_data").$type<ActWorkItem[]>(),
-  // Aggregated documentation (copied/merged from schedule tasks during generate-acts)
-  projectDrawingsAgg: text("project_drawings_agg"),
-  normativeRefsAgg: text("normative_refs_agg"),
-  executiveSchemesAgg: jsonb("executive_schemes_agg").$type<ExecutiveSchemeLink[]>(),
-  /** When true, generate-acts must not overwrite act_document_attachments. */
-  attachmentsManual: boolean("attachments_manual").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const acts = pgTable(
+  "acts",
+  {
+    id: serial("id").primaryKey(),
+    objectId: integer("object_id").references(() => objects.id),
+    workflowId: integer("workflow_id"),
+    scheduleId: integer("schedule_id"),
+    actNumber: integer("act_number"),
+    actTemplateId: integer("act_template_id").references(() => actTemplates.id, { onDelete: "set null" }),
+    dateStart: date("date_start"),
+    dateEnd: date("date_end"),
+    location: text("location"),
+    status: text("status").default("draft"), // draft, generated, signed
+    // Aggregated works for this act (with explicit source reference)
+    worksData: jsonb("works_data").$type<ActWorkItem[]>(),
+    // Aggregated documentation (copied/merged from schedule tasks during generate-acts)
+    projectDrawingsAgg: text("project_drawings_agg"),
+    normativeRefsAgg: text("normative_refs_agg"),
+    executiveSchemesAgg: jsonb("executive_schemes_agg").$type<ExecutiveSchemeLink[]>(),
+    /** When true, generate-acts must not overwrite act_document_attachments. */
+    attachmentsManual: boolean("attachments_manual").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    workflowIdIdx: index("acts_workflow_id_idx").on(t.workflowId),
+    scheduleIdIdx: index("acts_schedule_id_idx").on(t.scheduleId),
+    workflowActNumberUq: uniqueIndex("acts_workflow_act_number_uq")
+      .on(t.workflowId, t.actNumber)
+      .where(sql`workflow_id IS NOT NULL AND act_number IS NOT NULL`),
+    legacyObjectActNumberUq: uniqueIndex("acts_legacy_object_act_number_uq")
+      .on(t.objectId, t.actNumber)
+      .where(sql`workflow_id IS NULL AND object_id IS NOT NULL AND act_number IS NOT NULL`),
+  }),
+);
 
 // Attachments (Documents)
 export const attachments = pgTable("attachments", {
@@ -1153,6 +1167,45 @@ export const uploadSessions = pgTable(
   }),
 );
 
+export const ACT_ARTIFACT_KINDS = ["act_pdf", "attachments_pdf"] as const;
+export type ActArtifactKind = (typeof ACT_ARTIFACT_KINDS)[number];
+export const ACT_ARTIFACT_MODES = ["draft", "final"] as const;
+export type ActArtifactMode = (typeof ACT_ARTIFACT_MODES)[number];
+
+export const actArtifacts = pgTable(
+  "act_artifacts",
+  {
+    id: text("id").primaryKey(),
+    workflowId: integer("workflow_id")
+      .notNull()
+      .references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    actId: integer("act_id")
+      .notNull()
+      .references(() => acts.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    objectId: integer("object_id")
+      .notNull()
+      .references(() => objects.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<ActArtifactKind>().notNull(),
+    mode: text("mode").$type<ActArtifactMode>().notNull(),
+    storageKey: text("storage_key").notNull().unique(),
+    filename: text("filename").notNull(),
+    mimeType: text("mime_type").notNull().default("application/pdf"),
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    sha256: text("sha256").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    workflowIdIdx: index("act_artifacts_workflow_id_idx").on(t.workflowId),
+    actIdIdx: index("act_artifacts_act_id_idx").on(t.actId),
+    ownerIdx: index("act_artifacts_user_object_idx").on(t.userId, t.objectId),
+    kindCheck: check("act_artifacts_kind_check", sql`kind IN ('act_pdf', 'attachments_pdf')`),
+    modeCheck: check("act_artifacts_mode_check", sql`mode IN ('draft', 'final')`),
+  }),
+);
+
 // Idempotency records for write MCP tools. A repeated call with the same
 // (userId, toolName, idempotencyKey) short-circuits and returns the stored result
 // instead of re-executing the mutation.
@@ -1297,6 +1350,7 @@ export type InsertMessage = z.infer<typeof insertMessageSchema>;
 
 export type Act = typeof acts.$inferSelect;
 export type InsertAct = z.infer<typeof insertActSchema>;
+export type ActArtifact = typeof actArtifacts.$inferSelect;
 
 export type Attachment = typeof attachments.$inferSelect;
 

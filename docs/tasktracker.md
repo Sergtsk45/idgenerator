@@ -159,6 +159,24 @@
 - **Следующая задача**: TASK-009 (acts readiness)
 - **Известные ограничения**: filesystem и PostgreSQL не поддерживают общий atomic commit; rollback компенсируется, но process crash может оставить orphan-файл до будущей фоновой уборки.
 
+## Задача: MCP acts readiness и generation — TASK-009 (mcp-mvp-plan)
+- **Статус**: Завершена локально
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Формальная готовность групп актов, безопасная draft/final генерация и owner-scoped PDF artifacts через MCP и REST.
+- **Шаги выполнения**:
+  - [x] Deterministic per-act readiness и structured blockers
+  - [x] MCP `check_acts_readiness`, `generate_acts`, `export_act_pdf`, `export_act_attachments`
+  - [x] Explicit confirmation и отсутствие blockers для final
+  - [x] Общий generation service для MCP/REST и workflow-scoped act numbers
+  - [x] Неизменяемость signed acts и сохранение manual attachments
+  - [x] Scope/validity/binding validation документов качества
+  - [x] Durable opaque PDF artifacts, SHA-256 и authenticated download
+  - [x] Миграция `0036_act_workflow_artifacts.sql`, unit/contract/DB-gated tests
+  - [x] `npm run check`, `npm test`, `npm run build`
+- **Зависимости**: TASK-006, TASK-008
+- **Следующая задача**: TASK-010 (worklog + execution package)
+- **Известные ограничения**: DB integration body требует `DATABASE_URL`; filesystem/DB crash-orphan требует будущей bounded cleanup job.
+
 ---
 
 ## Задача: Создание материала из задачи графика с автопривязкой

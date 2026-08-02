@@ -168,7 +168,7 @@ export async function attachDocumentFromUpload(auth: McpAuthContext, args: Attac
         throw new McpToolError(MCP_ERROR_CODES.DOCUMENT_UPLOAD_INVALID, "Quality document upload is not ready");
       }
       if (workflow.version !== args.expectedVersion) throw workflowConflict();
-      if (workflow.stage !== "materials_register_ready" && workflow.stage !== "awaiting_quality_documents") {
+      if (!["materials_register_ready", "awaiting_quality_documents", "acts_blocked"].includes(workflow.stage)) {
         throw new McpToolError(
           MCP_ERROR_CODES.WORKFLOW_TRANSITION_NOT_ALLOWED,
           `Cannot attach a quality document while workflow is at "${workflow.stage}"`,

@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-08-02] - Readiness и выпуск актов через MCP (TASK-009)
+
+### Добавлено
+- Per-act readiness обязательных source fields, шаблонов, дат, материалов и документов.
+- MCP tools `check_acts_readiness`, `generate_acts`, `export_act_pdf`, `export_act_attachments`.
+- Draft/final orchestration: final требует подтверждения и отсутствия blockers; signed acts и manual attachments неизменяемы.
+- Миграция `0036_act_workflow_artifacts.sql`: workflow scope актов и durable metadata PDF artifacts.
+- Authenticated artifact storage с opaque keys, SHA-256 и owner-scoped URL.
+
+### Контракты и совместимость
+- Existing REST generation использует общий service; workflow PDF export сохраняет artifact.
+- Явный документ качества проверяется по объекту, сроку и привязке к тому же материалу/партии.
+- Новые ошибки: `ACTS_NOT_READY`, `ACT_GENERATION_REQUIRES_CONFIRMATION`, `ARTIFACT_NOT_OWNED`.
+- DB integration test выполняется при `DATABASE_URL`; filesystem/DB crash может оставить orphan artifact до будущей уборки.
+
+---
+
 ## [2026-08-02] - Загрузка документов качества через MCP (TASK-008)
 
 ### Добавлено
