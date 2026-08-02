@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-08-02] - Черновик журнала и execution package (TASK-010)
+
+### Добавлено
+- Детерминированный worklog draft из schedule tasks, object-scoped normalized messages и workflow acts с явными `planned`/`reported`/`act_confirmed`.
+- MCP `get_worklog_draft`, `generate_worklog_draft`, `check_handover_readiness`, `build_execution_package`.
+- Миграция `0037_worklog_execution_packages.sql` для immutable worklog snapshots и owner-scoped package metadata.
+- Manifest с expected/available/missing artifacts, blockers, warnings, assumptions, SHA-256 и semantic input hash.
+- Deterministic store-only ZIP с безопасными server-generated paths, file/count/100 MB limits, integrity recheck и authenticated download.
+
+### Контракты и совместимость
+- Plan rows не становятся фактом; raw/unprocessed messages и draft acts дают warning и не создают factual evidence.
+- Final package требует explicit confirmation, свежий worklog, готовые акты и final PDF artifacts; draft package сохраняет blockers и маркировку draft.
+- Повтор одного input hash возвращает существующий package; artifacts другого object/workflow исключены server-side.
+- Legacy section 3 теперь фильтрует сообщения по текущему объекту.
+
+---
+
 ## [2026-08-02] - Readiness и выпуск актов через MCP (TASK-009)
 
 ### Добавлено

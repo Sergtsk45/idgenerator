@@ -1,7 +1,7 @@
 # MCP endpoint — локальное подключение
 
 `POST/GET/DELETE /mcp` — Streamable HTTP, **stateless** (каждый HTTP-запрос обслуживается
-новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-009 из
+новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-010 из
 [`mcp-mvp-plan`](../../mcp-mvp-plan/).
 
 ## Требования
@@ -110,6 +110,19 @@ idempotency key не создаёт повторный document/binding.
 Draft не переводит workflow в generated state. Повторная генерация сохраняет manual
 attachments и не изменяет signed acts. Artifact URL требует authenticated REST request.
 
+### Worklog draft и execution package (TASK-010)
+
+| Tool | Описание |
+|---|---|
+| `get_worklog_draft` | Возвращает последний draft и признак freshness |
+| `generate_worklog_draft` | Идемпотентно сохраняет traceable journal draft |
+| `check_handover_readiness` | Возвращает expected/missing artifacts, blockers, warnings и assumptions |
+| `build_execution_package` | Собирает size-limited draft/final ZIP; final требует `confirmFinal: true` |
+
+Worklog различает `planned`, `reported`, `act_confirmed`; название и payload явно не
+заявляют полную нормативную форму ОЖР. Package download требует auth. ZIP хранится в
+`EXECUTION_PACKAGES_DIR` (по умолчанию `generated_pdfs/packages`), лимит unpacked input 100 MB.
+
 Все tools ownership-scoped по `userId` из проверенного JWT — не из аргументов вызова.
 
 ## Быстрая проверка через curl
@@ -175,6 +188,10 @@ TASK-008 добавляет `DOCUMENT_UPLOAD_INVALID`, `MATERIAL_NOT_OWNED`,
 
 TASK-009 добавляет `ACTS_NOT_READY`, `ACT_GENERATION_REQUIRES_CONFIRMATION`,
 `ARTIFACT_NOT_OWNED`.
+
+TASK-010 добавляет `WORKLOG_NOT_READY`, `WORKLOG_DRAFT_NOT_FOUND`,
+`WORKLOG_DRAFT_STALE`, `HANDOVER_NOT_READY`, `PACKAGE_REQUIRES_CONFIRMATION`,
+`PACKAGE_TOO_LARGE`, `PACKAGE_NOT_OWNED`, `PACKAGE_FILE_UNAVAILABLE`.
 
 Для конфликтов версий может присутствовать `recoverable: true`.
 

@@ -129,7 +129,7 @@ export function registerMessageRoutes(app: Express): void {
       const section3Obj = await storage.getCurrentObject(req.user!.id);
 
       const [allMessages, allActs] = await Promise.all([
-        storage.getMessages(req.user!.id),
+        storage.getMessages(req.user!.id).then((messages) => messages.filter((message) => message.objectId === section3Obj.id)),
         storage.getActs(section3Obj.id),
       ]);
 

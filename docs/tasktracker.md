@@ -177,6 +177,24 @@
 - **Следующая задача**: TASK-010 (worklog + execution package)
 - **Известные ограничения**: DB integration body требует `DATABASE_URL`; filesystem/DB crash-orphan требует будущей bounded cleanup job.
 
+## Задача: MCP worklog draft и execution package — TASK-010 (mcp-mvp-plan)
+- **Статус**: Завершена локально
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Трассируемый черновик журнала и owner-scoped manifest/ZIP для проверки комплектности передачи.
+- **Шаги выполнения**:
+  - [x] Worklog sources: schedule tasks, normalized object messages, workflow acts
+  - [x] Явные `planned`, `reported`, `act_confirmed` без подмены плана фактом
+  - [x] MCP `get_worklog_draft`, `generate_worklog_draft`, `check_handover_readiness`, `build_execution_package`
+  - [x] Freshness и semantic input hashes для worklog/package
+  - [x] Manifest expected/available/missing, blockers/warnings/assumptions/checksums
+  - [x] Final confirmation/readiness gates и явно маркированный draft package
+  - [x] Safe deterministic ZIP, size/count limits, owner-scoped authenticated download
+  - [x] Миграция `0037_worklog_execution_packages.sql`, pure/contract/DB-gated tests
+  - [x] `npm run check`, `npm test`, `npm run build`
+- **Зависимости**: TASK-009
+- **Следующая задача**: TASK-011 (agent-contract E2E)
+- **Известные ограничения**: worklog является черновиком, а не заявлением полной нормативной формы ОЖР; ZIP использует store-only без compression; DB integration body требует `DATABASE_URL`; crash-orphan package требует будущей cleanup job.
+
 ---
 
 ## Задача: Создание материала из задачи графика с автопривязкой

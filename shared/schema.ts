@@ -1206,6 +1206,66 @@ export const actArtifacts = pgTable(
   }),
 );
 
+export const WORKLOG_SOURCE_TYPES = ["schedule_task", "message", "act"] as const;
+export type WorklogSourceType = (typeof WORKLOG_SOURCE_TYPES)[number];
+export const WORKLOG_EVIDENCE_STATUSES = ["planned", "reported", "act_confirmed"] as const;
+export type WorklogEvidenceStatus = (typeof WORKLOG_EVIDENCE_STATUSES)[number];
+
+export type WorklogDraftEntry = {
+  date: string;
+  description: string;
+  quantity: number | null;
+  unit: string | null;
+  sourceType: WorklogSourceType;
+  sourceId: number;
+  sourceItemIndex: number;
+  evidenceStatus: WorklogEvidenceStatus;
+};
+
+export const worklogDrafts = pgTable(
+  "worklog_drafts",
+  {
+    id: serial("id").primaryKey(),
+    workflowId: integer("workflow_id").notNull().references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    objectId: integer("object_id").notNull().references(() => objects.id, { onDelete: "cascade" }),
+    inputHash: text("input_hash").notNull(),
+    schemaVersion: integer("schema_version").notNull().default(1),
+    entriesJson: jsonb("entries_json").$type<WorklogDraftEntry[]>().notNull(),
+    warningsJson: jsonb("warnings_json").$type<string[]>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    workflowInputUq: uniqueIndex("worklog_drafts_workflow_input_uq").on(t.workflowId, t.inputHash, t.schemaVersion),
+    workflowIdIdx: index("worklog_drafts_workflow_id_idx").on(t.workflowId),
+  }),
+);
+
+export const EXECUTION_PACKAGE_MODES = ["draft", "final"] as const;
+export type ExecutionPackageMode = (typeof EXECUTION_PACKAGE_MODES)[number];
+
+export const executionPackages = pgTable(
+  "execution_packages",
+  {
+    id: text("id").primaryKey(),
+    workflowId: integer("workflow_id").notNull().references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    objectId: integer("object_id").notNull().references(() => objects.id, { onDelete: "cascade" }),
+    mode: text("mode").$type<ExecutionPackageMode>().notNull(),
+    inputHash: text("input_hash").notNull(),
+    manifestJson: jsonb("manifest_json").$type<Record<string, unknown>>().notNull(),
+    storageKey: text("storage_key").notNull().unique(),
+    filename: text("filename").notNull(),
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    sha256: text("sha256").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    workflowInputUq: uniqueIndex("execution_packages_workflow_mode_input_uq").on(t.workflowId, t.mode, t.inputHash),
+    ownerIdx: index("execution_packages_user_object_idx").on(t.userId, t.objectId),
+    modeCheck: check("execution_packages_mode_check", sql`mode IN ('draft', 'final')`),
+  }),
+);
+
 // Idempotency records for write MCP tools. A repeated call with the same
 // (userId, toolName, idempotencyKey) short-circuits and returns the stored result
 // instead of re-executing the mutation.

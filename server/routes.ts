@@ -11,6 +11,7 @@ import { registerScheduleRoutes } from "./routes/schedule";
 import { registerObjectRoutes } from "./routes/objects";
 import { registerVoiceRoutes } from "./routes/voice";
 import { registerTariffRoutes } from "./routes/tariff";
+import { registerPackageRoutes } from "./routes/packages";
 
 
 export async function registerRoutes(
@@ -47,6 +48,7 @@ export async function registerRoutes(
 
   // Acts routes — extracted to server/routes/acts.ts
   registerActsRoutes(app);
+  registerPackageRoutes(app);
 
   // Admin routes — extracted to server/routes/admin.ts
   registerAdminRoutes(app);
