@@ -129,6 +129,7 @@ test("TASK-011 MCP discovery exposes prompts and workflow resources end to end",
   assert.equal(statusPayload.kind, "status");
   assert.equal(statusPayload.workflowId, workflow.id);
   assert.equal(statusPayload.content.stage, "created");
+  assert.equal(statusPayload.content.ready, false);
 
   const scheduleDraft = parseJsonRpcPayload(
     (await callMcp(
@@ -144,6 +145,6 @@ test("TASK-011 MCP discovery exposes prompts and workflow resources end to end",
   );
   const schedulePayload = JSON.parse(scheduleDraft.result.contents[0].text);
   assert.equal(schedulePayload.kind, "schedule-draft");
-  assert.equal(schedulePayload.workflow.workflowId, workflow.id);
-  assert.equal(schedulePayload.draft, null);
+  assert.equal(schedulePayload.content.workflow.workflowId, workflow.id);
+  assert.equal(schedulePayload.content.draft, null);
 });
