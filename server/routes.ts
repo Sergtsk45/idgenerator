@@ -11,6 +11,7 @@ import { registerScheduleRoutes } from "./routes/schedule";
 import { registerObjectRoutes } from "./routes/objects";
 import { registerVoiceRoutes } from "./routes/voice";
 import { registerTariffRoutes } from "./routes/tariff";
+import { mountMcpHttpTransport } from "./mcp/httpTransport";
 
 
 export async function registerRoutes(
@@ -50,6 +51,9 @@ export async function registerRoutes(
 
   // Admin routes — extracted to server/routes/admin.ts
   registerAdminRoutes(app);
+
+  // MCP endpoint (Streamable HTTP) — adapter over existing auth/storage, not a business logic layer
+  mountMcpHttpTransport(app);
 
   return httpServer;
 }
