@@ -21,7 +21,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, Loader2, Plus, Trash2, ChevronUp, ChevronDown, Check } from "lucide-react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import { isQualityBindingRole, resolveQualityDocumentId } from "@shared/documentBinding";
+import { isQualityBindingRole } from "@shared/documentBinding";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type MaterialItem = {
   projectMaterialId: number;
@@ -59,10 +60,13 @@ function getQualityDocumentOptions(details: any) {
       const document = documents.get(documentId);
       return [{
         id: documentId,
+        isPrimary: Boolean(binding.isPrimary),
+        hasFile: Boolean(document.fileUrl),
         label: [
           String(document.docType ?? "document"),
           document.docNumber ? `№${String(document.docNumber)}` : "",
           String(document.title ?? "").trim(),
+          binding.isPrimary ? "основной" : "",
         ].filter(Boolean).join(" · "),
       }];
     });
@@ -86,6 +90,12 @@ export default function SelectTaskMaterials() {
 
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [docPickOpen, setDocPickOpen] = useState(false);
+  const [pendingMaterialId, setPendingMaterialId] = useState<number | null>(null);
+  const [pendingDocIds, setPendingDocIds] = useState<number[]>([]);
+  const [pendingDocOptions, setPendingDocOptions] = useState<
+    Array<{ id: number; label: string; isPrimary?: boolean; hasFile?: boolean }>
+  >([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -184,15 +194,18 @@ export default function SelectTaskMaterials() {
     );
   }, [projectMaterialsMap]);
 
+  const usedDocIds = useMemo(
+    () => new Set(materials.map((m) => m.qualityDocumentId).filter((id): id is number => id != null)),
+    [materials],
+  );
+
+  // D′: material stays available while it still has unused quality docs (or no docs yet).
   const availableMaterials = useMemo(() => {
-    const selectedIds = new Set(materials.map((m) => m.projectMaterialId));
-    return (projectMaterials as ProjectMaterial[])
-      .filter((m) => !selectedIds.has(Number(m.id)))
-      .map((m) => ({
-        id: Number(m.id),
-        label: getMaterialLabel(Number(m.id)),
-      }));
-  }, [projectMaterials, materials, getMaterialLabel]);
+    return (projectMaterials as ProjectMaterial[]).map((m) => ({
+      id: Number(m.id),
+      label: getMaterialLabel(Number(m.id)),
+    }));
+  }, [projectMaterials, getMaterialLabel]);
 
   const filteredAvailableMaterials = useMemo(() => {
     if (!searchQuery.trim()) return availableMaterials;
@@ -200,28 +213,63 @@ export default function SelectTaskMaterials() {
     return availableMaterials.filter((m) => m.label.toLowerCase().includes(query));
   }, [availableMaterials, searchQuery]);
 
-  const handleAddMaterial = useCallback(async (materialId: number) => {
+  const handlePickMaterial = useCallback(async (materialId: number) => {
     const details = await queryClient.fetchQuery({
       queryKey: [api.projectMaterials.get.path, materialId],
       queryFn: () => loadProjectMaterialDetails(materialId),
     }).catch(() => null);
-    const availableDocumentIds = new Set((details?.documents ?? []).map((document) => Number(document.id)));
-    const qualityDocumentId = resolveQualityDocumentId(
-      (details?.bindings ?? []).filter((binding) => availableDocumentIds.has(Number(binding.documentId))),
-    );
+    const options = getQualityDocumentOptions(details).filter((opt) => !usedDocIds.has(opt.id));
+    if (options.length === 0) {
+      // No quality docs left (or none at all) — add a single row without document.
+      const alreadyBare = materials.some(
+        (m) => m.projectMaterialId === materialId && m.qualityDocumentId == null,
+      );
+      if (alreadyBare) {
+        toast({
+          title: language === "ru" ? "Документы уже добавлены" : "Documents already added",
+          description:
+            language === "ru"
+              ? "Для этого материала не осталось доступных документов качества"
+              : "No remaining quality documents for this material",
+          variant: "destructive",
+        });
+        return;
+      }
+      setMaterials((prev) => [
+        ...prev,
+        { projectMaterialId: materialId, batchId: null, qualityDocumentId: null, note: null },
+      ]);
+      setHasUnsavedChanges(true);
+      setAddDialogOpen(false);
+      setSearchQuery("");
+      return;
+    }
+    setPendingMaterialId(materialId);
+    setPendingDocOptions(options);
+    setPendingDocIds([]);
+    setDocPickOpen(true);
+  }, [queryClient, usedDocIds, materials, toast, language]);
+
+  const handleConfirmDocs = useCallback(() => {
+    if (pendingMaterialId == null || pendingDocIds.length === 0) return;
+    const uniqueIds = Array.from(new Set(pendingDocIds));
     setMaterials((prev) => [
       ...prev,
-      {
-        projectMaterialId: materialId,
-        batchId: null,
+      ...uniqueIds.map((qualityDocumentId) => ({
+        projectMaterialId: pendingMaterialId,
+        batchId: null as number | null,
         qualityDocumentId,
-        note: null,
-      },
+        note: null as string | null,
+      })),
     ]);
     setHasUnsavedChanges(true);
+    setDocPickOpen(false);
     setAddDialogOpen(false);
     setSearchQuery("");
-  }, [queryClient]);
+    setPendingMaterialId(null);
+    setPendingDocIds([]);
+    setPendingDocOptions([]);
+  }, [pendingMaterialId, pendingDocIds]);
 
   const handleRemoveMaterial = useCallback((index: number) => {
     setMaterials((prev) => prev.filter((_, i) => i !== index));
@@ -400,9 +448,19 @@ export default function SelectTaskMaterials() {
                             <SelectItem value="none">
                               {language === "ru" ? "Не указан" : "Not specified"}
                             </SelectItem>
-                            {getQualityDocumentOptions(materialDetailsById.get(item.projectMaterialId)).map((option) => (
+                            {getQualityDocumentOptions(materialDetailsById.get(item.projectMaterialId))
+                              .filter(
+                                (option) =>
+                                  option.id === item.qualityDocumentId || !usedDocIds.has(option.id),
+                              )
+                              .map((option) => (
                               <SelectItem key={option.id} value={String(option.id)}>
                                 {option.label}
+                                {!option.hasFile
+                                  ? language === "ru"
+                                    ? " · нет PDF"
+                                    : " · no PDF"
+                                  : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -466,14 +524,6 @@ export default function SelectTaskMaterials() {
                   {language === "ru" ? "Перейти к материалам" : "Go to materials"}
                 </Button>
               </div>
-            ) : (projectMaterials as ProjectMaterial[]).length > 0 && availableMaterials.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground">
-                  {language === "ru" 
-                    ? "Все материалы уже добавлены в задачу" 
-                    : "All materials already added to task"}
-                </p>
-              </div>
             ) : (
               <>
                 {/* Search input */}
@@ -500,7 +550,7 @@ export default function SelectTaskMaterials() {
                         <button
                           key={m.id}
                           type="button"
-                          onClick={() => handleAddMaterial(m.id)}
+                          onClick={() => handlePickMaterial(m.id)}
                           className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent transition-colors text-left"
                         >
                           <Check className="h-4 w-4 shrink-0 opacity-0" />
@@ -517,6 +567,69 @@ export default function SelectTaskMaterials() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
               {t.cancel}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Multi-select quality documents (Q7) */}
+      <Dialog
+        open={docPickOpen}
+        onOpenChange={(open) => {
+          setDocPickOpen(open);
+          if (!open) {
+            setPendingMaterialId(null);
+            setPendingDocIds([]);
+            setPendingDocOptions([]);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {language === "ru" ? "Документы качества" : "Quality documents"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {pendingMaterialId != null ? getMaterialLabel(pendingMaterialId) : ""}
+          </p>
+          <div className="max-h-[320px] overflow-y-auto border rounded-lg divide-y">
+            {pendingDocOptions.map((opt) => {
+              const checked = pendingDocIds.includes(opt.id);
+              return (
+                <label
+                  key={opt.id}
+                  className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-accent"
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(value) => {
+                      setPendingDocIds((prev) =>
+                        value ? Array.from(new Set([...prev, opt.id])) : prev.filter((id) => id !== opt.id),
+                      );
+                    }}
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm flex-1 min-w-0 break-words">
+                    {opt.label}
+                    {!opt.hasFile && (
+                      <span className="ml-2 text-[11px] text-amber-700">
+                        {language === "ru" ? "нет PDF" : "no PDF"}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDocPickOpen(false)}>
+              {t.cancel}
+            </Button>
+            <Button onClick={handleConfirmDocs} disabled={pendingDocIds.length === 0}>
+              {language === "ru"
+                ? `Добавить (${pendingDocIds.length})`
+                : `Add (${pendingDocIds.length})`}
             </Button>
           </DialogFooter>
         </DialogContent>

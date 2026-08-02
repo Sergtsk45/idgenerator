@@ -4,7 +4,7 @@
  * @dependencies: use-acts, OdooCard, Badge, Accordion, Sheet, ResponsiveShell
  * @created: 2026-03-22
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useAct } from "@/hooks/use-acts";
 import { ResponsiveShell } from "@/components/ResponsiveShell";
@@ -38,6 +38,9 @@ import {
   BookOpen,
   Loader2,
   CheckCircle2,
+  Plus,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ru, enUS } from "date-fns/locale";
@@ -46,8 +49,22 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ApiError, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { openPdfDownload } from "@/lib/pdf-download";
-import { useActDocumentAttachments, useActMaterialUsages } from "@/hooks/use-act-materials";
+import {
+  useActDocumentAttachments,
+  useActMaterialUsages,
+  useReplaceActDocumentAttachments,
+  useResetActDocumentAttachments,
+} from "@/hooks/use-act-materials";
+import { useUploadDocumentFile } from "@/hooks/use-documents";
 import { api, buildUrl } from "@shared/routes";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ActDetailProps {
   params: { id: string };
@@ -81,7 +98,11 @@ export default function ActDetail({ params }: ActDetailProps) {
   const actId = Number(params.id);
   const { data: act, isLoading } = useAct(actId);
   const { data: materialUsages = [], isLoading: materialsLoading } = useActMaterialUsages(actId);
-  const { data: documentAttachments = [], isLoading: documentsLoading } = useActDocumentAttachments(actId);
+  const { data: documentAttachments = [], isLoading: documentsLoading, refetch: refetchAttachments } =
+    useActDocumentAttachments(actId);
+  const replaceAttachments = useReplaceActDocumentAttachments(actId);
+  const resetAttachments = useResetActDocumentAttachments(actId);
+  const uploadDocumentFile = useUploadDocumentFile();
   const { data: templatesData, isLoading: templatesLoading } = useQuery<TemplatesResponse>({
     queryKey: ["/api/act-templates"],
   });
@@ -89,8 +110,120 @@ export default function ActDetail({ params }: ActDetailProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [addDocsOpen, setAddDocsOpen] = useState(false);
+  const [pendingAddDocIds, setPendingAddDocIds] = useState<number[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadTargetDocId, setUploadTargetDocId] = useState<number | null>(null);
 
   const t = (ru: string, en: string) => (language === "ru" ? ru : en);
+
+  const attachedDocIds = useMemo(
+    () => new Set(documentAttachments.map((a: any) => Number(a.documentId))),
+    [documentAttachments],
+  );
+
+  const candidateDocsFromUsages = useMemo(() => {
+    const map = new Map<number, { id: number; title: string; docType?: string; docNumber?: string; fileUrl?: string | null }>();
+    for (const usage of materialUsages as any[]) {
+      const doc = usage.qualityDocument;
+      if (!doc?.id) continue;
+      const id = Number(doc.id);
+      if (!Number.isFinite(id) || attachedDocIds.has(id) || map.has(id)) continue;
+      map.set(id, {
+        id,
+        title: String(doc.title ?? "").trim() || `Документ #${id}`,
+        docType: doc.docType,
+        docNumber: doc.docNumber,
+        fileUrl: doc.fileUrl,
+      });
+    }
+    return Array.from(map.values());
+  }, [materialUsages, attachedDocIds]);
+
+  const missingPdfCount = useMemo(
+    () => documentAttachments.filter((a: any) => !a.document?.fileUrl).length,
+    [documentAttachments],
+  );
+
+  const persistAttachmentIds = async (documentIds: number[]) => {
+    await replaceAttachments.mutateAsync({
+      items: documentIds.map((documentId, orderIndex) => ({ documentId, orderIndex })),
+      markManual: true,
+    });
+  };
+
+  const handleRemoveAttachment = async (documentId: number) => {
+    try {
+      const next = documentAttachments
+        .map((a: any) => Number(a.documentId))
+        .filter((id: number) => id !== documentId);
+      await persistAttachmentIds(next);
+      toast({ title: t("Документ убран из приложений", "Document removed from attachments") });
+    } catch (err: any) {
+      toast({
+        title: t("Не удалось обновить приложения", "Failed to update attachments"),
+        description: err?.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfirmAddDocs = async () => {
+    if (pendingAddDocIds.length === 0) return;
+    try {
+      const next = [
+        ...documentAttachments.map((a: any) => Number(a.documentId)),
+        ...pendingAddDocIds,
+      ];
+      await persistAttachmentIds(Array.from(new Set(next)));
+      setAddDocsOpen(false);
+      setPendingAddDocIds([]);
+      toast({ title: t("Приложения обновлены", "Attachments updated") });
+    } catch (err: any) {
+      toast({
+        title: t("Не удалось добавить документы", "Failed to add documents"),
+        description: err?.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleResetAttachments = async () => {
+    try {
+      await resetAttachments.mutateAsync();
+      toast({ title: t("Приложения сброшены к материалам", "Attachments reset from materials") });
+    } catch (err: any) {
+      toast({
+        title: t("Не удалось сбросить приложения", "Failed to reset attachments"),
+        description: err?.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAttachmentRowClick = (documentId: number, hasFile: boolean) => {
+    if (hasFile) return;
+    setUploadTargetDocId(documentId);
+    fileInputRef.current?.click();
+  };
+
+  const handleUploadSelectedFile = async (file: File | null) => {
+    if (!file || uploadTargetDocId == null) return;
+    try {
+      await uploadDocumentFile.mutateAsync({ id: uploadTargetDocId, file });
+      await refetchAttachments();
+      toast({ title: t("PDF загружен", "PDF uploaded") });
+    } catch (err: any) {
+      toast({
+        title: t("Не удалось загрузить PDF", "Failed to upload PDF"),
+        description: err?.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadTargetDocId(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const statusLabel = (status: string | null | undefined) => {
     if (status === "signed") return t("принято", "accepted");
@@ -475,7 +608,7 @@ export default function ActDetail({ params }: ActDetailProps) {
             </AccordionContent>
           </AccordionItem>
 
-          {/* Документы */}
+          {/* Документы / приложения */}
           <AccordionItem value="docs" className="bg-white border border-[--g200] rounded-[--o-radius-md] overflow-hidden">
             <AccordionTrigger className="px-4 py-3 text-[13px] font-semibold text-[--g900] hover:no-underline [&>svg]:text-[--g400]">
               <div className="flex items-center gap-2">
@@ -484,45 +617,132 @@ export default function ActDetail({ params }: ActDetailProps) {
                 {documentAttachments.length > 0 && (
                   <span className="ml-1 text-[11px] bg-[--g200] text-[--g700] rounded-full px-1.5 py-0">{documentAttachments.length}</span>
                 )}
+                {(act as any)?.attachmentsManual && (
+                  <span className="ml-1 text-[10px] bg-amber-100 text-amber-800 rounded px-1.5 py-0">
+                    {t("вручную", "manual")}
+                  </span>
+                )}
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4 pt-1">
+            <AccordionContent className="px-4 pb-4 pt-1 space-y-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                onChange={(e) => handleUploadSelectedFile(e.target.files?.[0] ?? null)}
+              />
               {documentsLoading ? (
                 <div className="flex items-center justify-center py-4 text-[--g500]">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   {t("Загрузка...", "Loading...")}
                 </div>
               ) : documentAttachments.length === 0 ? (
-                <p className="text-[13px] text-[--g400] text-center py-4">
+                <p className="text-[13px] text-[--g400] text-center py-2">
                   {t("Нет прикреплённых документов", "No attached documents")}
                 </p>
               ) : (
                 <div className="space-y-2">
                   {documentAttachments.map((a: any) => {
                     const document = a.document;
+                    const documentId = Number(a.documentId);
+                    const hasFile = Boolean(document?.fileUrl);
                     return (
-                    <div key={a.id} className="flex items-center gap-2 py-1.5 border-b border-[--g100] last:border-0">
-                      <FileText className="h-4 w-4 text-[--g400] shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] text-[--g900] truncate">
-                          {document?.title || document?.docNumber || t("Документ качества", "Quality document")}
-                        </p>
-                        <p className="text-[11px] text-[--g500]">
-                          {[document?.docType, document?.docNumber ? `№${document.docNumber}` : ""].filter(Boolean).join(" · ")}
-                        </p>
+                      <div
+                        key={a.id}
+                        className={`flex items-center gap-2 py-1.5 border-b border-[--g100] last:border-0 ${
+                          !hasFile ? "cursor-pointer hover:bg-[--g50] rounded px-1 -mx-1" : ""
+                        }`}
+                        onClick={() => handleAttachmentRowClick(documentId, hasFile)}
+                        title={
+                          !hasFile
+                            ? t("Нажмите, чтобы загрузить PDF", "Click to upload PDF")
+                            : undefined
+                        }
+                      >
+                        <FileText className="h-4 w-4 text-[--g400] shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] text-[--g900] truncate">
+                            {document?.title || document?.docNumber || t("Документ качества", "Quality document")}
+                          </p>
+                          <p className="text-[11px] text-[--g500]">
+                            {[document?.docType, document?.docNumber ? `№${document.docNumber}` : ""]
+                              .filter(Boolean)
+                              .join(" · ")}
+                            {!hasFile && (
+                              <span className="ml-2 text-amber-700">
+                                {t("нет PDF — нажмите, чтобы загрузить", "no PDF — click to upload")}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        {hasFile && (
+                          <a
+                            href={document.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Button variant="odoo-icon" size="odoo-icon-sm">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </a>
+                        )}
+                        <Button
+                          variant="odoo-icon"
+                          size="odoo-icon-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleRemoveAttachment(documentId);
+                          }}
+                          aria-label={t("Убрать", "Remove")}
+                        >
+                          <Trash2 className="h-4 w-4 text-[--g500]" />
+                        </Button>
                       </div>
-                      {document?.fileUrl && (
-                        <a href={document.fileUrl} target="_blank" rel="noreferrer">
-                          <Button variant="odoo-icon" size="odoo-icon-sm">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </a>
-                      )}
-                    </div>
                     );
                   })}
                 </div>
               )}
+
+              {missingPdfCount > 0 && (
+                <p className="text-[11px] text-amber-700">
+                  {t(
+                    `Без PDF: ${missingPdfCount}. Экспорт приложений потребует файлы.`,
+                    `Missing PDF: ${missingPdfCount}. Attachments export needs files.`,
+                  )}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  disabled={candidateDocsFromUsages.length === 0 || replaceAttachments.isPending}
+                  onClick={() => {
+                    setPendingAddDocIds([]);
+                    setAddDocsOpen(true);
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("Добавить", "Add")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  disabled={resetAttachments.isPending}
+                  onClick={() => void handleResetAttachments()}
+                >
+                  {resetAttachments.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  )}
+                  {t("Сбросить к материалам", "Reset from materials")}
+                </Button>
+              </div>
             </AccordionContent>
           </AccordionItem>
 
@@ -541,6 +761,69 @@ export default function ActDetail({ params }: ActDetailProps) {
             </AccordionItem>
           )}
         </Accordion>
+
+        <Dialog open={addDocsOpen} onOpenChange={setAddDocsOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t("Добавить в приложения", "Add to attachments")}</DialogTitle>
+            </DialogHeader>
+            {candidateDocsFromUsages.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  "Нет документов из материалов акта, которых ещё нет в приложениях",
+                  "No material quality docs left to add",
+                )}
+              </p>
+            ) : (
+              <div className="max-h-[320px] overflow-y-auto border rounded-lg divide-y">
+                {candidateDocsFromUsages.map((doc) => {
+                  const checked = pendingAddDocIds.includes(doc.id);
+                  return (
+                    <label
+                      key={doc.id}
+                      className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-accent"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(value) => {
+                          setPendingAddDocIds((prev) =>
+                            value ? Array.from(new Set([...prev, doc.id])) : prev.filter((id) => id !== doc.id),
+                          );
+                        }}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm flex-1 min-w-0 break-words">
+                        {[doc.docType, doc.docNumber ? `№${doc.docNumber}` : "", doc.title]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        {!doc.fileUrl && (
+                          <span className="ml-2 text-[11px] text-amber-700">
+                            {t("нет PDF", "no PDF")}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setAddDocsOpen(false)}>
+                {t("Отмена", "Cancel")}
+              </Button>
+              <Button
+                onClick={() => void handleConfirmAddDocs()}
+                disabled={pendingAddDocIds.length === 0 || replaceAttachments.isPending}
+              >
+                {replaceAttachments.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  t(`Добавить (${pendingAddDocIds.length})`, `Add (${pendingAddDocIds.length})`)
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* 18.4+18.5 — Separate act and attachments exports */}
         <div className="space-y-3">

@@ -827,10 +827,20 @@ export const api = {
             orderIndex: z.number().int().min(0).optional(),
           })
         ),
+        /** When true (default), mark act.attachmentsManual so generate-acts won't overwrite. */
+        markManual: z.boolean().optional(),
       }),
       responses: {
         200: z.array(z.any()),
         400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
+    resetFromUsages: {
+      method: "POST" as const,
+      path: "/api/acts/:id/document-attachments/reset-from-usages",
+      responses: {
+        200: z.array(z.any()),
         404: z.object({ message: z.string() }),
       },
     },

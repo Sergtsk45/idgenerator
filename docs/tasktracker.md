@@ -3,22 +3,20 @@
 ---
 
 ## Задача: Выбор нескольких документов качества в акте (партия ⟂ docs)
-- **Статус**: В процессе (решения Q1–Q7 согласованы → ADR/код)
+- **Статус**: Завершена (код; smoke на проде после деплоя миграции 0028)
 - **Дата фиксации**: 2026-08-01
 - **Описание**: D′ multi-row; unique `(task, material, document)`; дубль паспорта запрещён; п.3 — перечень в одной ячейке; выбор в графике и карточке акта; клик по строке без PDF → upload; при добавлении материала — сразу multi-select docs.
 - **Шаги выполнения**:
-  - [x] Диагностика прода: акт №2, термометр/манометр, один primary, `fileUrl=null` → 422
-  - [x] Уточнение: партия ⟂ документы качества
-  - [x] D′ + п.3 перечень в одной ячейке (Q4)
-  - [x] Unique `(task, material, document)`, batch вне unique (Q2)
-  - [x] Дубль паспорта запрещён (Q3)
-  - [x] Выбор docs: график и карточка акта (Q5)
-  - [x] Doc без PDF: клик по строке в карточке акта → загрузка PDF (Q6)
-  - [x] При добавлении материала — сразу multi-select (Q7)
-  - [x] План: `ai_docs/develop/plans/2026-08-01-act-quality-doc-instances.md`
-  - [ ] ADR + реализация INST-001…009
+  - [x] Диагностика прода и продуктовые решения Q1–Q7
+  - [x] ADR + план
+  - [x] Миграция `0028_act_quality_docs_multirow.sql`
+  - [x] `buildP3MaterialsText` groupBy + тесты
+  - [x] generate-acts уважает `attachments_manual`
+  - [x] SelectTaskMaterials multi-select
+  - [x] ActDetail редактор приложений + upload по клику
+  - [ ] Smoke на проде: акт №2, два паспорта термометра, export-attachments
 - **Зависимости**: `task_materials`, `document_bindings`, `generate-acts`, `buildP3MaterialsText`, `export-attachments`
-- **Детали**: `ai_docs/develop/plans/2026-08-01-act-quality-doc-instances.md`
+- **Детали**: `ai_docs/develop/plans/2026-08-01-act-quality-doc-instances.md`, `ai_docs/develop/architecture/ADR-2026-08-01-act-quality-docs-multirow.md`
 
 ---
 

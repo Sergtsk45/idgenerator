@@ -375,6 +375,8 @@ export const acts = pgTable("acts", {
   projectDrawingsAgg: text("project_drawings_agg"),
   normativeRefsAgg: text("normative_refs_agg"),
   executiveSchemesAgg: jsonb("executive_schemes_agg").$type<ExecutiveSchemeLink[]>(),
+  /** When true, generate-acts must not overwrite act_document_attachments. */
+  attachmentsManual: boolean("attachments_manual").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -686,10 +688,11 @@ export const taskMaterials = pgTable(
   (t) => ({
     taskIdIdx: index("task_materials_task_id_idx").on(t.taskId),
     orderIdx: index("task_materials_order_idx").on(t.taskId, t.orderIndex),
-    taskMaterialBatchUq: uniqueIndex("task_materials_task_material_batch_uq").on(
+    // D′: batch is orthogonal; uniqueness is per quality document on the task material.
+    taskMaterialDocUq: uniqueIndex("task_materials_task_material_doc_uq").on(
       t.taskId,
       t.projectMaterialId,
-      t.batchId,
+      t.qualityDocumentId,
     ),
   }),
 );

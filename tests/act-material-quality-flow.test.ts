@@ -15,15 +15,20 @@ test("act detail renders material usages and formal document attachments", async
   assert.match(source, /api\.acts\.exportAttachments/);
   assert.match(source, /openPdfDownload\(result\.url, result\.filename\)/);
   assert.match(source, /error\.status === 422/);
+  assert.match(source, /handleAttachmentRowClick/);
+  assert.match(source, /useResetActDocumentAttachments/);
   assert.doesNotMatch(source, /Привязка материалов — в разделе/);
 });
 
-test("task material picker saves a selected quality document instead of a manual id", async () => {
+test("task material picker multi-selects quality documents into D′ rows", async () => {
   const source = await readFile("client/src/pages/SelectTaskMaterials.tsx", "utf8");
 
-  assert.match(source, /resolveQualityDocumentId/);
+  assert.match(source, /handlePickMaterial/);
+  assert.match(source, /handleConfirmDocs/);
+  assert.match(source, /pendingDocIds/);
   assert.match(source, /qualityDocumentId,/);
   assert.match(source, /<Select[\s\S]*qualityDocumentId/);
+  assert.doesNotMatch(source, /resolveQualityDocumentId/);
   assert.doesNotMatch(source, /placeholder=\{language === "ru" \? "ID документа"/);
 });
 
@@ -36,5 +41,7 @@ test("generate-acts persists fallback quality documents for both source branches
   assert.match(schedule, /resolveQualityDocumentForMaterial/);
   assert.match(schedule, /qualityDocumentId: qdId/);
   assert.match(schedule, /attachmentDocIds\.map/);
+  assert.match(schedule, /attachmentsManual/);
   assert.match(pdf, /u\.qualityDocument \?\? fallbackQualityDocuments/);
+  assert.match(pdf, /formatP3MaterialsGrouped/);
 });
