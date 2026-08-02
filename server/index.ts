@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { telegramAuthMiddleware } from "./middleware/telegramAuth";
+import { handleMcpRequest, mcpBodyErrorHandler, mcpBodyParser, mcpRateLimiter } from "./mcp/httpTransport";
 
 const app = express();
 const httpServer = createServer(app);
@@ -14,18 +15,7 @@ declare module "http" {
   }
 }
 
-app.use(
-  express.json({
-    limit: '10mb', // Увеличен лимит для импорта смет с большим количеством ресурсов
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
-
-app.use(express.urlencoded({ limit: '10mb', extended: false }));
-
-// CORS configuration
+// CORS configuration — must run before every route, including /mcp.
 app.use((req, res, next) => {
   const origin = req.get('origin') || req.get('referer')?.split('/').slice(0, 3).join('/');
   res.header('Access-Control-Allow-Origin', origin || '*');
@@ -39,6 +29,31 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// MCP endpoint (Streamable HTTP, stateless). Mounted BEFORE the app-wide body parser
+// and Telegram auth middleware below, on purpose:
+//   - its own body parser enforces a real 256kb limit instead of inheriting the
+//     10mb REST limit (which would already have consumed/allowed the body by the
+//     time a route-only check ran);
+//   - it must not depend on Telegram init-data resolution, which is REST/MiniApp
+//     specific and irrelevant to MCP's Bearer-JWT-only auth contract.
+// Disabled by default; requires an explicit opt-in (MCP_ENABLED=true), especially
+// in production, since it never touches REST behavior when off.
+const mcpEnabled = process.env.MCP_ENABLED === "true";
+if (mcpEnabled) {
+  app.all("/mcp", mcpRateLimiter, mcpBodyParser, mcpBodyErrorHandler, handleMcpRequest);
+}
+
+app.use(
+  express.json({
+    limit: '10mb', // Увеличен лимит для импорта смет с большим количеством ресурсов
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
+
+app.use(express.urlencoded({ limit: '10mb', extended: false }));
 
 // Telegram authentication middleware (устанавливает req.telegramUser если есть X-Telegram-Init-Data)
 app.use(telegramAuthMiddleware({ required: false }));

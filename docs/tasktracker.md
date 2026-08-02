@@ -2,6 +2,52 @@
 
 ---
 
+## Задача: MCP foundation — TASK-001 (mcp-mvp-plan)
+- **Статус**: Завершена (влита в единый deploy-вариант `chore/mcp-mvp-unified`)
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Добавлен защищённый MCP endpoint `/mcp` (Streamable HTTP) как отдельный transport layer поверх существующего Express/REST-приложения, без переноса бизнес-логики и без изменения UI. Первый шаг дорожной карты `mcp-mvp-plan/02-implementation-roadmap.md` (Фаза 1).
+- **Шаги выполнения**:
+  - [x] Добавлена зависимость `@modelcontextprotocol/sdk`
+  - [x] `server/mcp/authContext.ts` — auth строго из `Authorization: Bearer <jwt>`, различие `missing`/`invalid`/`ok`
+  - [x] `server/mcp/errors.ts`, `toolResult.ts` — стабильные error codes и builder результата
+  - [x] `server/mcp/createMcpServer.ts` — фабрика per-request `McpServer` (stateless)
+  - [x] `server/mcp/tools/diagnostics.ts` — `ping`, `get_current_user`, `list_objects` (read-only, ownership по auth context)
+  - [x] `server/mcp/httpTransport.ts` — роут `/mcp`, rate limit, лимит тела запроса, логирование без секретов
+  - [x] Feature flag `MCP_ENABLED` в `server/index.ts`
+  - [x] Unit-тесты helper'ов (`mcp-tool-result.test.ts`)
+  - [x] Контрактные тесты по исходникам (`mcp-foundation-contract.test.ts`)
+  - [x] Интеграционные тесты handshake/auth/ownership поверх Postgres (`mcp-foundation-integration.test.ts`, skip без `DATABASE_URL`)
+  - [x] `npm run check`, `npm test`, `npm run build` — зелёные
+  - [x] Ручной smoke: initialize без auth, ping/get_current_user/list_objects с валидным JWT, `AUTH_REQUIRED`/`AUTH_INVALID`, изоляция объектов между двумя пользователями, блокированный пользователь отклонён, REST не затронут, лимит тела запроса (413)
+- **Пост-ревью фиксы (перед merge)**:
+  - [x] Настоящий лимит тела: собственный `express.json({limit:256kb})` (`mcpBodyParser`/`mcpBodyErrorHandler`) вместо мёртвой проверки после глобального парсера 10 MB
+  - [x] `/mcp` смонтирован до `express.json({limit:'10mb'})` и `telegramAuthMiddleware` — изолирован от REST-специфичных сайд-эффектов
+  - [x] `MCP_ENABLED` — opt-in (`=== "true"`), выключен по умолчанию (было opt-out `!== "false"`)
+  - [x] Контрактный тест на порядок монтирования `/mcp` относительно body-parser/Telegram middleware
+  - [x] Интеграционные тесты: malformed JWT, expired JWT, пустой `Bearer `, `get_current_user`, реальный 413 на >256 KB через продовую цепочку, `MCP_ENABLED=false`, REST рядом с MCP (включая независимость лимитов тела), необработанная DB-ошибка без утечки деталей
+  - [x] `npm run check`, `npm test` (107 passed), `npm run build` — зелёные после фиксов
+  - [x] Повторный ручной smoke: реальный 413, `/mcp` недоступен при выключенном флаге, REST не затронут в обоих состояниях флага
+- **Зависимости**: нет (первая задача дорожной карты `mcp-mvp-plan`)
+- **Следующая задача**: TASK-002 (workflow state) — см. ниже
+- **Известные ограничения**: Host/Origin validation, audit log, per-tool метрики — TASK-012.
+
+## Задача: MCP workflow state — TASK-002 (mcp-mvp-plan)
+- **Статус**: Завершена (влита в единый deploy-вариант поверх foundation PR #3)
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Персистентная state machine для сквозного сценария агента (смета → график → материалы → акты → журнал). Источник истины — PostgreSQL; не зависит от истории чата.
+- **Шаги выполнения**:
+  - [x] Миграции `0029_execution_workflow_state.sql`, `0030_execution_workflow_events_append_only.sql`
+  - [x] `server/services/execution-workflow/*` — state machine, inputs, repository, transactional service + idempotency
+  - [x] MCP tools: `create_execution_workflow`, `get_execution_workflow`, `set_workflow_input`, `get_missing_workflow_inputs`
+  - [x] Адаптация к foundation PR #3 (`requireAuth`, opt-in `/mcp`, без `mountMcpHttpTransport` через routes.ts)
+  - [x] Тесты state machine + service (интеграционные скипаются без `DATABASE_URL`)
+  - [x] Документация: `docs/changelog.md`, `server/mcp/README.md`
+- **Зависимости**: TASK-001
+- **Следующая задача**: TASK-003 (upload + estimate import)
+- **Известные ограничения**: `get_missing_workflow_inputs` — временный статичный список (замена в TASK-005); stage transitions — через внутренний `transitionWorkflowStage` для TASK-003+.
+
+---
+
 ## Задача: Создание материала из задачи графика с автопривязкой
 - **Статус**: Завершена
 - **Дата фиксации**: 2026-08-02
