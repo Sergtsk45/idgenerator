@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-08-02] - Unified MCP MVP deploy: TASK-001 foundation + TASK-002 workflow
+
+### Добавлено
+- Единый вариант для деплоя: foundation из PR #3 (opt-in `/mcp`, body limit 256 KB, изоляция от Telegram middleware) + execution workflow из PR #4.
+- `server/mcp/tools/workflow.ts` — MCP tools `create_execution_workflow`, `get_execution_workflow`, `set_workflow_input`, `get_missing_workflow_inputs`.
+- `server/services/execution-workflow/` — state machine, inputs, repository, service с транзакционными write-операциями и idempotency.
+- Миграции `0029_execution_workflow_state.sql`, `0030_execution_workflow_events_append_only.sql`.
+- `shared/schema.ts` — таблицы `execution_workflows`, `execution_workflow_inputs`, `execution_workflow_events`, `tool_idempotency_records`.
+- Тесты: `tests/execution-workflow-state-machine.test.ts`, `tests/execution-workflow-service.test.ts` (интеграционные, skip без `DATABASE_URL`).
+
+### Изменено
+- `server/mcp/errors.ts` — расширены коды `NOT_FOUND`, `WORKFLOW_*`; опциональный `recoverable`.
+- `server/mcp/authContext.ts` — общий `requireAuth` для diagnostic и workflow tools.
+- `server/mcp/createMcpServer.ts` — регистрирует diagnostic + workflow tools.
+- `server/mcp/README.md` — документация единого деплой-варианта.
+
+### Известные ограничения
+- `/mcp` остаётся opt-in (`MCP_ENABLED=true`); на проде можно держать выключенным до rollout.
+- `get_missing_workflow_inputs` — временный базовый контракт (замена в TASK-005).
+
+---
+
 ## [2026-08-02] - MCP foundation: защищённый /mcp endpoint (TASK-001)
 
 ### Добавлено

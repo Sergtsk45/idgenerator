@@ -38,9 +38,12 @@ test("MCP diagnostic tools require auth and scope list_objects to the caller", a
   // list_objects must be scoped by the resolved caller identity, not by client-supplied input.
   assert.match(source, /storage\.listUserObjects\(authContext\.userId\)/);
 
-  // Missing vs invalid credentials must map to distinct, stable error codes.
-  assert.match(source, /status === "missing"[\s\S]{0,20}throw AUTH_REQUIRED/);
-  assert.match(source, /status === "invalid"[\s\S]{0,20}throw AUTH_INVALID/);
+  // Missing vs invalid credentials must map to distinct, stable error codes
+  // (requireAuth lives in authContext.ts and is shared with workflow tools).
+  const authSource = await readFile("server/mcp/authContext.ts", "utf8");
+  assert.match(authSource, /export function requireAuth/);
+  assert.match(authSource, /status === "missing"[\s\S]{0,40}throw AUTH_REQUIRED/);
+  assert.match(authSource, /status === "invalid"[\s\S]{0,40}throw AUTH_INVALID/);
 });
 
 test("MCP tools never accept a client-supplied userId argument", async () => {

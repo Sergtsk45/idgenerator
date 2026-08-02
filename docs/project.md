@@ -82,7 +82,7 @@
   - **API**: `POST /parse` — загрузка PDF (multipart/form-data), возврат структурированного JSON с таблицами
   - **Интеграция**: backend proxy `POST /api/parse-invoice` с multer, SSRF-защита, rate-limiting
 - **Backend**: Express + TypeScript. REST API с типами/валидацией на базе `shared/routes.ts` (Zod).
-- **MCP endpoint** (`server/mcp/`): отдельный transport layer поверх REST-приложения для AI-агентов (Model Context Protocol, Streamable HTTP). REST и UI остаются основным ядром; MCP не дублирует бизнес-логику, а переиспользует `storage`/domain services. Подробности: `mcp-mvp-plan/01-architecture-and-boundaries.md`, локальное подключение — `server/mcp/README.md`.
+- **MCP endpoint** (`server/mcp/`): отдельный transport layer поверх REST-приложения для AI-агентов (Model Context Protocol, Streamable HTTP). REST и UI остаются основным ядром; MCP не дублирует бизнес-логику, а переиспользует `storage`/domain services. Workflow-состояние агента хранится в PostgreSQL (`execution_workflows*` + `tool_idempotency_records`, `server/services/execution-workflow/`). Подробности: `mcp-mvp-plan/01-architecture-and-boundaries.md`, локальное подключение — `server/mcp/README.md`.
 - **База данных**: PostgreSQL + Drizzle ORM. Схема описана в `shared/schema.ts`.
 - **AI**: OpenAI API (через переменные окружения интеграции), используется для нормализации сообщений.
 - **Навигация UI**: основные разделы в `BottomNav` на mobile, `ResponsiveShell` на tablet/desktop. Доступ к `Settings` через `secondary` на tablet/desktop, hamburger `Header` Sheet на mobile.

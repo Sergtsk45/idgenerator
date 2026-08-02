@@ -7,8 +7,7 @@
  */
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { McpAuthContext, McpAuthResolution } from "../authContext";
-import { AUTH_INVALID, AUTH_REQUIRED } from "../errors";
+import { requireAuth, type McpAuthResolution } from "../authContext";
 import { toolError, toolSuccess } from "../toolResult";
 import { storage } from "../../storage";
 
@@ -74,14 +73,4 @@ export function registerDiagnosticTools(server: McpServer, authResolution: McpAu
       }
     },
   );
-}
-
-function requireAuth(authResolution: McpAuthResolution): McpAuthContext {
-  if (authResolution.status === "missing") {
-    throw AUTH_REQUIRED;
-  }
-  if (authResolution.status === "invalid") {
-    throw AUTH_INVALID;
-  }
-  return authResolution.context;
 }

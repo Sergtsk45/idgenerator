@@ -3,7 +3,7 @@
 ---
 
 ## Задача: MCP foundation — TASK-001 (mcp-mvp-plan)
-- **Статус**: Завершена
+- **Статус**: Завершена (влита в единый deploy-вариант `chore/mcp-mvp-unified`)
 - **Дата фиксации**: 2026-08-02
 - **Описание**: Добавлен защищённый MCP endpoint `/mcp` (Streamable HTTP) как отдельный transport layer поверх существующего Express/REST-приложения, без переноса бизнес-логики и без изменения UI. Первый шаг дорожной карты `mcp-mvp-plan/02-implementation-roadmap.md` (Фаза 1).
 - **Шаги выполнения**:
@@ -28,8 +28,23 @@
   - [x] `npm run check`, `npm test` (107 passed), `npm run build` — зелёные после фиксов
   - [x] Повторный ручной smoke: реальный 413, `/mcp` недоступен при выключенном флаге, REST не затронут в обоих состояниях флага
 - **Зависимости**: нет (первая задача дорожной карты `mcp-mvp-plan`)
-- **Следующая задача**: TASK-002 (workflow state) — см. `mcp-mvp-plan/tasks/TASK-002-workflow-state.md`
-- **Известные ограничения**: только read-only diagnostic tools; Host/Origin validation, audit log, per-tool метрики — TASK-012.
+- **Следующая задача**: TASK-002 (workflow state) — см. ниже
+- **Известные ограничения**: Host/Origin validation, audit log, per-tool метрики — TASK-012.
+
+## Задача: MCP workflow state — TASK-002 (mcp-mvp-plan)
+- **Статус**: Завершена (влита в единый deploy-вариант поверх foundation PR #3)
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Персистентная state machine для сквозного сценария агента (смета → график → материалы → акты → журнал). Источник истины — PostgreSQL; не зависит от истории чата.
+- **Шаги выполнения**:
+  - [x] Миграции `0029_execution_workflow_state.sql`, `0030_execution_workflow_events_append_only.sql`
+  - [x] `server/services/execution-workflow/*` — state machine, inputs, repository, transactional service + idempotency
+  - [x] MCP tools: `create_execution_workflow`, `get_execution_workflow`, `set_workflow_input`, `get_missing_workflow_inputs`
+  - [x] Адаптация к foundation PR #3 (`requireAuth`, opt-in `/mcp`, без `mountMcpHttpTransport` через routes.ts)
+  - [x] Тесты state machine + service (интеграционные скипаются без `DATABASE_URL`)
+  - [x] Документация: `docs/changelog.md`, `server/mcp/README.md`
+- **Зависимости**: TASK-001
+- **Следующая задача**: TASK-003 (upload + estimate import)
+- **Известные ограничения**: `get_missing_workflow_inputs` — временный статичный список (замена в TASK-005); stage transitions — через внутренний `transitionWorkflowStage` для TASK-003+.
 
 ---
 

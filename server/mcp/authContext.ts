@@ -11,6 +11,7 @@ import { authService } from "../auth-service";
 import { db } from "../db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { AUTH_INVALID, AUTH_REQUIRED } from "./errors";
 
 export interface McpAuthContext {
   userId: number;
@@ -62,4 +63,18 @@ export async function resolveMcpAuthContext(
       role: user.role,
     },
   };
+}
+
+/**
+ * Maps a per-request auth resolution to a verified context or a stable auth error.
+ * Shared by diagnostic and workflow tools so missing vs invalid credentials stay distinct.
+ */
+export function requireAuth(authResolution: McpAuthResolution): McpAuthContext {
+  if (authResolution.status === "missing") {
+    throw AUTH_REQUIRED;
+  }
+  if (authResolution.status === "invalid") {
+    throw AUTH_INVALID;
+  }
+  return authResolution.context;
 }
