@@ -4,21 +4,27 @@
 
 ### Добавлено
 - `server/mcp/` — MCP transport layer поверх существующего Express-приложения:
-  - `httpTransport.ts` — Express-роут `/mcp` (Streamable HTTP, stateless, свежий `McpServer` на каждый запрос), rate limit (120 req/min), лимит тела запроса 256 KB, structured logging без токенов/секретов.
+  - `httpTransport.ts` — Express-роут `/mcp` (Streamable HTTP, stateless, свежий `McpServer` на каждый запрос), rate limit (120 req/min), собственный JSON body parser с реальным лимитом 256 KB (`mcpBodyParser`/`mcpBodyErrorHandler`), structured logging без токенов/секретов.
   - `authContext.ts` — резолвинг identity строго из `Authorization: Bearer <jwt>` (без Telegram init-data и dev browser-token fallback), различает `missing`/`invalid`/`ok`.
   - `createMcpServer.ts` — фабрика `McpServer` с зарегистрированными diagnostic tools.
   - `errors.ts`, `toolResult.ts` — единые machine-readable коды ошибок (`AUTH_REQUIRED`, `AUTH_INVALID`, `FORBIDDEN`, `VALIDATION_ERROR`, `INTERNAL_ERROR`) и builder успешного/ошибочного `CallToolResult`.
   - `tools/diagnostics.ts` — read-only tools `ping`, `get_current_user`, `list_objects` (переиспользуют `storage.listUserObjects`, ownership по `userId` из проверенного auth context, не из аргументов tool).
-- Feature flag `MCP_ENABLED` (env, default `true`) — позволяет отключить `/mcp` без влияния на REST.
+- Feature flag `MCP_ENABLED` (env, default выключен) — endpoint включается только явным opt-in (`MCP_ENABLED=true`), особенно важно для production.
+- `/mcp` смонтирован **до** app-wide `express.json({limit:'10mb'})` и `telegramAuthMiddleware` в `server/index.ts`: у него собственный body parser (реальный лимит 256 KB вместо недостижимого лимита поверх 10 MB) и он не зависит от Telegram init-data.
 - Зависимость `@modelcontextprotocol/sdk@^1.30.0`.
-- Тесты: `tests/mcp-tool-result.test.ts` (unit, без БД), `tests/mcp-foundation-contract.test.ts` (контрактные проверки исходников, без БД), `tests/mcp-foundation-integration.test.ts` (реальный HTTP handshake/auth/ownership поверх Postgres; скипается автоматически без `DATABASE_URL`).
+- Тесты: `tests/mcp-tool-result.test.ts` (unit, без БД), `tests/mcp-foundation-contract.test.ts` (контрактные проверки исходников, без БД), `tests/mcp-foundation-integration.test.ts` (реальный HTTP handshake/auth/ownership поверх Postgres, включая malformed/expired/empty JWT, `get_current_user`, тело >256 KB, `MCP_ENABLED=false`, REST после подключения MCP, необработанная DB-ошибка без утечки деталей; скипается автоматически без `DATABASE_URL`).
 
 ### Изменено
-- `server/index.ts` — подключён `/mcp` роут за feature flag; порядок существующих middleware и `registerRoutes` не изменён.
+- `server/index.ts` — `/mcp` смонтирован до глобальных body-parser/Telegram middleware, за feature flag (opt-in); порядок регистрации REST routes (`registerRoutes`) не изменён.
+
+### Исправлено (по итогам ревью перед merge)
+- Лимит тела `/mcp` был недостижим: проверка на 256 KB выполнялась уже после того, как глобальный парсер с лимитом 10 MB принимал и парсил тело. Теперь `/mcp` использует собственный парсер с реальным лимитом.
+- `/mcp` больше не проходит через `telegramAuthMiddleware` (нерелевантный побочный эффект для Bearer-only контракта MCP).
+- `MCP_ENABLED` стал opt-in (`=true` включает), а не opt-out (`=false` отключал), чтобы endpoint не оказался включённым по умолчанию в production.
 
 ### Известные ограничения
 - MCP-инструменты read-only и не реализуют workflow (в объёме TASK-001).
-- Host/Origin validation, audit log, метрики per-tool и полноценный kill-switch — запланированы в TASK-012.
+- Host/Origin validation, audit log, метрики per-tool — запланированы в TASK-012.
 
 ---
 

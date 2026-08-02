@@ -452,7 +452,7 @@ objects
   - `PORT` — порт HTTP (по умолчанию 5000).
   - `ENABLE_DEMO_SEED=true` — (только dev) включить сидирование демо-работ в пустую БД. В production игнорируется.
 - **MCP**
-  - `MCP_ENABLED=false` — отключить endpoint `/mcp` (kill-switch). По умолчанию включён.
+  - `MCP_ENABLED=true` — явно включить endpoint `/mcp` (opt-in). По умолчанию выключен, особенно важно для production.
 
 ## Команды разработки
 См. `package.json`:

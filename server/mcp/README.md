@@ -6,9 +6,12 @@
 
 ## Требования
 
+- Endpoint **выключен по умолчанию**. Включить: `MCP_ENABLED=true` в `.env` (opt-in,
+  особенно важно для production — включать осознанно, а не по умолчанию).
 - `Authorization: Bearer <jwt>` обязателен для **всех tool-вызовов** (не для `initialize`).
   JWT — тот же, что выдаёт `POST /api/auth/login` / `/api/auth/register`.
-- Отключить endpoint: `MCP_ENABLED=false` (kill-switch, не влияет на REST).
+- Лимит тела запроса — 256 KB, обеспечивается собственным JSON-парсером `/mcp`
+  (не связан с 10 MB лимитом REST): превышение → `413 PAYLOAD_TOO_LARGE`.
 
 ## Доступные tools (read-only, TASK-001)
 
