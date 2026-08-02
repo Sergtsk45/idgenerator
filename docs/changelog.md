@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-08-02] - Детерминированный анализ сметы (TASK-004)
+
+### Добавлено
+- `estimateAnalysisService` и чистый analyzer: main works, resource categories, labor total/coverage, candidates, missing values, trace IDs и warnings.
+- MCP tools `analyze_estimate` и read-only `get_estimate_analysis`.
+- Append-only snapshot cache по SHA-256 source rows, `analysisVersion=1`, `schemaVersion=1`; миграция `0032_estimate_analysis_snapshots.sql`.
+- Unit/contract/DB integration tests для детерминизма, coverage, unknown resources, ownership, idempotency и invalidation.
+
+### Изменено
+- Backend bootstrap графика и Schedule UI используют общий строгий classifier смет вместо двух локальных копий.
+- Расчёт трудозатрат Schedule вынесен в общий helper и учитывает только положительные человеко-часы.
+- `analyze_estimate` атомарно сохраняет snapshot/event и переводит workflow в `estimate_analysis_ready`.
+
+### Известные ограничения
+- Ресурсы без надёжного `resourceType` не классифицируются по названию и возвращаются как unclassified.
+- TASK-005 отвечает за переход к formal missing inputs; TASK-006 — за порог пригодности coverage для crew mode.
+
+---
+
 ## [2026-08-02] - MCP upload sessions и импорт сметы (TASK-003)
 
 ### Добавлено

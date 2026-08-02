@@ -1,7 +1,7 @@
 # MCP endpoint — локальное подключение
 
 `POST/GET/DELETE /mcp` — Streamable HTTP, **stateless** (каждый HTTP-запрос обслуживается
-новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-003 из
+новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-004 из
 [`mcp-mvp-plan`](../../mcp-mvp-plan/).
 
 ## Требования
@@ -12,7 +12,7 @@
   JWT — тот же, что выдаёт `POST /api/auth/login` / `/api/auth/register`.
 - Лимит тела запроса — 256 KB, обеспечивается собственным JSON-парсером `/mcp`
   (не связан с 10 MB лимитом REST): превышение → `413 PAYLOAD_TOO_LARGE`.
-- Перед использованием workflow/upload tools применить миграции `0029`–`0031`.
+- Перед использованием workflow/upload/analysis tools применить миграции `0029`–`0032`.
 - Для persistent хранения XLSX задайте `ESTIMATE_UPLOAD_DIR` (по умолчанию `uploads/estimates`).
 
 ## Доступные tools
@@ -44,6 +44,17 @@
 Upload выполняется как `multipart/form-data`, поле `file`, на возвращённый URL с тем же
 `Authorization: Bearer <jwt>`. Допускается только `.xlsx` с MIME
 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, лимит — 20 MB.
+
+### Estimate analysis (TASK-004)
+
+| Tool | Описание |
+|---|---|
+| `analyze_estimate` | Детерминированно анализирует source rows, сохраняет snapshot и переводит stage в `estimate_analysis_ready` |
+| `get_estimate_analysis` | Возвращает только актуальный snapshot; stale source требует повторного `analyze_estimate` |
+
+Coverage — процент основных работ с положительной поддержанной трудоёмкостью. Трудовые
+часы принимаются только для `ОТ`/`ОТМ` в человеко-часах либо untyped строки с единицей
+человеко-часов; неизвестные типы возвращаются в `unclassifiedResources`.
 
 Все tools ownership-scoped по `userId` из проверенного JWT — не из аргументов вызова.
 
@@ -97,6 +108,8 @@ TASK-003 также возвращает `UPLOAD_EXPIRED`, `UPLOAD_NOT_FOUND`,
 `UPLOAD_ALREADY_CONSUMED`, `FILE_TYPE_NOT_ALLOWED`, `FILE_TOO_LARGE`,
 `ESTIMATE_IMPORT_FAILED`.
 
+TASK-004 добавляет `WORKFLOW_ESTIMATE_NOT_SET`, `ESTIMATE_NOT_FOUND`.
+
 Для конфликтов версий может присутствовать `recoverable: true`.
 
 ## Известные ограничения
@@ -104,4 +117,5 @@ TASK-003 также возвращает `UPLOAD_EXPIRED`, `UPLOAD_NOT_FOUND`,
 - `get_missing_workflow_inputs` — временный базовый контракт; замена в TASK-005.
 - `create_upload_session` и `import_estimate_from_upload` выполняют свои stage transitions серверно.
 - Автоматическая уборка истёкших/осиротевших upload-файлов пока не реализована.
+- Порог labor coverage для режима планирования по численности задаётся в TASK-006.
 - Host/Origin validation для `/mcp`, audit log и per-tool метрики — TASK-012.

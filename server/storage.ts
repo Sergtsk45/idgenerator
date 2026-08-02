@@ -91,6 +91,7 @@ import {
 import { COPY_CERTIFIER_ROLE, type PartyDto, type PersonDto, type SourceDataDto } from "@shared/routes";
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql, count } from "drizzle-orm";
 import { compareWorksOrder, isMainWorkPosition } from "@shared/workPositionKind";
+import { isMainEstimatePosition } from "@shared/estimateClassification";
 import { getQuota, getEffectiveTariff } from "@shared/tariff-features";
 import { QUALITY_BINDING_ROLES, resolveQualityDocumentId } from "@shared/documentBinding";
 
@@ -116,17 +117,6 @@ export class DocumentInUseError extends Error {
     super(message);
     this.name = "DocumentInUseError";
   }
-}
-
-/**
- * Determines if an estimate position is a "main" work (for schedule tasks).
- * Main positions have code starting with ГЭСН, ФЕР, ТЕР (case-insensitive).
- * Other positions (ФСБЦ, прайс, etc.) are "auxiliary" and shown as sub-items.
- */
-function isMainEstimatePosition(position: { code?: string | null }): boolean {
-  const code = String(position.code ?? "").trim().toUpperCase();
-  if (!code) return false;
-  return code.startsWith("ГЭСН") || code.startsWith("ФЕР") || code.startsWith("ТЕР");
 }
 
 export interface IStorage {

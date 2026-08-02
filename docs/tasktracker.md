@@ -64,6 +64,25 @@
 - **Следующая задача**: TASK-004 (детерминированный анализ сметы)
 - **Известные ограничения**: поддерживается только `.xlsx`; storage требует persistent `ESTIMATE_UPLOAD_DIR`; автоматическая уборка истёкших/осиротевших файлов остаётся эксплуатационной задачей.
 
+## Задача: MCP deterministic estimate analysis — TASK-004 (mcp-mvp-plan)
+- **Статус**: Завершена локально
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Детерминированный анализ импортированной сметы с едиными правилами main works/ресурсов/трудозатрат, трассируемым JSON и content-hash snapshot cache.
+- **Шаги выполнения**:
+  - [x] Общий strict classifier основных позиций сметы для backend и Schedule UI
+  - [x] Нормализация `ОТ`/`ОТМ`/`М`/`ЭМ`, безопасный fallback `чел.-ч`, unknown без потери
+  - [x] Summary: sections/main works/resources/labor coverage/candidates/missing quantity-unit
+  - [x] Source IDs для агрегатов, warnings и unclassified resources
+  - [x] SHA-256 по каноническим source rows, `analysisVersion=1`, `schemaVersion=1`
+  - [x] Миграция `0032_estimate_analysis_snapshots.sql`, append-only snapshots
+  - [x] MCP tools `analyze_estimate`, `get_estimate_analysis`
+  - [x] Ownership, optimistic version, idempotency, stale snapshot invalidation
+  - [x] Pure/unit, MCP contract и DB integration tests (skip без `DATABASE_URL`)
+  - [x] `npm run check`, `npm test`, `npm run build`
+- **Зависимости**: TASK-003
+- **Следующая задача**: TASK-005 (missing-input engine)
+- **Известные ограничения**: классификация консервативная; coded resources без явного `resourceType` остаются unclassified; порог labor coverage для crew planning определяется в TASK-006.
+
 ---
 
 ## Задача: Создание материала из задачи графика с автопривязкой

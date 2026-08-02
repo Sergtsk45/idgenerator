@@ -894,6 +894,36 @@ export const executionWorkflowEvents = pgTable(
   })
 );
 
+// Append-only deterministic analysis snapshots. A new row is inserted whenever
+// the estimate input hash or analysis contract version changes.
+export const estimateAnalysisSnapshots = pgTable(
+  "estimate_analysis_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    workflowId: integer("workflow_id")
+      .notNull()
+      .references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    estimateId: integer("estimate_id")
+      .notNull()
+      .references(() => estimates.id, { onDelete: "cascade" }),
+    analysisVersion: text("analysis_version").notNull(),
+    schemaVersion: integer("schema_version").notNull(),
+    inputHash: text("input_hash").notNull(),
+    analysisJson: jsonb("analysis_json").$type<unknown>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    workflowIdIdx: index("estimate_analysis_snapshots_workflow_id_idx").on(t.workflowId),
+    estimateIdIdx: index("estimate_analysis_snapshots_estimate_id_idx").on(t.estimateId),
+    inputVersionUq: uniqueIndex("estimate_analysis_snapshots_input_version_uq").on(
+      t.workflowId,
+      t.inputHash,
+      t.analysisVersion,
+      t.schemaVersion,
+    ),
+  }),
+);
+
 export const uploadSessions = pgTable(
   "upload_sessions",
   {
@@ -962,6 +992,9 @@ export type InsertExecutionWorkflowInput = typeof executionWorkflowInputs.$infer
 
 export type ExecutionWorkflowEvent = typeof executionWorkflowEvents.$inferSelect;
 export type InsertExecutionWorkflowEvent = typeof executionWorkflowEvents.$inferInsert;
+
+export type EstimateAnalysisSnapshot = typeof estimateAnalysisSnapshots.$inferSelect;
+export type InsertEstimateAnalysisSnapshot = typeof estimateAnalysisSnapshots.$inferInsert;
 
 export type UploadSession = typeof uploadSessions.$inferSelect;
 export type InsertUploadSession = typeof uploadSessions.$inferInsert;

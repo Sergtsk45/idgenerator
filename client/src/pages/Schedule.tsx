@@ -31,6 +31,10 @@ import {
   compareWorksOrder,
   groupAuxiliaryWorksByMainId,
 } from "@shared/workPositionKind";
+import {
+  getEstimatePositionLaborHours,
+  isMainEstimatePosition,
+} from "@shared/estimateClassification";
 import { buildScheduleRowLayout } from "@/lib/schedule-row-layout";
 import { 
   useBootstrapScheduleFromWorks, 
@@ -303,64 +307,6 @@ export default function Schedule() {
     setLinkMaterialId(existingMaterialId);
     setLinkMaterialSearch("");
     setLinkDialogOpen(true);
-  };
-
-  // Helper: check if estimate position is "main" (ГЭСН/ФЕР/ТЕР)
-  const isMainEstimatePosition = (pos: { code?: string | null }): boolean => {
-    const code = String(pos.code ?? "").trim().toUpperCase();
-    if (!code) return false;
-    return code.startsWith("ГЭСН") || code.startsWith("ФЕР") || code.startsWith("ТЕР");
-  };
-
-  const parseNumeric = (value: unknown): number | null => {
-    if (value == null) return null;
-    if (typeof value === "number") return Number.isFinite(value) ? value : null;
-    const s = String(value).trim();
-    if (!s) return null;
-    // Support "123,45" and "1 234,56" formats
-    const normalized = s.replace(/\s+/g, "").replace(",", ".");
-    const n = Number(normalized);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  const getLaborManHours = (position: any): number | null => {
-    const resources: any[] = position?.resources ?? [];
-    if (!Array.isArray(resources) || resources.length === 0) return null;
-
-    // Prefer explicit labor resource types (ОТ + ОТМ) if present
-    const laborByType = resources.filter((r: any) => {
-      const type = String(r?.resourceType ?? "")
-        .toUpperCase()
-        .replace(/[()]/g, "")
-        .trim();
-      return type === "ОТ" || type === "ОТМ";
-    });
-
-    let laborResources = laborByType;
-    let laborMode: "type" | "unit" = "type";
-
-    // Fallback: some estimate exports store labor without resourceType; then use unit "чел.-ч"
-    if (laborResources.length === 0) {
-      const laborByUnit = resources.filter((r: any) => {
-        const u = String(r?.unit ?? "").toLowerCase().replace(/\s+/g, "");
-        return u.includes("чел") && u.includes("ч");
-      });
-
-      if (laborByUnit.length > 0) {
-        laborResources = laborByUnit;
-        laborMode = "unit";
-      } else {
-        return null;
-      }
-    }
-
-    let total = 0;
-    for (const r of laborResources) {
-      const n = parseNumeric(r?.quantityTotal ?? r?.quantity);
-      if (n != null) total += n;
-    }
-
-    return total > 0 ? total : null;
   };
 
   const formatTzHours = (hoursRaw: number): string => {
@@ -1322,7 +1268,9 @@ export default function Schedule() {
                         ? `акт ${actNumber ?? "-"}`
                         : `act ${actNumber ?? "-"}`;
                       const tzHours =
-                        sourceType === "estimate" ? (getLaborManHours(p) ?? 0) : 0;
+                        sourceType === "estimate"
+                          ? (getEstimatePositionLaborHours(Array.isArray(p?.resources) ? p.resources : []) ?? 0)
+                          : 0;
                       const tzLabel = language === "ru"
                         ? `${formatTzHours(tzHours)} ч`
                         : `${formatTzHours(tzHours)} h`;
