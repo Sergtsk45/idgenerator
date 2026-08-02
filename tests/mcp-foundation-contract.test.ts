@@ -65,12 +65,32 @@ test("MCP HTTP transport enforces a body size limit and never logs secrets", asy
   assert.doesNotMatch(logFn, /req\.body/);
 });
 
-test("MCP endpoint does not proxy Express route handlers and is feature-flagged", async () => {
+test("MCP endpoint does not proxy Express route handlers and is opt-in feature-flagged", async () => {
   const source = await readFile("server/index.ts", "utf8");
 
-  assert.match(source, /MCP_ENABLED/);
+  // Opt-in, not opt-out: the endpoint must stay off unless explicitly enabled,
+  // especially important for production defaults.
+  assert.match(source, /MCP_ENABLED\s*===\s*"true"/);
+  assert.doesNotMatch(source, /MCP_ENABLED\s*!==\s*"false"/);
   assert.match(source, /app\.all\("\/mcp"/);
   assert.doesNotMatch(source, /registerRoutes\([^)]*\).*\/mcp/);
+});
+
+test("MCP route is mounted before the app-wide body parser and Telegram auth middleware", async () => {
+  const source = await readFile("server/index.ts", "utf8");
+
+  const mcpMountIndex = source.indexOf('app.all("/mcp"');
+  const globalJsonParserIndex = source.indexOf("express.json({");
+  const telegramAuthIndex = source.indexOf("telegramAuthMiddleware(");
+
+  assert.ok(mcpMountIndex >= 0, "MCP route mount not found");
+  assert.ok(globalJsonParserIndex >= 0, "global express.json() not found");
+  assert.ok(telegramAuthIndex >= 0, "telegramAuthMiddleware() not found");
+  assert.ok(mcpMountIndex < globalJsonParserIndex, "MCP route must be mounted before the 10mb REST body parser");
+  assert.ok(mcpMountIndex < telegramAuthIndex, "MCP route must be mounted before Telegram auth middleware");
+
+  // The MCP route must use its own body parser, not the shared one.
+  assert.match(source, /app\.all\("\/mcp",\s*mcpRateLimiter,\s*mcpBodyParser,\s*mcpBodyErrorHandler,\s*handleMcpRequest\)/);
 });
 
 test("MCP error codes match the TASK-001 contract", async () => {
