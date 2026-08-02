@@ -813,6 +813,9 @@ export type WorkflowStage = (typeof WORKFLOW_STAGES)[number];
 export const WORKFLOW_INPUT_SOURCES = ["user", "estimate", "system_default", "calculated"] as const;
 export type WorkflowInputSource = (typeof WORKFLOW_INPUT_SOURCES)[number];
 
+export const WORKFLOW_STATUSES = ["active", "completed", "failed"] as const;
+export type WorkflowStatus = (typeof WORKFLOW_STATUSES)[number];
+
 export const executionWorkflows = pgTable(
   "execution_workflows",
   {
@@ -826,7 +829,7 @@ export const executionWorkflows = pgTable(
     estimateId: integer("estimate_id").references(() => estimates.id, { onDelete: "set null" }),
     scheduleId: integer("schedule_id").references(() => schedules.id, { onDelete: "set null" }),
     stage: text("stage").$type<WorkflowStage>().notNull().default("created"),
-    status: text("status").$type<"active" | "completed" | "failed">().notNull().default("active"),
+    status: text("status").$type<WorkflowStatus>().notNull().default("active"),
     version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -851,7 +854,7 @@ export const executionWorkflowInputs = pgTable(
       .references(() => executionWorkflows.id, { onDelete: "cascade" }),
     key: text("key").notNull(),
     valueJson: jsonb("value_json").$type<unknown>(),
-    source: text("source").notNull(),
+    source: text("source").$type<WorkflowInputSource>().notNull(),
     confirmed: boolean("confirmed").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

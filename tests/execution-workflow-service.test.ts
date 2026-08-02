@@ -195,12 +195,197 @@ test("execution workflow service: ownership, idempotency, concurrency, events", 
   });
 
   await t.test("event log records workflow_created, three input_set and one stage_transition (append-only)", async () => {
-    const events = await workflowRepository.getWorkflowEvents(created.workflowId);
+    const { db } = await import("../server/db.ts");
+    const events = await workflowRepository.getWorkflowEvents(db, created.workflowId);
     const types = events.map((e) => e.eventType);
     assert.equal(types.filter((t) => t === "workflow_created").length, 1);
     assert.equal(types.filter((t) => t === "input_set").length, 3);
     assert.equal(types.filter((t) => t === "stage_transition").length, 1);
     const stageEvent = events.find((e) => e.eventType === "stage_transition");
     assert.deepEqual(stageEvent?.payloadJson, { from: "created", to: "estimate_upload_pending" });
+  });
+
+  await t.test("a transition to the current stage is a genuine no-op: no version bump, no new event", async () => {
+    const { db } = await import("../server/db.ts");
+    const before = await workflowRepository.getWorkflowEvents(db, created.workflowId);
+
+    const result = await workflowService.transitionWorkflowStage(ownerAuth, {
+      workflowId: created.workflowId,
+      expectedVersion: transitioned.version,
+      nextStage: transitioned.stage,
+    });
+
+    assert.equal(result.version, transitioned.version);
+    const after = await workflowRepository.getWorkflowEvents(db, created.workflowId);
+    assert.equal(after.length, before.length);
+  });
+
+  await t.test("reusing an idempotencyKey with the same body but a different expectedVersion is rejected", async () => {
+    const sharedKey = `set-shared-${Date.now()}`;
+    const before = await workflowService.getExecutionWorkflow(ownerAuth, created.workflowId);
+
+    const first = await workflowService.setWorkflowInput(ownerAuth, {
+      workflowId: created.workflowId,
+      expectedVersion: before.version,
+      idempotencyKey: sharedKey,
+      key: "workingCalendar",
+      value: "6x1",
+      source: "user",
+      confirmed: true,
+    });
+    currentVersion = first.version;
+
+    await assert.rejects(
+      () =>
+        workflowService.setWorkflowInput(ownerAuth, {
+          workflowId: created.workflowId,
+          expectedVersion: currentVersion, // different from the first call's expectedVersion (before.version)
+          idempotencyKey: sharedKey,
+          key: "workingCalendar",
+          value: "6x1",
+          source: "user",
+          confirmed: true,
+        }),
+      (err: unknown) => err instanceof McpToolError && err.code === MCP_ERROR_CODES.VALIDATION_ERROR,
+    );
+  });
+
+  await t.test("transitioning into 'failed' keeps status in sync (no {stage: failed, status: active})", async () => {
+    const before = await workflowService.getExecutionWorkflow(ownerAuth, created.workflowId);
+    const failed = await workflowService.transitionWorkflowStage(ownerAuth, {
+      workflowId: created.workflowId,
+      expectedVersion: before.version,
+      nextStage: "failed",
+    });
+    assert.equal(failed.stage, "failed");
+    assert.equal(failed.status, "failed");
+  });
+});
+
+test("execution workflow service: concurrent requests do not create duplicates or leak losing writes", async (t) => {
+  if (!process.env.DATABASE_URL) {
+    t.skip("DATABASE_URL not set; skipping DB-backed concurrency tests");
+    return;
+  }
+
+  const { db } = await import("../server/db.ts");
+  const { executionWorkflows } = await import("../shared/schema.ts");
+  const { eq } = await import("drizzle-orm");
+  const { ownerUser, ownerObject } = await setupTestUsers();
+  const workflowService = await import("../server/services/execution-workflow/workflowService.ts");
+  const workflowRepository = await import("../server/services/execution-workflow/workflowRepository.ts");
+  const { McpToolError, MCP_ERROR_CODES } = await import("../server/mcp/errors.ts");
+
+  const auth = { userId: ownerUser.id, displayName: "Owner", email: null, role: "user", tariff: "basic" as const };
+
+  await t.test("two concurrent create_execution_workflow calls with the same idempotencyKey create exactly one workflow", async () => {
+    const key = `concurrent-create-${Date.now()}`;
+    const [resultA, resultB] = await Promise.all([
+      workflowService.createExecutionWorkflow(auth, { objectId: ownerObject.id, idempotencyKey: key }),
+      workflowService.createExecutionWorkflow(auth, { objectId: ownerObject.id, idempotencyKey: key }),
+    ]);
+
+    assert.equal(resultA.workflowId, resultB.workflowId);
+
+    const rows = await db.select().from(executionWorkflows).where(eq(executionWorkflows.objectId, ownerObject.id));
+    const createdForThisObject = rows.filter((r) => r.id === resultA.workflowId);
+    assert.equal(createdForThisObject.length, 1);
+  });
+
+  await t.test("two concurrent set_workflow_input calls racing on the same expectedVersion: exactly one wins, the loser's write never lands", async () => {
+    const workflow = await workflowService.createExecutionWorkflow(auth, {
+      objectId: ownerObject.id,
+      idempotencyKey: `concurrent-race-base-${Date.now()}-${Math.random()}`,
+    });
+
+    const attempt = (value: string) =>
+      workflowService
+        .setWorkflowInput(auth, {
+          workflowId: workflow.workflowId,
+          expectedVersion: workflow.version,
+          idempotencyKey: `concurrent-race-${value}-${Date.now()}-${Math.random()}`,
+          key: "projectStartDate",
+          value,
+          source: "user",
+          confirmed: true,
+        })
+        .then((r) => ({ status: "fulfilled" as const, value: r }))
+        .catch((err) => ({ status: "rejected" as const, error: err }));
+
+    const [outcomeA, outcomeB] = await Promise.all([attempt("2026-09-01"), attempt("2026-10-01")]);
+    const outcomes = [outcomeA, outcomeB];
+
+    const winners = outcomes.filter((o) => o.status === "fulfilled");
+    const losers = outcomes.filter((o) => o.status === "rejected");
+
+    assert.equal(winners.length, 1, "exactly one concurrent writer should succeed");
+    assert.equal(losers.length, 1, "exactly one concurrent writer should be rejected");
+    assert.ok(
+      losers[0].status === "rejected" &&
+        losers[0].error instanceof McpToolError &&
+        losers[0].error.code === MCP_ERROR_CODES.WORKFLOW_VERSION_CONFLICT,
+    );
+
+    // The persisted state must match the winner's write exactly — the loser's value must
+    // not have landed even transiently (this is the exact bug from the code review: the
+    // loser's upsertWorkflowInput used to run before the CAS check).
+    const winningValue = winners[0].status === "fulfilled" ? winners[0].value.inputs[0].value : undefined;
+    const stored = await workflowService.getExecutionWorkflow(auth, workflow.workflowId);
+    assert.equal(stored.version, workflow.version + 1, "version must have incremented exactly once");
+    assert.equal(stored.inputs.find((i) => i.key === "projectStartDate")?.value, winningValue);
+
+    const events = await workflowRepository.getWorkflowEvents(db, workflow.workflowId);
+    assert.equal(
+      events.filter((e) => e.eventType === "input_set").length,
+      1,
+      "only the winning write should be recorded in the event log",
+    );
+  });
+});
+
+test("execution_workflow_events is append-only at the DB level", async (t) => {
+  if (!process.env.DATABASE_URL) {
+    t.skip("DATABASE_URL not set; skipping DB-level append-only trigger tests");
+    return;
+  }
+
+  const { db } = await import("../server/db.ts");
+  const { executionWorkflowEvents } = await import("../shared/schema.ts");
+  const { eq } = await import("drizzle-orm");
+  const { ownerUser, ownerObject } = await setupTestUsers();
+  const workflowService = await import("../server/services/execution-workflow/workflowService.ts");
+
+  const auth = { userId: ownerUser.id, displayName: "Owner", email: null, role: "user", tariff: "basic" as const };
+  const workflow = await workflowService.createExecutionWorkflow(auth, {
+    objectId: ownerObject.id,
+    idempotencyKey: `append-only-${Date.now()}`,
+  });
+
+  await t.test("direct UPDATE against execution_workflow_events is rejected by the DB trigger", async () => {
+    await assert.rejects(
+      () =>
+        db
+          .update(executionWorkflowEvents)
+          .set({ eventType: "tampered" })
+          .where(eq(executionWorkflowEvents.workflowId, workflow.workflowId)),
+      /append-only/,
+    );
+  });
+
+  await t.test("direct DELETE against execution_workflow_events is rejected by the DB trigger", async () => {
+    await assert.rejects(
+      () => db.delete(executionWorkflowEvents).where(eq(executionWorkflowEvents.workflowId, workflow.workflowId)),
+      /append-only/,
+    );
+  });
+
+  await t.test("deleting the parent workflow still cascades and removes its events", async () => {
+    const { executionWorkflows } = await import("../shared/schema.ts");
+    await db.delete(executionWorkflows).where(eq(executionWorkflows.id, workflow.workflowId));
+    const remaining = await db
+      .select()
+      .from(executionWorkflowEvents)
+      .where(eq(executionWorkflowEvents.workflowId, workflow.workflowId));
+    assert.equal(remaining.length, 0);
   });
 });

@@ -1,5 +1,29 @@
 # Changelog
 
+## [2026-08-02] - MCP-IDgenerator TASK-002 fixes: транзакционность, идемпотентность, append-only
+
+Исправления по итогам code review TASK-002 (устраняют все заявленные блокирующие проблемы).
+
+### Исправлено (блокирующие)
+- **Гонка CAS/input**: в `setWorkflowInput` CAS по `version` теперь выполняется первым шагом внутри единой DB-транзакции; запись input, event и финализация idempotency-записи идут только после успешного CAS. Проигравший запрос не пишет ничего — вся транзакция откатывается.
+- **Дубли при параллельном create**: `withIdempotency` теперь атомарно "резервирует" `(userId, toolName, idempotencyKey)` через `INSERT ... ON CONFLICT DO NOTHING` **внутри той же транзакции**, что и бизнес-мутация и event. Postgres естественным образом сериализует конкурентные claim одного ключа (второй `INSERT` блокируется до коммита/отката первого), что исключает создание двух workflow с одним ключом.
+- **Неатомарность мутации/event/idempotency**: `createExecutionWorkflow`, `setWorkflowInput`, `transitionWorkflowStage` теперь выполняются целиком в одной `db.transaction(...)`: claim idempotency → доменная мутация → event → finalize idempotency. Любая ошибка (включая проигранный CAS) откатывает всё, включая claim — ключ остаётся свободным для легитимного повтора.
+
+### Исправлено (существенные замечания)
+- `expectedVersion` включён в нормализованный request hash для `set_workflow_input`: повтор одного `idempotencyKey` с другим `expectedVersion` теперь корректно возвращает `VALIDATION_ERROR`.
+- `execution_workflow_events` теперь append-only на уровне БД: `migrations/0030_execution_workflow_events_append_only.sql` добавляет триггеры, блокирующие прямые `UPDATE`/`DELETE`; каскадное удаление вместе с родительским workflow (`ON DELETE CASCADE`) явно разрешено через проверку `pg_trigger_depth()`.
+- `status` синхронизирован со стадией: переход в `completed`/`failed` теперь атомарно выставляет соответствующий `status` в том же `UPDATE`, что и `stage`/`version` (`updateWorkflowStageIfVersionMatches`). Состояние `{stage: "completed", status: "active"}` больше невозможно.
+- Переход в ту же стадию — теперь настоящий no-op: `transitionWorkflowStage` не увеличивает `version`, не меняет `updatedAt` и не пишет событие, если `nextStage === currentStage`.
+
+### Изменено
+- `server/services/execution-workflow/workflowRepository.ts`: все функции теперь принимают явный первый аргумент `client: DbClient` (`db` либо `tx`) вместо неявного захвата модульного `db` — структурно исключает повторение бага "запись вне транзакции". Добавлены `claimIdempotencyRecord`/`finalizeIdempotencyRecord` взамен `findIdempotencyRecord`+`saveIdempotencyRecord` с `onConflictDoNothing` после факта.
+- `shared/schema.ts`: добавлен явный тип `WorkflowStatus`, `executionWorkflowInputs.source` типизирован как `WorkflowInputSource` (было `text` без `$type`).
+
+### Тесты
+- `tests/execution-workflow-service.test.ts`: добавлены тесты с реальным параллелизмом через `Promise.all` — два конкурентных `create_execution_workflow` с одним `idempotencyKey` (ровно один workflow создаётся), два конкурентных `set_workflow_input` с одинаковым `expectedVersion` (ровно один побеждает, проигравший не оставляет следов ни в данных, ни в event log). Добавлены тесты на no-op переход, синхронизацию `status`, повтор `idempotencyKey` с другим `expectedVersion`, и отдельный test-suite для DB-триггеров append-only (прямой `UPDATE`/`DELETE` отклоняется, каскадное удаление через родителя проходит).
+
+---
+
 ## [2026-08-02] - MCP-IDgenerator TASK-001+TASK-002: MCP foundation и execution workflow state
 
 ### Добавлено
