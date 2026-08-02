@@ -98,6 +98,22 @@ test("appendCreatedMaterial keeps previous rows and notes", () => {
   assert.equal(existing.length, 2);
 });
 
+test("appendCreatedMaterial does not append the same project material twice", () => {
+  const existing = [
+    { projectMaterialId: 10, batchId: null, qualityDocumentId: null, note: "keep-me" },
+  ];
+  const next = appendCreatedMaterial(existing, {
+    projectMaterialId: 10,
+    batchId: 11,
+    qualityDocumentId: 12,
+    displayName: "Тот же материал",
+  });
+
+  assert.strictEqual(next, existing);
+  assert.equal(next.length, 1);
+  assert.equal(next[0].note, "keep-me");
+});
+
 test("toReplaceTaskMaterialsPayload preserves orderIndex for full list", () => {
   const payload = toReplaceTaskMaterialsPayload([
     { projectMaterialId: 1, batchId: null, qualityDocumentId: null, note: "a" },
@@ -121,6 +137,19 @@ test("MaterialWizard wires onCreated after creation and keeps backward-compatibl
   assert.match(source, /Не удалось создать материал\. Проверьте заполненные данные/);
   // Without onCreated — legacy toast remains
   assert.match(source, /Материал добавлен/);
+});
+
+test("MaterialWizard retries only task linking and locks the complete submit pipeline", async () => {
+  const source = await readFile("client/src/components/materials/MaterialWizard.tsx", "utf8");
+  const cacheResult = source.indexOf("setCreatedResult(result)");
+  const linkResult = source.indexOf("await props.onCreated(result)");
+
+  assert.match(source, /let result = createdResult;\s+if \(!result\)/);
+  assert.ok(cacheResult >= 0 && cacheResult < linkResult, "created result must be cached before onCreated");
+  assert.match(source, /if \(submittingRef\.current\) return/);
+  assert.match(source, /finally \{\s+submittingRef\.current = false;\s+setSubmitting\(false\)/);
+  assert.match(source, /disabled=\{isBusy \|\| submitting\}/);
+  assert.match(source, /isBusy \|\| submitting \? <Loader2/);
 });
 
 test("SelectTaskMaterials opens wizard and persists full local list", async () => {

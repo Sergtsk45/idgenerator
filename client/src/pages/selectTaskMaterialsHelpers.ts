@@ -18,6 +18,9 @@ export function appendCreatedMaterial(
   materials: TaskMaterialItem[],
   result: CreatedMaterialResult,
 ): TaskMaterialItem[] {
+  if (materials.some((material) => material.projectMaterialId === result.projectMaterialId)) {
+    return materials;
+  }
   return [
     ...materials,
     {

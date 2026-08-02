@@ -5,7 +5,7 @@
  * @created: 2026-02-01
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -89,6 +89,9 @@ export function MaterialWizard(props: MaterialWizardProps) {
     scope: "project",
     useInActs: true,
   });
+  const [createdResult, setCreatedResult] = useState<CreatedMaterialResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const createMaterial = useCreateProjectMaterial(props.objectId);
   const createDocument = useCreateDocument();
@@ -122,6 +125,7 @@ export function MaterialWizard(props: MaterialWizardProps) {
     setSelectedDocumentId(null);
     setDocBindTarget("material");
     setDoc({ docType: "certificate", scope: "project", useInActs: true });
+    setCreatedResult(null);
   };
 
   useEffect(() => {
@@ -144,109 +148,124 @@ export function MaterialWizard(props: MaterialWizardProps) {
   };
 
   const submit = async () => {
-    let materialCreated = false;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    let materialCreated = createdResult != null;
     try {
-      const material = await createMaterial.mutateAsync({
-        ...(source === "catalog" ? { catalogMaterialId: selectedCatalogId } : { nameOverride, baseUnitOverride }),
-      } as Parameters<typeof createMaterial.mutateAsync>[0]);
+      let result = createdResult;
+      if (!result) {
+        const material = await createMaterial.mutateAsync({
+          ...(source === "catalog" ? { catalogMaterialId: selectedCatalogId } : { nameOverride, baseUnitOverride }),
+        } as Parameters<typeof createMaterial.mutateAsync>[0]);
 
-      const projectMaterialId = Number((material as { id: number }).id);
-      if (!Number.isFinite(projectMaterialId) || projectMaterialId <= 0) {
-        throw new Error("Не удалось создать материал");
-      }
-      materialCreated = true;
-
-      let createdBatchId: number | null = null;
-      let documentId: number | null = null;
-      let bindingRole: string | null = null;
-
-      if (addBatch) {
-        const url = buildUrl(api.materialBatches.create.path, { id: projectMaterialId });
-        const res = await fetch(url, {
-          method: api.materialBatches.create.method,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            supplierName: batch.supplierName || null,
-            plant: batch.plant || null,
-            batchNumber: batch.batchNumber || null,
-            deliveryDate: batch.deliveryDate || null,
-            quantity: batch.quantity || null,
-            unit: batch.unit || null,
-            notes: batch.notes || null,
-          }),
-          credentials: "include",
-        });
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error((errorData as { message?: string }).message || "Failed to create batch");
+        const projectMaterialId = Number((material as { id: number }).id);
+        if (!Number.isFinite(projectMaterialId) || projectMaterialId <= 0) {
+          throw new Error("Не удалось создать материал");
         }
-        const createdBatch = api.materialBatches.create.responses[201].parse(await res.json());
-        createdBatchId = Number((createdBatch as { id: number }).id);
-      }
+        materialCreated = true;
 
-      if (addDoc) {
-        const selectedExistingDoc =
-          docMode === "registry"
-            ? ((docsQuery.data ?? []) as Array<{ id: number; docType?: string }>).find(
-                (d) => Number(d.id) === selectedDocumentId,
+        const catalogName =
+          source === "catalog"
+            ? String(
+                ((catalogSearch.data ?? []) as Array<{ id: number; name?: string }>).find(
+                  (m) => Number(m.id) === selectedCatalogId,
+                )?.name ?? "",
               )
             : null;
 
-        if (docMode === "registry" && !selectedExistingDoc) {
-          throw new Error("Выберите документ из реестра");
+        result = buildCreatedMaterialResult({
+          projectMaterialId,
+          source,
+          nameOverride,
+          catalogName,
+        });
+        setCreatedResult(result);
+
+        let createdBatchId: number | null = null;
+        let documentId: number | null = null;
+        let bindingRole: string | null = null;
+
+        if (addBatch) {
+          const url = buildUrl(api.materialBatches.create.path, { id: projectMaterialId });
+          const res = await fetch(url, {
+            method: api.materialBatches.create.method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              supplierName: batch.supplierName || null,
+              plant: batch.plant || null,
+              batchNumber: batch.batchNumber || null,
+              deliveryDate: batch.deliveryDate || null,
+              quantity: batch.quantity || null,
+              unit: batch.unit || null,
+              notes: batch.notes || null,
+            }),
+            credentials: "include",
+          });
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error((errorData as { message?: string }).message || "Failed to create batch");
+          }
+          const createdBatch = api.materialBatches.create.responses[201].parse(await res.json());
+          createdBatchId = Number((createdBatch as { id: number }).id);
         }
 
-        const documentForBinding =
-          selectedExistingDoc ??
-          (await createDocument.mutateAsync({
-            docType: doc.docType,
-            scope: doc.scope,
-            title: doc.title || null,
-            docNumber: doc.docNumber || null,
-            docDate: doc.docDate || null,
-            validFrom: null,
-            validTo: null,
-            meta: {},
-            fileUrl: doc.fileUrl || null,
-          } as Parameters<typeof createDocument.mutateAsync>[0]));
+        if (addDoc) {
+          const selectedExistingDoc =
+            docMode === "registry"
+              ? ((docsQuery.data ?? []) as Array<{ id: number; docType?: string }>).find(
+                  (d) => Number(d.id) === selectedDocumentId,
+                )
+              : null;
 
-        documentId = Number((documentForBinding as { id: number }).id);
-        const documentType = String(
-          (documentForBinding as { docType?: string }).docType ?? doc.docType,
-        );
-        bindingRole = bindingRoleFromDocType(documentType);
+          if (docMode === "registry" && !selectedExistingDoc) {
+            throw new Error("Выберите документ из реестра");
+          }
 
-        const batchIdForBinding = addBatch && docBindTarget === "batch" ? createdBatchId : null;
+          const documentForBinding =
+            selectedExistingDoc ??
+            (await createDocument.mutateAsync({
+              docType: doc.docType,
+              scope: doc.scope,
+              title: doc.title || null,
+              docNumber: doc.docNumber || null,
+              docDate: doc.docDate || null,
+              validFrom: null,
+              validTo: null,
+              meta: {},
+              fileUrl: doc.fileUrl || null,
+            } as Parameters<typeof createDocument.mutateAsync>[0]));
 
-        await createBinding.mutateAsync({
-          documentId,
+          documentId = Number((documentForBinding as { id: number }).id);
+          const documentType = String(
+            (documentForBinding as { docType?: string }).docType ?? doc.docType,
+          );
+          bindingRole = bindingRoleFromDocType(documentType);
+
+          const batchIdForBinding = addBatch && docBindTarget === "batch" ? createdBatchId : null;
+
+          await createBinding.mutateAsync({
+            documentId,
+            projectMaterialId,
+            objectId: null,
+            batchId: batchIdForBinding,
+            bindingRole,
+            useInActs: isQualityBindingRole(bindingRole) ? doc.useInActs : false,
+            isPrimary: false,
+          } as Parameters<typeof createBinding.mutateAsync>[0]);
+        }
+
+        result = buildCreatedMaterialResult({
           projectMaterialId,
-          objectId: null,
-          batchId: batchIdForBinding,
+          batchId: createdBatchId,
+          documentId,
           bindingRole,
-          useInActs: isQualityBindingRole(bindingRole) ? doc.useInActs : false,
-          isPrimary: false,
-        } as Parameters<typeof createBinding.mutateAsync>[0]);
+          source,
+          nameOverride,
+          catalogName,
+        });
+        setCreatedResult(result);
       }
-
-      const catalogName =
-        source === "catalog"
-          ? String(
-              ((catalogSearch.data ?? []) as Array<{ id: number; name?: string }>).find(
-                (m) => Number(m.id) === selectedCatalogId,
-              )?.name ?? "",
-            )
-          : null;
-
-      const result = buildCreatedMaterialResult({
-        projectMaterialId,
-        batchId: createdBatchId,
-        documentId,
-        bindingRole,
-        source,
-        nameOverride,
-        catalogName,
-      });
 
       if (props.onCreated) {
         try {
@@ -279,6 +298,9 @@ export function MaterialWizard(props: MaterialWizardProps) {
           : "Не удалось создать материал. Проверьте заполненные данные и повторите попытку.",
         variant: "destructive",
       });
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -574,8 +596,8 @@ export function MaterialWizard(props: MaterialWizardProps) {
                 Далее
               </Button>
             ) : (
-              <Button type="button" onClick={submit} disabled={isBusy}>
-                {isBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              <Button type="button" onClick={submit} disabled={isBusy || submitting}>
+                {isBusy || submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
                 Готово
               </Button>
             )}

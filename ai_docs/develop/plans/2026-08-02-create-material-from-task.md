@@ -14,6 +14,13 @@
 3. Результат: `{ projectMaterialId, batchId, qualityDocumentId, displayName }`.
 4. Привязка через существующий `PUT taskMaterials.replace` (split-sync сохраняется).
 5. Persist передаёт актуальный локальный массив, чтобы не терять несохранённые правки.
+6. Результат create-пайплайна кэшируется в мастере до `onCreated`: при ошибке привязки повторяется только persist, без нового материала/партии/документа.
+7. Локальный `submitting` с синхронным ref-guard блокирует «Готово» на всём пайплайне; append результата идемпотентен по `projectMaterialId`.
+
+## Ограничения
+
+- Ошибка `onCreated` больше не требует закрывать мастер: безопасный retry реализован.
+- Ownership для остальных patch/delete/save-to-catalog/bulk materials endpoints вынесен в backlog `docs/tasktracker.md`.
 
 ## Файлы
 

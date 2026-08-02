@@ -11,9 +11,18 @@
   - [x] Кнопка «Создать новый материал» в `SelectTaskMaterials`
   - [x] Persist полного локального списка через `replaceTaskMaterials`
   - [x] Auth/ownership на используемых API
+  - [x] Идемпотентный retry привязки без повторного create/batch/doc
+  - [x] Блокировка «Готово» на всём submit-пайплайне и dedup локальной строки
   - [x] Тесты + `check`/`test`/`build`
 - **Зависимости**: `MaterialWizard`, `task_materials`, `project_materials`, split-sync
 - **Детали**: `ai_docs/develop/plans/2026-08-02-create-material-from-task.md`
+
+### Follow-up: ownership остальных materials endpoints
+- **Статус**: Backlog (вне scope merge-блокера)
+- **Описание**: Добавить auth и проверку владельца для `projectMaterials.patch`, `projectMaterials.saveToCatalog`, `projectMaterials.bulkCreate`, `materialBatches.patch/delete`; отдельно проверить `parseInvoice` на ownership объекта.
+- **Шаги выполнения**:
+  - [ ] Добавить `appAuth` и object/material ownership по образцу защищённых create/get endpoints
+  - [ ] Добавить runnable checks на 401/403 для чужого объекта или материала
 
 ---
 
