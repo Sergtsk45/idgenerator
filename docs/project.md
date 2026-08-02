@@ -82,6 +82,7 @@
   - **API**: `POST /parse` — загрузка PDF (multipart/form-data), возврат структурированного JSON с таблицами
   - **Интеграция**: backend proxy `POST /api/parse-invoice` с multer, SSRF-защита, rate-limiting
 - **Backend**: Express + TypeScript. REST API с типами/валидацией на базе `shared/routes.ts` (Zod).
+- **MCP endpoint** (`server/mcp/`): отдельный transport layer поверх REST-приложения для AI-агентов (Model Context Protocol, Streamable HTTP). REST и UI остаются основным ядром; MCP не дублирует бизнес-логику, а переиспользует `storage`/domain services. Подробности: `mcp-mvp-plan/01-architecture-and-boundaries.md`, локальное подключение — `server/mcp/README.md`.
 - **База данных**: PostgreSQL + Drizzle ORM. Схема описана в `shared/schema.ts`.
 - **AI**: OpenAI API (через переменные окружения интеграции), используется для нормализации сообщений.
 - **Навигация UI**: основные разделы в `BottomNav` на mobile, `ResponsiveShell` на tablet/desktop. Доступ к `Settings` через `secondary` на tablet/desktop, hamburger `Header` Sheet на mobile.
@@ -450,6 +451,8 @@ objects
 - **Server**
   - `PORT` — порт HTTP (по умолчанию 5000).
   - `ENABLE_DEMO_SEED=true` — (только dev) включить сидирование демо-работ в пустую БД. В production игнорируется.
+- **MCP**
+  - `MCP_ENABLED=false` — отключить endpoint `/mcp` (kill-switch). По умолчанию включён.
 
 ## Команды разработки
 См. `package.json`:
@@ -480,3 +483,5 @@ objects
 - `/docs/telegram-bot-setup.md` — пошаговая инструкция по созданию и настройке Telegram-бота.
 - `/docs/telegram-buttons-guide.md` — руководство по использованию нативных кнопок Telegram (MainButton, BackButton).
 - `/docs/telegram-haptic-guide.md` — руководство по использованию тактильной обратной связи (HapticFeedback).
+- `/mcp-mvp-plan/` — план разработки MCP-MVP (сценарий, архитектура, roadmap, задачи TASK-001…012).
+- `/server/mcp/README.md` — локальное подключение MCP-клиента к `/mcp`.

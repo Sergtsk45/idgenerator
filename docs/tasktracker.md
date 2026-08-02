@@ -2,6 +2,29 @@
 
 ---
 
+## Задача: MCP foundation — TASK-001 (mcp-mvp-plan)
+- **Статус**: Завершена
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Добавлен защищённый MCP endpoint `/mcp` (Streamable HTTP) как отдельный transport layer поверх существующего Express/REST-приложения, без переноса бизнес-логики и без изменения UI. Первый шаг дорожной карты `mcp-mvp-plan/02-implementation-roadmap.md` (Фаза 1).
+- **Шаги выполнения**:
+  - [x] Добавлена зависимость `@modelcontextprotocol/sdk`
+  - [x] `server/mcp/authContext.ts` — auth строго из `Authorization: Bearer <jwt>`, различие `missing`/`invalid`/`ok`
+  - [x] `server/mcp/errors.ts`, `toolResult.ts` — стабильные error codes и builder результата
+  - [x] `server/mcp/createMcpServer.ts` — фабрика per-request `McpServer` (stateless)
+  - [x] `server/mcp/tools/diagnostics.ts` — `ping`, `get_current_user`, `list_objects` (read-only, ownership по auth context)
+  - [x] `server/mcp/httpTransport.ts` — роут `/mcp`, rate limit, лимит тела запроса, логирование без секретов
+  - [x] Feature flag `MCP_ENABLED` в `server/index.ts`
+  - [x] Unit-тесты helper'ов (`mcp-tool-result.test.ts`)
+  - [x] Контрактные тесты по исходникам (`mcp-foundation-contract.test.ts`)
+  - [x] Интеграционные тесты handshake/auth/ownership поверх Postgres (`mcp-foundation-integration.test.ts`, skip без `DATABASE_URL`)
+  - [x] `npm run check`, `npm test`, `npm run build` — зелёные
+  - [x] Ручной smoke: initialize без auth, ping/get_current_user/list_objects с валидным JWT, `AUTH_REQUIRED`/`AUTH_INVALID`, изоляция объектов между двумя пользователями, блокированный пользователь отклонён, REST не затронут, лимит тела запроса (413)
+- **Зависимости**: нет (первая задача дорожной карты `mcp-mvp-plan`)
+- **Следующая задача**: TASK-002 (workflow state) — см. `mcp-mvp-plan/tasks/TASK-002-workflow-state.md`
+- **Известные ограничения**: только read-only diagnostic tools; Host/Origin validation, audit log, per-tool метрики — TASK-012.
+
+---
+
 ## Задача: Создание материала из задачи графика с автопривязкой
 - **Статус**: Завершена
 - **Дата фиксации**: 2026-08-02

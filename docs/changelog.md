@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-08-02] - MCP foundation: защищённый /mcp endpoint (TASK-001)
+
+### Добавлено
+- `server/mcp/` — MCP transport layer поверх существующего Express-приложения:
+  - `httpTransport.ts` — Express-роут `/mcp` (Streamable HTTP, stateless, свежий `McpServer` на каждый запрос), rate limit (120 req/min), лимит тела запроса 256 KB, structured logging без токенов/секретов.
+  - `authContext.ts` — резолвинг identity строго из `Authorization: Bearer <jwt>` (без Telegram init-data и dev browser-token fallback), различает `missing`/`invalid`/`ok`.
+  - `createMcpServer.ts` — фабрика `McpServer` с зарегистрированными diagnostic tools.
+  - `errors.ts`, `toolResult.ts` — единые machine-readable коды ошибок (`AUTH_REQUIRED`, `AUTH_INVALID`, `FORBIDDEN`, `VALIDATION_ERROR`, `INTERNAL_ERROR`) и builder успешного/ошибочного `CallToolResult`.
+  - `tools/diagnostics.ts` — read-only tools `ping`, `get_current_user`, `list_objects` (переиспользуют `storage.listUserObjects`, ownership по `userId` из проверенного auth context, не из аргументов tool).
+- Feature flag `MCP_ENABLED` (env, default `true`) — позволяет отключить `/mcp` без влияния на REST.
+- Зависимость `@modelcontextprotocol/sdk@^1.30.0`.
+- Тесты: `tests/mcp-tool-result.test.ts` (unit, без БД), `tests/mcp-foundation-contract.test.ts` (контрактные проверки исходников, без БД), `tests/mcp-foundation-integration.test.ts` (реальный HTTP handshake/auth/ownership поверх Postgres; скипается автоматически без `DATABASE_URL`).
+
+### Изменено
+- `server/index.ts` — подключён `/mcp` роут за feature flag; порядок существующих middleware и `registerRoutes` не изменён.
+
+### Известные ограничения
+- MCP-инструменты read-only и не реализуют workflow (в объёме TASK-001).
+- Host/Origin validation, audit log, метрики per-tool и полноценный kill-switch — запланированы в TASK-012.
+
+---
+
 ## [2026-08-02] - Создание материала из задачи графика с автопривязкой
 
 ### Добавлено
