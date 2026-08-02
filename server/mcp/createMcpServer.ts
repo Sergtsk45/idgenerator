@@ -19,6 +19,7 @@ import { registerDocumentIngestionTools } from "./tools/documentIngestion";
 import { registerActTools } from "./tools/acts";
 import { registerWorklogTools } from "./tools/worklog";
 import { registerExecutionPackageTools } from "./tools/executionPackage";
+import { registerMcpDiscovery } from "./discovery";
 
 const SERVER_NAME = "idgenerator-mcp";
 const SERVER_VERSION = "0.2.0";
@@ -36,6 +37,7 @@ export function createMcpServer(authResolution: McpAuthResolution): McpServer {
   registerActTools(server, authResolution);
   registerWorklogTools(server, authResolution);
   registerExecutionPackageTools(server, authResolution);
+  registerMcpDiscovery(server, authResolution);
 
   return server;
 }

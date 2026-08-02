@@ -36,7 +36,7 @@ export function registerActTools(server: McpServer, authResolution: McpAuthResol
     "generate_acts",
     {
       title: "Generate acts",
-      description: "Idempotently generates explicit draft acts or confirmed final acts from the owned workflow schedule.",
+      description: "Idempotently generates explicit draft acts or confirmed final acts from the owned workflow schedule; final mode requires confirmFinal=true and no readiness blockers.",
       inputSchema: {
         workflowId: z.number().int().positive(),
         mode: actGenerationModeSchema,
@@ -69,7 +69,7 @@ export function registerActTools(server: McpServer, authResolution: McpAuthResol
     "export_act_pdf",
     {
       title: "Export act PDF",
-      description: "Creates an owned draft or final PDF artifact for one workflow act.",
+      description: "Creates an owned draft or final PDF artifact for one workflow act without mutating act content.",
       inputSchema: {
         workflowId: z.number().int().positive(),
         actId: z.number().int().positive(),
@@ -91,7 +91,7 @@ export function registerActTools(server: McpServer, authResolution: McpAuthResol
     "export_act_attachments",
     {
       title: "Export act attachments",
-      description: "Creates an owned draft or final PDF package from one workflow act's manual or automatic attachments.",
+      description: "Creates an owned draft or final PDF package from one workflow act's attachments without changing binding state.",
       inputSchema: {
         workflowId: z.number().int().positive(),
         actId: z.number().int().positive(),

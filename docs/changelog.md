@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-08-02] - Agent contract discovery и workflow resources (TASK-011)
+
+### Добавлено
+- MCP discovery surface для workflow state: resource templates `idgenerator://workflow/{workflowId}/status`, `.../schedule-draft`, `.../material-readiness`, `.../acts-readiness`.
+- Версионированный prompt `execution_documentation_workflow` с deterministic guidance: только недостающие inputs, явные assumptions, без выдуманных facts, с confirmation gate перед approval/final actions.
+- Runtime registration discovery surface через общую `createMcpServer` фабрику.
+- DB-gated smoke/tests для discovery, end-to-end workflow contract и recovery coverage.
+
+### Изменено
+- `calculate_schedule_draft`, `approve_schedule`, `generate_acts`, `export_act_pdf`, `export_act_attachments` получили более честные descriptions о сайд-эффектах.
+- Prompt/resource payloads читают persisted workflow state и не перезапускают workflow.
+
+### Контракты и совместимость
+- Discovery ресурсы возвращают versioned JSON payloads, пригодные для agent guidance и manual smoke.
+- DB-backed TASK-011 тесты скипаются без `DATABASE_URL`; prompt/resource discovery не требует LLM execution.
+
 ## [2026-08-02] - Черновик журнала и execution package (TASK-010)
 
 ### Добавлено

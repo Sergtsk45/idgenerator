@@ -12,7 +12,7 @@ export function registerSchedulePlanningTools(server: McpServer, authResolution:
     "calculate_schedule_draft",
     {
       title: "Calculate schedule draft",
-      description: "Calculates and stores a deterministic versioned linear schedule draft from current confirmed inputs.",
+      description: "Calculates and stores a deterministic versioned linear schedule draft from the current confirmed inputs, updating the workflow draft stage only when the draft changes.",
       inputSchema: {
         workflowId: z.number().int().positive(),
         expectedVersion: z.number().int().nonnegative(),
@@ -50,7 +50,7 @@ export function registerSchedulePlanningTools(server: McpServer, authResolution:
     "approve_schedule",
     {
       title: "Approve schedule",
-      description: "Approves one fresh draft version and atomically creates the schedule and linked estimate tasks.",
+      description: "Approves one fresh draft version, changes workflow stage to approved, and atomically creates the schedule with linked estimate tasks.",
       inputSchema: {
         workflowId: z.number().int().positive(),
         draftVersion: z.number().int().positive(),

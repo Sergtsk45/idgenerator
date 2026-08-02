@@ -1,7 +1,7 @@
 # MCP endpoint — локальное подключение
 
 `POST/GET/DELETE /mcp` — Streamable HTTP, **stateless** (каждый HTTP-запрос обслуживается
-новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-010 из
+новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-011 из
 [`mcp-mvp-plan`](../../mcp-mvp-plan/).
 
 ## Требования
@@ -125,6 +125,19 @@ Worklog различает `planned`, `reported`, `act_confirmed`; назван�
 
 Все tools ownership-scoped по `userId` из проверенного JWT — не из аргументов вызова.
 
+### Agent contract, workflow resources и prompts (TASK-011)
+
+| Resource / Prompt | Описание |
+|---|---|
+| `idgenerator://workflow/{workflowId}/status` | Текущий workflow snapshot с inputs, missing inputs, readiness и hash |
+| `idgenerator://workflow/{workflowId}/schedule-draft` | Последний schedule draft и `fresh`-признак |
+| `idgenerator://workflow/{workflowId}/material-readiness` | Material register, missing quality documents и blockers |
+| `idgenerator://workflow/{workflowId}/acts-readiness` | Acts readiness и structured blockers |
+| `execution_documentation_workflow` | Версионированный prompt v1: only missingInputs, explicit assumptions, no invention, confirmation before approval/final actions, continue current stage |
+
+`resources/list` и `prompts/list` возвращают только owned workflows текущего пользователя.
+`prompts/get` ожидает `workflowId` и возвращает system+user messages без запуска модели.
+
 ## Быстрая проверка через curl
 
 ```bash
@@ -145,6 +158,25 @@ curl -s -X POST http://localhost:5000/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_objects","arguments":{}}}'
+
+# 4) list resources / prompts
+curl -s -X POST http://localhost:5000/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"resources/list","params":{}}'
+
+curl -s -X POST http://localhost:5000/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":4,"method":"prompts/list","params":{}}'
+
+curl -s -X POST http://localhost:5000/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":5,"method":"prompts/get","params":{"name":"execution_documentation_workflow","arguments":{"workflowId":123}}}'
 ```
 
 ## Подключение MCP-клиента (например, Cursor/Claude Desktop)

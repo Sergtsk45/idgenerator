@@ -195,6 +195,21 @@
 - **Следующая задача**: TASK-011 (agent-contract E2E)
 - **Известные ограничения**: worklog является черновиком, а не заявлением полной нормативной формы ОЖР; ZIP использует store-only без compression; DB integration body требует `DATABASE_URL`; crash-orphan package требует будущей cleanup job.
 
+## Задача: Agent contract discovery и workflow resources — TASK-011 (mcp-mvp-plan)
+- **Статус**: Завершена локально
+- **Дата фиксации**: 2026-08-02
+- **Описание**: MCP discovery surface для workflow status/schedule/material/acts readiness и prompt `execution_documentation_workflow` с deterministic agent guidance.
+- **Шаги выполнения**:
+  - [x] Resource templates для workflow status, schedule draft, material readiness и acts readiness
+  - [x] Версионированный prompt `execution_documentation_workflow` с explicit assumptions и gating на confirmation
+  - [x] MCP registration через общую фабрику сервера
+  - [x] Side-effect descriptions для schedule planning и acts tools
+  - [x] Contract, E2E и recovery coverage с DB-gated smoke
+  - [x] `npm run check`, `npm test`, `npm run build`
+- **Зависимости**: TASK-010
+- **Следующая задача**: TASK-012 (host/origin validation + audit log + per-tool metrics)
+- **Известные ограничения**: DB integration body требует `DATABASE_URL`; workflow resources read current persisted state and do not restart the workflow.
+
 ---
 
 ## Задача: Создание материала из задачи графика с автопривязкой
