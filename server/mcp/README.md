@@ -1,7 +1,7 @@
 # MCP endpoint — локальное подключение
 
 `POST/GET/DELETE /mcp` — Streamable HTTP, **stateless** (каждый HTTP-запрос обслуживается
-новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001 + TASK-002 из
+новым `McpServer`; сессии/`Mcp-Session-Id` не используются). Реализует TASK-001–TASK-003 из
 [`mcp-mvp-plan`](../../mcp-mvp-plan/).
 
 ## Требования
@@ -12,7 +12,8 @@
   JWT — тот же, что выдаёт `POST /api/auth/login` / `/api/auth/register`.
 - Лимит тела запроса — 256 KB, обеспечивается собственным JSON-парсером `/mcp`
   (не связан с 10 MB лимитом REST): превышение → `413 PAYLOAD_TOO_LARGE`.
-- Перед использованием workflow-tools применить миграции `0029` и `0030`.
+- Перед использованием workflow/upload tools применить миграции `0029`–`0031`.
+- Для persistent хранения XLSX задайте `ESTIMATE_UPLOAD_DIR` (по умолчанию `uploads/estimates`).
 
 ## Доступные tools
 
@@ -32,6 +33,17 @@
 | `get_execution_workflow` | Текущий stage/version/inputs/missing inputs |
 | `get_missing_workflow_inputs` | Временный список вопросов планирования графика |
 | `set_workflow_input` | Сохраняет input с `expectedVersion` + `idempotencyKey` |
+
+### Estimate upload (TASK-003)
+
+| Tool | Описание |
+|---|---|
+| `create_upload_session` | Создаёт одноразовую 30-минутную XLSX-сессию и возвращает authenticated upload URL |
+| `import_estimate_from_upload` | Импортирует XLSX, привязывает estimate к workflow и consumed upload (idempotent) |
+
+Upload выполняется как `multipart/form-data`, поле `file`, на возвращённый URL с тем же
+`Authorization: Bearer <jwt>`. Допускается только `.xlsx` с MIME
+`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, лимит — 20 MB.
 
 Все tools ownership-scoped по `userId` из проверенного JWT — не из аргументов вызова.
 
@@ -81,10 +93,15 @@ curl -s -X POST http://localhost:5000/mcp \
 `AUTH_REQUIRED`, `AUTH_INVALID`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`,
 `INTERNAL_ERROR`, `WORKFLOW_VERSION_CONFLICT`, `WORKFLOW_TRANSITION_NOT_ALLOWED`.
 
+TASK-003 также возвращает `UPLOAD_EXPIRED`, `UPLOAD_NOT_FOUND`,
+`UPLOAD_ALREADY_CONSUMED`, `FILE_TYPE_NOT_ALLOWED`, `FILE_TOO_LARGE`,
+`ESTIMATE_IMPORT_FAILED`.
+
 Для конфликтов версий может присутствовать `recoverable: true`.
 
 ## Известные ограничения
 
 - `get_missing_workflow_inputs` — временный базовый контракт; замена в TASK-005.
-- Переходы stage выполняет внутренний `transitionWorkflowStage` (orchestration tools — TASK-003+).
+- `create_upload_session` и `import_estimate_from_upload` выполняют свои stage transitions серверно.
+- Автоматическая уборка истёкших/осиротевших upload-файлов пока не реализована.
 - Host/Origin validation для `/mcp`, audit log и per-tool метрики — TASK-012.

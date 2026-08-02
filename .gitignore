@@ -7,6 +7,7 @@ vite.config.ts.*
 # Generated PDFs
 generated_pdfs/
 uploads/documents/
+uploads/estimates/
 test-output-*.pdf
 # Local / temp
 tmp/

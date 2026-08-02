@@ -11,6 +11,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpAuthResolution } from "./authContext";
 import { registerDiagnosticTools } from "./tools/diagnostics";
 import { registerWorkflowTools } from "./tools/workflow";
+import { registerUploadTools } from "./tools/uploads";
 
 const SERVER_NAME = "idgenerator-mcp";
 const SERVER_VERSION = "0.2.0";
@@ -20,6 +21,7 @@ export function createMcpServer(authResolution: McpAuthResolution): McpServer {
 
   registerDiagnosticTools(server, authResolution);
   registerWorkflowTools(server, authResolution);
+  registerUploadTools(server, authResolution);
 
   return server;
 }

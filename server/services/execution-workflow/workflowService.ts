@@ -69,7 +69,7 @@ function hashRequest(payload: unknown): string {
  *     the same transaction — so a failure anywhere (including a losing CAS) rolls back
  *     the claim too, leaving the idempotencyKey free for a legitimate retry.
  */
-async function withIdempotency<T>(
+export async function withIdempotency<T>(
   userId: number,
   toolName: string,
   idempotencyKey: string,
@@ -113,7 +113,7 @@ async function withIdempotency<T>(
 }
 
 /** Loads a workflow and verifies ownership, hiding existence from non-owners (404, not 403). */
-async function loadOwnedWorkflow(client: DbClient, auth: McpAuthContext, workflowId: number): Promise<ExecutionWorkflow> {
+export async function loadOwnedWorkflow(client: DbClient, auth: McpAuthContext, workflowId: number): Promise<ExecutionWorkflow> {
   const row = await repo.getWorkflowById(client, workflowId);
   if (!row || row.userId !== auth.userId) {
     throw new McpToolError(MCP_ERROR_CODES.NOT_FOUND, "Workflow not found");

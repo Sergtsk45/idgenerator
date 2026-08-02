@@ -46,6 +46,24 @@
 - **Следующая задача**: TASK-003 (upload + estimate import)
 - **Известные ограничения**: `get_missing_workflow_inputs` — временный статичный список (замена в TASK-005); stage transitions — через внутренний `transitionWorkflowStage` для TASK-003+.
 
+## Задача: MCP upload + estimate import — TASK-003 (mcp-mvp-plan)
+- **Статус**: Завершена (в main; деплой миграции 0031 отдельно)
+- **Дата фиксации**: 2026-08-02
+- **Описание**: Безопасная двухэтапная загрузка XLSX через owner-scoped upload session и атомарный импорт сметы в execution workflow.
+- **Шаги выполнения**:
+  - [x] Миграция `0031_upload_sessions.sql` и Drizzle schema
+  - [x] MCP tools `create_upload_session`, `import_estimate_from_upload`
+  - [x] Authenticated multipart endpoint `POST /api/mcp/uploads/:uploadId`, opt-in вместе с MCP
+  - [x] Extension/MIME/ZIP-signature/20 MB/SHA-256/30 min expiry validation
+  - [x] Непрогнозируемый storage key и защита пути
+  - [x] Общий DB import service для REST и MCP без дублирования правил
+  - [x] Атомарные estimate create + workflow link/stage/event + upload consume + idempotency
+  - [x] Unit/contract/integration tests; DB integration skip без `DATABASE_URL`
+  - [x] `npm run check`, `npm test`, `npm run build`
+- **Зависимости**: TASK-001, TASK-002
+- **Следующая задача**: TASK-004 (детерминированный анализ сметы)
+- **Известные ограничения**: поддерживается только `.xlsx`; storage требует persistent `ESTIMATE_UPLOAD_DIR`; автоматическая уборка истёкших/осиротевших файлов остаётся эксплуатационной задачей.
+
 ---
 
 ## Задача: Создание материала из задачи графика с автопривязкой

@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { db } from "./db";
+import { importEstimate as importEstimateThroughService } from "./services/estimateImportService";
 import {
   objects,
   objectParties,
@@ -2397,62 +2398,7 @@ export class DatabaseStorage implements IStorage {
     positions: Array<Omit<InsertEstimatePosition, "estimateId" | "sectionId"> & { sectionNumber?: string | null }>;
     resources: Array<Omit<InsertPositionResource, "positionId"> & { positionLineNo: string }>;
   }, objectId: number): Promise<{ estimateId: number; sections: number; positions: number; resources: number }> {
-    const { estimate, sections, positions, resources } = payload;
-
-    return await db.transaction(async (tx) => {
-      const [createdEstimate] = await tx.insert(estimates).values({ ...estimate, objectId } as any).returning();
-
-      const sectionIdByNumber = new Map<string, number>();
-      let sectionCount = 0;
-      for (const s of sections) {
-        const [created] = await tx
-          .insert(estimateSections)
-          .values({ ...s, estimateId: createdEstimate.id })
-          .returning();
-        sectionIdByNumber.set(created.number, created.id);
-        sectionCount++;
-      }
-
-      const positionIdByLineNo = new Map<string, number>();
-      let positionCount = 0;
-      for (const p of positions) {
-        const sectionId =
-          p.sectionNumber && sectionIdByNumber.has(p.sectionNumber) ? sectionIdByNumber.get(p.sectionNumber)! : null;
-
-        const values: InsertEstimatePosition = {
-          ...p,
-          estimateId: createdEstimate.id,
-          sectionId,
-        } as any;
-        delete (values as any).sectionNumber;
-
-        const [created] = await tx.insert(estimatePositions).values(values).returning();
-        positionIdByLineNo.set(created.lineNo, created.id);
-        positionCount++;
-      }
-
-      let resourceCount = 0;
-      for (const r of resources) {
-        const positionId = positionIdByLineNo.get(r.positionLineNo);
-        if (!positionId) continue;
-
-        const values: InsertPositionResource = {
-          ...r,
-          positionId,
-        } as any;
-        delete (values as any).positionLineNo;
-
-        await tx.insert(positionResources).values(values);
-        resourceCount++;
-      }
-
-      return {
-        estimateId: createdEstimate.id,
-        sections: sectionCount,
-        positions: positionCount,
-        resources: resourceCount,
-      };
-    });
+    return importEstimateThroughService(payload, objectId);
   }
 
   async deleteEstimate(id: number, options?: { resetScheduleIfInUse?: boolean }): Promise<boolean> {

@@ -5,12 +5,64 @@
  * @created: 2026-03-18
  */
 
-import type { Express } from 'express';
+import type { Express, NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { api } from '@shared/routes';
 import { storage, appAuth } from './_common';
+import { importEstimate } from '../services/estimateImportService';
+import { ESTIMATE_UPLOAD_MAX_BYTES } from '../estimate-upload-files';
+import { MCP_ERROR_CODES, McpToolError } from '../mcp/errors';
+import { storeEstimateUpload } from '../services/estimateUploadService';
+
+const estimateUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: ESTIMATE_UPLOAD_MAX_BYTES } });
+const estimateUploadRateLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
+
+function receiveEstimateUpload(req: Request, res: Response, next: NextFunction): void {
+  estimateUpload.single('file')(req, res, (error: unknown) => {
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ code: MCP_ERROR_CODES.FILE_TOO_LARGE, message: 'Estimate file is too large' });
+    }
+    if (error) return res.status(400).json({ code: MCP_ERROR_CODES.FILE_TYPE_NOT_ALLOWED, message: 'Invalid upload' });
+    next();
+  });
+}
+
+function uploadErrorStatus(error: McpToolError): number {
+  if (error.code === MCP_ERROR_CODES.UPLOAD_NOT_FOUND) return 404;
+  if (error.code === MCP_ERROR_CODES.UPLOAD_EXPIRED || error.code === MCP_ERROR_CODES.UPLOAD_ALREADY_CONSUMED) return 409;
+  if (error.code === MCP_ERROR_CODES.FILE_TOO_LARGE) return 413;
+  return 400;
+}
 
 export function registerEstimateRoutes(app: Express): void {
+  if (process.env.MCP_ENABLED === 'true') {
+    app.post(
+      '/api/mcp/uploads/:uploadId',
+      estimateUploadRateLimiter,
+      ...appAuth,
+      receiveEstimateUpload,
+      async (req, res) => {
+        if (!req.file) return res.status(400).json({ code: MCP_ERROR_CODES.FILE_TYPE_NOT_ALLOWED, message: 'XLSX file is required' });
+        try {
+          const result = await storeEstimateUpload(
+            { userId: req.user!.id, displayName: req.user!.displayName, email: req.user!.email, role: req.user!.role },
+            String(req.params.uploadId),
+            req.file,
+          );
+          return res.status(200).json(result);
+        } catch (error) {
+          if (error instanceof McpToolError) {
+            return res.status(uploadErrorStatus(error)).json({ code: error.code, message: error.message });
+          }
+          console.error('Estimate upload failed:', error);
+          return res.status(500).json({ code: MCP_ERROR_CODES.INTERNAL_ERROR, message: 'Internal Server Error' });
+        }
+      },
+    );
+  }
+
   // ── Estimates (Сметы / ЛСР) ────────────────────────────────────────────────
 
   // GET /api/estimates — список смет текущего объекта
@@ -44,7 +96,7 @@ export function registerEstimateRoutes(app: Express): void {
     try {
       const input = api.estimates.import.input.parse(req.body);
       const obj = await storage.getCurrentObject(req.user!.id);
-      const result = await storage.importEstimate(input as any, obj.id);
+      const result = await importEstimate(input, obj.id);
       return res.status(200).json(result);
     } catch (err) {
       if (err instanceof z.ZodError) {

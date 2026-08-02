@@ -894,6 +894,41 @@ export const executionWorkflowEvents = pgTable(
   })
 );
 
+export const uploadSessions = pgTable(
+  "upload_sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    objectId: integer("object_id")
+      .notNull()
+      .references(() => objects.id, { onDelete: "cascade" }),
+    workflowId: integer("workflow_id")
+      .notNull()
+      .references(() => executionWorkflows.id, { onDelete: "cascade" }),
+    purpose: text("purpose").notNull(),
+    status: text("status").notNull().default("pending"),
+    storageKey: text("storage_key").notNull().unique(),
+    originalFilename: text("original_filename").notNull(),
+    mimeType: text("mime_type"),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
+    sha256: text("sha256"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    estimateId: integer("estimate_id").references(() => estimates.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdIdx: index("upload_sessions_user_id_idx").on(t.userId),
+    workflowIdIdx: index("upload_sessions_workflow_id_idx").on(t.workflowId),
+    expiresAtIdx: index("upload_sessions_expires_at_idx").on(t.expiresAt),
+    purposeCheck: check("upload_sessions_purpose_check", sql`purpose IN ('estimate')`),
+    statusCheck: check("upload_sessions_status_check", sql`status IN ('pending', 'uploaded', 'consumed')`),
+  }),
+);
+
 // Idempotency records for write MCP tools. A repeated call with the same
 // (userId, toolName, idempotencyKey) short-circuits and returns the stored result
 // instead of re-executing the mutation.
@@ -927,6 +962,9 @@ export type InsertExecutionWorkflowInput = typeof executionWorkflowInputs.$infer
 
 export type ExecutionWorkflowEvent = typeof executionWorkflowEvents.$inferSelect;
 export type InsertExecutionWorkflowEvent = typeof executionWorkflowEvents.$inferInsert;
+
+export type UploadSession = typeof uploadSessions.$inferSelect;
+export type InsertUploadSession = typeof uploadSessions.$inferInsert;
 
 export type ToolIdempotencyRecord = typeof toolIdempotencyRecords.$inferSelect;
 export type InsertToolIdempotencyRecord = typeof toolIdempotencyRecords.$inferInsert;

@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-08-02] - MCP upload sessions и импорт сметы (TASK-003)
+
+### Добавлено
+- `upload_sessions` и миграция `0031_upload_sessions.sql`: owner/object/workflow/purpose scope, expiry, status, SHA-256 и связь с импортированной сметой.
+- MCP tools `create_upload_session` и `import_estimate_from_upload`.
+- Защищённый multipart endpoint `POST /api/mcp/uploads/:uploadId` с Bearer auth, rate limit и лимитом 20 MB.
+- Проверки `.xlsx`, официального MIME, ZIP-сигнатуры, имени файла, срока жизни и ownership; случайный storage key.
+- Unit/contract/DB integration tests для file validation, traversal, discovery wiring, ownership, expiry, consumption и idempotent retry.
+
+### Изменено
+- REST `/api/estimates/import` и MCP используют единый `estimateImportService`.
+- Импорт через MCP атомарно создаёт смету, связывает её с workflow, переводит stage в `estimate_imported`, пишет event и помечает upload consumed.
+
+### Известные ограничения
+- Только XLSX; PDF/XLS/RTF и внешние URL не принимаются.
+- Для сохранения файлов в deploy нужен persistent `ESTIMATE_UPLOAD_DIR`.
+
+---
+
 ## [2026-08-02] - Unified MCP MVP deploy: TASK-001 foundation + TASK-002 workflow
 
 ### Добавлено
