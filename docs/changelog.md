@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-03] - Runbook полировки MCP-агента в Cursor
+
+### Добавлено
+- `docs/mcp-cursor-polish-runbook.md` — пошаговый чеклист подключения Cursor к `/mcp`, сквозной сценарий A–H, негативные проверки и Definition of Done перед UI-вариантом B (экран «Ассистент»).
+
+### Изменено
+- Зафиксирована рекомендуемая последовательность: сначала стабилизировать агента во внешнем MCP-клиенте (Cursor), затем строить in-app Assistant UI.
+
+---
+
 ## [2026-08-02] - Security hardening, telemetry и rollout notes (TASK-012)
 
 ### Добавлено
