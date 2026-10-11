@@ -108,8 +108,16 @@ test("TASK-009 REST generation and exports share services and artifact downloads
 
 test("TASK-009 scopes duplicate act numbers by workflow/object instead of globally", async () => {
   const migration = await readFile("migrations/0036_act_workflow_artifacts.sql", "utf8");
+  const compatibilityMigration = await readFile(
+    "migrations/0038_drop_global_act_number_unique.sql",
+    "utf8",
+  );
 
   assert.match(migration, /DROP (?:CONSTRAINT|INDEX)[^;]*acts_act_number_unique/i);
+  assert.match(
+    compatibilityMigration,
+    /ALTER TABLE "acts" DROP CONSTRAINT IF EXISTS "acts_act_number_key"/i,
+  );
   assert.match(
     migration,
     /CREATE UNIQUE INDEX[^;]*acts_workflow_act_number_uq[\s\S]*?\("workflow_id",\s*"act_number"\)/i,

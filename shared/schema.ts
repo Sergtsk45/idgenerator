@@ -648,7 +648,7 @@ export const scheduleTasks = pgTable(
     estimatePositionId: integer("estimate_position_id").references(() => estimatePositions.id, {
       onDelete: "cascade",
     }),
-    // Act number this task belongs to (global). Nullable = not assigned to an act.
+    // Act number within the task's workflow/object. Nullable = not assigned to an act.
     actNumber: integer("act_number"),
     actTemplateId: integer("act_template_id").references(() => actTemplates.id, { onDelete: "set null" }),
     // Task-scoped docs for act generation
