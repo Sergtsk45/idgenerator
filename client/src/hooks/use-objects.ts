@@ -40,9 +40,10 @@ export function useCreateObject() {
       }
       return api.objects.create.responses[200].parse(await res.json());
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["objects"] });
-      queryClient.invalidateQueries({ queryKey: CURRENT_OBJECT_QUERY_KEY });
+    onSuccess: async () => {
+      // Creating an object also makes it current on the server, so every
+      // object-scoped query must be reloaded before the mutation completes.
+      await queryClient.invalidateQueries();
     },
   });
 }
