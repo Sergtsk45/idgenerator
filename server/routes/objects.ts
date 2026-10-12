@@ -8,11 +8,28 @@
 import type { Express } from 'express';
 import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
+import multer from 'multer';
 import { api } from '@shared/routes';
 import { getQuota } from '@shared/tariff-features';
 import { storage, appAuth } from './_common';
 import { db } from '../db';
 import { objects } from '@shared/schema';
+import { extractTextFromBuffer } from './_documentParser';
+import { extractSourceDataFromText } from './_openai';
+
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['.pdf', '.docx', '.doc', '.txt'];
+    const name = file.originalname.toLowerCase();
+    if (allowed.some((ext) => name.endsWith(ext))) {
+      cb(null, true);
+    } else {
+      cb(new Error('Принимаются только PDF, DOCX, DOC, TXT файлы'));
+    }
+  },
+});
 
 export function registerObjectRoutes(app: Express): void {
 
@@ -193,6 +210,35 @@ export function registerObjectRoutes(app: Express): void {
       return res.status(500).json({ message: "Internal Server Error" });
     }
   });
+
+  // POST /api/object/current/extract-source-data — AI-извлечение реквизитов из документа
+  app.post(
+    api.object.extractSourceData.path,
+    ...appAuth,
+    documentUpload.single('document'),
+    async (req, res) => {
+      if (!req.file) {
+        return res.status(400).json({ message: 'Файл не прикреплён (поле "document")' });
+      }
+      try {
+        const text = await extractTextFromBuffer(req.file.buffer, req.file.originalname);
+        if (!text.trim()) {
+          return res.status(400).json({ message: 'Не удалось извлечь текст из документа' });
+        }
+        const extracted = await extractSourceDataFromText(text);
+        return res.status(200).json({ extracted });
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('API key')) {
+          return res.status(503).json({ message: 'OpenAI API не настроен на сервере' });
+        }
+        if (err instanceof Error && err.message.includes('формат')) {
+          return res.status(400).json({ message: err.message });
+        }
+        console.error('extract-source-data failed:', err);
+        return res.status(500).json({ message: 'Ошибка обработки документа' });
+      }
+    },
+  );
 }
 
 // ── Quota helper (used by tariff routes) ──────────────────────────────────────

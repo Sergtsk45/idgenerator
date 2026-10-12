@@ -1,6 +1,6 @@
 /**
  * @file: use-source-data.ts
- * @description: React Query hooks для чтения/сохранения анкеты “Исходные данные” текущего объекта.
+ * @description: React Query hooks для чтения/сохранения анкеты "Исходные данных" текущего объекта.
  * @dependencies: @shared/routes, @tanstack/react-query
  * @created: 2026-01-27
  */
@@ -54,6 +54,27 @@ export function useSaveSourceData() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.object.getSourceData.path] });
       queryClient.invalidateQueries({ queryKey: CURRENT_OBJECT_QUERY_KEY });
+    },
+  });
+}
+
+export function useExtractSourceData() {
+  return useMutation({
+    mutationFn: async (file: File): Promise<Partial<SourceDataDto>> => {
+      const formData = new FormData();
+      formData.append("document", file);
+      const res = await fetch(api.object.extractSourceData.path, {
+        method: "POST",
+        headers: createApiHeaders(false), // без Content-Type — multer сам определит boundary
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Ошибка извлечения данных");
+      }
+      const json = await res.json();
+      return json.extracted as Partial<SourceDataDto>;
     },
   });
 }

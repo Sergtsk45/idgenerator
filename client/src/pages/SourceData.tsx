@@ -27,6 +27,7 @@ import { MaterialWizard } from "@/components/materials/MaterialWizard";
 import { useProjectMaterials } from "@/hooks/use-materials";
 import { useCurrentObject, useSaveSourceData, useSourceData } from "@/hooks/use-source-data";
 import { COPY_CERTIFIER_ROLE, type SourceDataDto } from "@shared/routes";
+import { ExtractFromDocumentButton } from "@/components/source-data/ExtractFromDocumentDialog";
 
 function emptySourceData(): SourceDataDto {
   return {
@@ -201,6 +202,14 @@ export default function SourceData() {
               </span>
               <ChevronDown className="h-4 w-4 text-[--p500] shrink-0" />
             </button>
+
+            <ExtractFromDocumentButton
+              draft={draft}
+              onApply={(merged) => {
+                setDraft(merged);
+                setInitialized(true);
+              }}
+            />
 
             <Button
               type="button"

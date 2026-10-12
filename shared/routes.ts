@@ -381,6 +381,16 @@ export const api = {
         404: z.object({ message: z.string() }),
       },
     },
+    extractSourceData: {
+      method: 'POST' as const,
+      path: '/api/object/current/extract-source-data',
+      // multipart/form-data, field: "document" — input не описывается через Zod
+      responses: {
+        200: z.object({ extracted: sourceDataDtoSchema.partial().deepPartial() }),
+        400: z.object({ message: z.string() }),
+        503: z.object({ message: z.string() }),
+      },
+    },
   },
   materialsCatalog: {
     search: {
