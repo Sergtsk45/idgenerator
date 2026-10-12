@@ -13,9 +13,10 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { createRequire } from 'module';
 
-// CJS-сборка: import.meta.url пустой, используем __filename (как в pdfGenerator)
-const require = createRequire(__filename);
-const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
+// Работает и в dev (ESM, нет __filename), и в CJS-сборке (import.meta.url пустой) — как в pdfGenerator
+const require = createRequire(join(process.cwd(), 'server/routes/_documentParser.ts'));
+// pdf-parse v2: экспортирует класс PDFParse (в v1 был default-функцией)
+const { PDFParse } = require('pdf-parse') as typeof import('pdf-parse');
 const execFileAsync = promisify(execFile);
 
 const MAX_CHARS = 15_000;
@@ -35,8 +36,13 @@ export async function extractTextFromBuffer(
   let text: string;
 
   if (lower.endsWith('.pdf')) {
-    const result = await pdfParse(buffer);
-    text = result.text;
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      text = result.text;
+    } finally {
+      await parser.destroy();
+    }
   } else if (lower.endsWith('.docx') || lower.endsWith('.doc') || lower.endsWith('.txt')) {
     text = await extractViaScript(buffer, lower.endsWith('.docx') ? '.docx' : lower.endsWith('.doc') ? '.doc' : '.txt');
   } else {
